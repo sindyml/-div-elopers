@@ -20,12 +20,12 @@
    ============================================================ */
 
 const firebaseConfig = {
-  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
-  authDomain:        "REPLACE_WITH_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket:     "REPLACE_WITH_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
-  appId:             "REPLACE_WITH_YOUR_APP_ID"
+  apiKey:            "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
+  authDomain:        "stokvel-database.firebaseapp.com",
+  projectId:         "stokvel-database",
+  storageBucket:     "stokvel-database.firebasestorage.app",
+  messagingSenderId: "997328421094",
+  appId:             "1:997328421094:web:9f88bf8ac720b118d97b27"
 };
 
 // ── Initialise Firebase ──────────────────────────────────────
