@@ -8,4 +8,22 @@
         <!-- idk what to put here yet. for defining client-side javaScript at a later point-->
     </script>
 </head>
+<body>
+    <h1>Position: Admin/Treasurer</h1>
+    <h2>Name & Surname</h2>
+    <hr> 
+    <form> 
+        <label for="meeting date">Select a meeting date:</label>
+        <input type="date" id="meeting date"> <!--do i need to add a name-->
+        <label for="meeting times">Select a meeting start time between 8AM and 8PM:</label>
+        <input type="time" id="meeting times" min="08:00" max="20:00" step="900" required> <!--do i need to add a name-->
+    </form>
+    <hr>
+    <form>
+        <label for="agenda">Meeting Agenda:</label>
+        <textarea id="agenda" rows="10" cols="30">Fill in meeting agenda notes here...</textarea>
+        <!--how to make the textarea text here greyed out?-->
+    </form>
+    <hr>
+</body>
 </html>
