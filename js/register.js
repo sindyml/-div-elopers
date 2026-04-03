@@ -1,5 +1,5 @@
 // js/register.js
-
+console.log("register is running")
 import { auth, db } from "./firebase-config.js";
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
