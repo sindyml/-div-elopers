@@ -1,29 +1,58 @@
-<!-- pages/register.html -->
-
+<!-- register.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Register</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — Stokvel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/register.css" />
 </head>
 <body>
-<link rel="stylesheet" href="..css/styles.css"
-<h2>Register</h2>
+  <div class="register-page">
+    <div class="register-card">
+      <div class="register-card__header">
+        <div class="register-card__logo">Stokvel</div>
+        <h1 class="register-card__title">Create an account</h1>
+        <p class="register-card__sub">Join your stokvel and start saving together</p>
+      </div>
 
-<form id="registerForm">
-  <input type="email" id="email" placeholder="Email" required>
-  <input type="password" id="password" placeholder="Password" required>
+      <div class="register-card__body">
+        <div id="alertMessage" class="alert alert--hidden"></div>
 
-  <select id="role">
-    <option value="Member">Member</option>
-    <option value="Treasurer">Treasurer</option>
-    <option value="Admin">Admin</option>
-  </select>
+        <form id="registerForm">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="email" class="form-input" placeholder="you@example.com" required>
+          </div>
 
-  <button type="submit">Register</button>
-</form>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="password" class="form-input" placeholder="Create a strong password" required>
+          </div>
 
-</div>
-<script type="module" src="../js/register.js"></script>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select id="role" class="form-select">
+              <option value="Member">Member</option>
+              <option value="Treasurer">Treasurer</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
 
+          <button type="submit" class="btn btn--primary btn--full">Create account</button>
+        </form>
+      </div>
+
+      <div class="register-card__footer">
+        <p>Already have an account? <a href="login.html">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/register.js"></script>
 </body>
 </html>
