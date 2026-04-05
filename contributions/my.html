@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StokPal - My Contributions</title>
+    <!-- CSS will be added later in separate file -->
+</head>
+<body>
+
+    <header>
+        <h1>StokPal</h1>
+        <button id="logoutButton">Logout</button>
+    </header>
+
+    <main>
+        <h1>Contribution Tracking</h1>
+
+        <!-- Container where each group's section will be inserted -->
+        <section id="groupsContainer"></section>
+    </main>
+
+    <script type="module">
+        // Import Firebase auth and your functions
+        import { auth } from '../js/firebase-config.js';
+        import { 
+            getCurrentUserId, 
+            listenToMemberContributions,
+            getPayoutSchedule 
+        } from '../js/contributions.js';
+
+        // ============================================================
+        // LOGOUT FUNCTION
+        // ============================================================
+        async function logout() {
+            try {
+                await auth.signOut();
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        // ============================================================
+        // GET USER'S GROUPS (TEMPORARY - will come from Person 3 later)
+        // ============================================================
+        // For now, hardcode a mock group. When Person 3's groups feature is ready,
+        // you will fetch real groups from Firestore.
+        async function getUserGroups(userId) {
+            // TODO: Replace with actual groups query from Person 3
+            // This is temporary mock data
+            return [
+                { id: 'group_1', name: 'Thabo\'s Stokvel' },
+                { id: 'group_2', name: 'Family Fund' }
+            ];
+        }
+
+        // ============================================================
+        // DISPLAY CONTRIBUTIONS FOR ONE GROUP
+        // ============================================================
+        function renderGroupSection(group, contributions) {
+            // Create a section for this group
+            const section = document.createElement('section');
+            section.setAttribute('data-group-id', group.id);
+
+            // Group heading
+            const heading = document.createElement('h2');
+            heading.textContent = `Your contributions for group: ${group.name}`;
+            section.appendChild(heading);
+
+            // Create table
+            const table = document.createElement('table');
+
+            // Table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Amount', 'Date', 'Status'];
+            headers.forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // Table body
+            const tbody = document.createElement('tbody');
+            contributions.forEach(contribution => {
+                const row = document.createElement('tr');
+                
+                // Amount cell
+                const amountCell = document.createElement('td');
+                amountCell.textContent = `R${contribution.amount}`;
+                row.appendChild(amountCell);
+                
+                // Date cell
+                const dateCell = document.createElement('td');
+                dateCell.textContent = contribution.date;
+                row.appendChild(dateCell);
+                
+                // Status cell
+                const statusCell = document.createElement('td');
+                statusCell.textContent = contribution.status === 'confirmed' ? '✅ Confirmed' : '❌ Missed';
+                row.appendChild(statusCell);
+                
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            section.appendChild(table);
+
+            // Payout button
+            const payoutButton = document.createElement('button');
+            payoutButton.textContent = 'View Payout Schedule';
+            payoutButton.addEventListener('click', () => {
+                // Navigate to payout page with group ID in URL
+                window.location.href = `payout.html?groupId=${group.id}`;
+            });
+            section.appendChild(payoutButton);
+
+            return section;
+        }
+
+        // ============================================================
+        // LOAD ALL GROUPS AND SET UP REAL-TIME LISTENERS
+        // ============================================================
+        async function loadAllGroups() {
+            const currentUserId = getCurrentUserId();
+            if (!currentUserId) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // Get all groups this user belongs to
+            const groups = await getUserGroups(currentUserId);
+            const container = document.getElementById('groupsContainer');
+            
+            // Clear container
+            container.innerHTML = '';
+
+            // For each group, set up a real-time listener
+            groups.forEach(group => {
+                // Start listening to contributions for this group's member
+                const unsubscribe = listenToMemberContributions(currentUserId, (contributions) => {
+                    // Filter contributions for this specific group
+                    const groupContributions = contributions.filter(c => c.groupId === group.id);
+                    
+                    // Check if this group's section already exists
+                    let existingSection = container.querySelector(`section[data-group-id="${group.id}"]`);
+                    
+                    if (existingSection) {
+                        // Replace existing section
+                        const newSection = renderGroupSection(group, groupContributions);
+                        existingSection.replaceWith(newSection);
+                    } else {
+                        // Add new section
+                        const newSection = renderGroupSection(group, groupContributions);
+                        container.appendChild(newSection);
+                    }
+                });
+                
+                // Store unsubscribe function if you need to clean up later
+                // (optional - for page unload)
+            });
+        }
+
+        // ============================================================
+        // SET UP LOGOUT BUTTON
+        // ============================================================
+        document.getElementById('logoutButton').addEventListener('click', logout);
+
+        // ============================================================
+        // START THE APP
+        // ============================================================
+        loadAllGroups();
+    </script>
+</body>
+</html>
