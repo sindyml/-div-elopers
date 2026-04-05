@@ -17,6 +17,13 @@
         <input type="date" id="meeting date"> <!--do i need to add a name-->
         <label for="meeting times">Select a meeting start time between 8AM and 8PM:</label>
         <input type="time" id="meeting times" min="08:00" max="20:00" step="900" required> <!--do i need to add a name-->
+        <label for="meeting location">Select a meeting location:</label>
+        <select id="meeting location">
+            <option value="zoom">Zoom</option>
+            <option value="google meet">Google Meet</option>
+            <option value="in-person">In-person</option>
+            <option value="whatsapp">Whatsapp</option>
+        </select>
     </form>
     <hr>
     <form>
@@ -25,5 +32,12 @@
         <!--how to make the textarea text here greyed out?-->
     </form>
     <hr>
+    <form>
+        <!--link the groups the admin/treasurer thats logged in is a part of using a datalist-->
+        <label for="group">Select the group for this meeting:</label>
+        <select id="group">
+            <!-- change to datalist and link-->
+        </select>
+    </form>
 </body>
 </html>
