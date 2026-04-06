@@ -1,0 +1,16 @@
+{
+  "name": "stockpal-app",
+  "version": "1.0.0",
+  "description": "Stokvel Management Platform — Software Design 2026",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["stokvel", "firebase", "azure"],
+  "author": "Sindiswa",
+  "license": "ISC"
+}
