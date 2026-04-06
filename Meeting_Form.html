@@ -37,5 +37,34 @@
         <button type="submit" class="btn-submit">Submit</button><!--what's the point of having a class?-->
         <script type="module" src=".Meeting_Form.js"></script> <!-- what's this for?-->
     </form>
+
+    <!-- meeting list aka. task 3 & notification banner of task 4-->
+    <section id="meeting-list" aria-labelledby="meeting-list-title">
+     <h2 id="meeting-list-title">Upcoming Meetings</h2>
+
+    <!-- Example meeting entry --><!--REMOVE THIS ARTICLE BUT USE IT'S STRUCYURE FOR HOW MEETINGS SHOULD SHOW UP -->
+    <article class="meeting-card">
+     <header>
+      <h3>Group: Savings Club A</h3>
+     </header>
+     <p>
+      <time datetime="2026-04-10T18:00">April 10, 2026 at 6:00 PM</time>
+     </p>
+     <p><strong>Location:</strong> Community Hall</p>
+     <p><strong>Agenda:</strong> Monthly contribution review and payout schedule</p>
+    </article>
+  </section>
+
+  <!-- Notification banner -->
+  <aside id="notification-banner" class="notification-banner" role="alert" aria-live="polite" hidden>
+   <header>
+    <h3>New Meeting Scheduled</h3>
+   </header>
+   <p id="notification-body">
+     A new meeting has been scheduled for your group.
+   </p>
+   <button type="button" class="notification-banner__close" aria-label="Close notification">×</button>
+  </aside>
+
 </body>
 </html>

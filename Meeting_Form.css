@@ -146,3 +146,69 @@
     padding: 0.6rem;
   }
 }
+
+
+/*Meeting List TASK 3*/
+.meeting-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.meeting-card h3 {
+  font-family: var(--font-display);
+  color: var(--color-primary);
+  margin-bottom: var(--space-2);
+}
+
+.meeting-card p {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+/* Notification Banner TASK 4*/
+.notification-banner {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: var(--color-surface);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-4) var(--space-5);
+  max-width: 340px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  animation: slideIn 0.3s ease;
+}
+
+.notification-banner header h3 {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: var(--space-1);
+  color: var(--color-primary);
+}
+
+.notification-banner p {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.notification-banner__close {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}

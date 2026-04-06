@@ -1,6 +1,6 @@
-//import {db} from './firebase';
+
 import { db } from "./firebase.js";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot, where, getDocs } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 // Initialize Firebase Auth
@@ -71,4 +71,66 @@ Meeting_Form.addEventListener("submit", async (e) => {
     console.error("Error saving meeting:", error);
     alert("Failed to schedule meeting.");
   }
+});
+
+
+//TASK 3 & 4.Meeting List & Notification Banner
+const meetingList = document.getElementById("meeting-list");
+const banner = document.getElementById("notification-banner");
+const bannerBody = document.getElementById("notification-body");
+const closeBtn = document.querySelector(".notification-banner__close");
+
+function showBanner(message) {
+  bannerBody.textContent = message;
+  banner.hidden = false;
+
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    banner.hidden = true;
+  }, 10000);
+}
+
+closeBtn.addEventListener("click", () => {
+  banner.hidden = true;
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    meetingList.innerHTML = "<p>Please log in to view meetings.</p>";
+    return;
+  }
+
+  // Assume user document in Firestore has a `groupIds` array
+  const userDoc = await db.collection("users").doc(user.uid).get();
+  const userData = userDoc.data();
+  const userGroups = userData?.group || [];
+
+  // Listen to meetings in real time
+  const q = query(collection(db, "meetings"), orderBy("date", "asc"));
+
+  onSnapshot(q, (snapshot) => {
+    meetingList.innerHTML = "";
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+
+      // Only render meetings for groups the user belongs to
+      if (userGroups.includes(data.groupId)) {
+        const article = document.createElement("article");
+        article.className = "meeting-card";
+        article.innerHTML = `
+          <header><h3>Group: ${data.group}</h3></header>
+          <p><time datetime="${data.date}">${data.date} at ${data.time}</time></p>
+          <p><strong>Location:</strong> ${data.location}</p>
+          <p><strong>Agenda:</strong> ${data.agenda}</p>
+        `;
+        meetingList.appendChild(article);
+
+        // Show banner for new meetings
+        if (doc.metadata.hasPendingWrites === false) {
+          showBanner(`A new meeting for group ${data.groupId} has been scheduled on ${data.date} at ${data.time}.`);
+        }
+      }
+    });
+  });
 });
