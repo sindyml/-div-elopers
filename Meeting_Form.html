@@ -7,6 +7,9 @@
     <script>
         <!-- idk what to put here yet. for defining client-side javaScript at a later point-->
     </script>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="Meeting_Form.css">
+
 </head>
 <body>
     <h1>Position: Admin/Treasurer</h1>
@@ -14,30 +17,25 @@
     <hr> 
     <form> 
         <label for="meeting date">Select a meeting date:</label>
-        <input type="date" id="meeting date"> <!--do i need to add a name-->
+        <input type="date" id="meeting date" required> <!--do i need to add a name? convert to string for the db-->
         <label for="meeting times">Select a meeting start time between 8AM and 8PM:</label>
-        <input type="time" id="meeting times" min="08:00" max="20:00" step="900" required> <!--do i need to add a name-->
+        <input type="time" id="meeting time" min="08:00" max="20:00" step="900" required> <!--do i need to add a name-->
         <label for="meeting location">Select a meeting location:</label>
-        <select id="meeting location">
+        <select id="meeting location" required>
             <option value="zoom">Zoom</option>
             <option value="google meet">Google Meet</option>
             <option value="in-person">In-person</option>
-            <option value="whatsapp">Whatsapp</option>
+            <option value="whatsapp">Whatsapp</option> <!--these should be strings in the db. if in-person is chosen, textarea pops up and what is typed there gets stored in the location field in the db-->
         </select>
-    </form>
-    <hr>
-    <form>
         <label for="agenda">Meeting Agenda:</label>
         <textarea id="agenda" rows="10" cols="30">Fill in meeting agenda notes here...</textarea>
         <!--how to make the textarea text here greyed out?-->
-    </form>
-    <hr>
-    <form>
         <!--link the groups the admin/treasurer thats logged in is a part of using a datalist-->
         <label for="group">Select the group for this meeting:</label>
-        <select id="group">
-            <!-- change to datalist and link-->
-        </select>
+        <input list="groupOptions" id="group" name="group" required> <!--id here must match id in db?-->
+        <datalist id="groupOptions"></datalist>
+        <button type="submit" class="btn-submit">Submit</button><!--what's the point of having a class?-->
+        <script type="module" src=".Meeting_Form.js"></script> <!-- what's this for?-->
     </form>
 </body>
 </html>
