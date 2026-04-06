@@ -1,0 +1,34 @@
+query ListAllTasks @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  tasks {
+    id
+    title
+    description
+    completed
+    createdAt
+  }
+}
+
+mutation CreateNewTask($title: String!, $description: String!) @auth(level: USER) {
+  task: task_insert(data: {
+    title: $title,
+    description: $description,
+    completed: false,
+    createdAt_expr: "request.time"
+  })
+}
+
+mutation MarkTaskAsCompleted($id: UUID!) @auth(level: USER) {
+  task: task_update(key: {id: $id}, data: {
+    completed: true
+  })
+}
+
+query GetTaskDetails($id: UUID!) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  task(key: {id: $id}) {
+    id
+    title
+    description
+    completed
+    createdAt
+  }
+}

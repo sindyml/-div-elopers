@@ -1,0 +1,88 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed mutation and only used by authenticated developers to populate the database.") {
+  stokvel_insertMany(data: [
+    {
+      id: "stokvel-id-001",
+      name: "Community Savings Group",
+      goal: "Collective savings for community projects",
+      frequency: "MONTHLY",
+      joiningFee: 50,
+      contributionAmount: 100
+    },
+    {
+      id: "stokvel-id-002",
+      name: "Investment Club",
+      goal: "Pooled investments for financial growth",
+      frequency: "QUARTERLY",
+      joiningFee: 100,
+      contributionAmount: 500
+    }
+  ])
+  member_insertMany(data: [
+    {
+      id: "member-id-001",
+      stokvelId: "stokvel-id-001",
+      name: "Alice Johnson",
+      email: "alice.johnson@example.com",
+      phone: "+1234567890",
+      role: "ADMIN"
+    },
+    {
+      id: "member-id-002",
+      stokvelId: "stokvel-id-001",
+      name: "Bob Williams",
+      email: "bob.williams@example.com",
+      phone: "+1987654321",
+      role: "MEMBER"
+    },
+    {
+      id: "member-id-003",
+      stokvelId: "stokvel-id-002",
+      name: "Charlie Brown",
+      email: "charlie.brown@example.com",
+      phone: "+1122334455",
+      role: "ADMIN"
+    }
+  ])
+  contribution_insertMany(data: [
+    {
+      id: "contribution-id-001",
+      stokvelId: "stokvel-id-001",
+      memberId: "member-id-001",
+      amount: 100,
+      date: "2023-10-01T00:00:00Z"
+    },
+    {
+      id: "contribution-id-002",
+      stokvelId: "stokvel-id-001",
+      memberId: "member-id-002",
+      amount: 100,
+      date: "2023-10-01T00:00:00Z"
+    },
+    {
+      id: "contribution-id-003",
+      stokvelId: "stokvel-id-002",
+      memberId: "member-id-003",
+      amount: 500,
+      date: "2023-09-15T00:00:00Z"
+    }
+  ])
+  payout_insertMany(data: [
+    {
+      id: "payout-id-001",
+      stokvelId: "stokvel-id-001",
+      memberId: "member-id-002",
+      amount: 200,
+      date: "2023-11-01T00:00:00Z",
+      status: "PAID"
+    }
+  ])
+  expense_insertMany(data: [
+    {
+      id: "expense-id-001",
+      stokvelId: "stokvel-id-001",
+      description: "Meeting refreshments",
+      amount: 25,
+      date: "2023-10-05T00:00:00Z"
+    }
+  ])
+}
