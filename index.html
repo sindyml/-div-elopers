@@ -12,16 +12,16 @@
 </head>
 <body>
 
-  <!-- NAVBAR -->
+  <!-- Navbar — rendered immediately by navbar.js (no Firebase wait) -->
   <div id="navbar-root"></div>
 
-  <!-- HERO — full-width section, inner div controls max-width -->
+  <!-- HERO -->
   <section class="hero">
-    <div class="hero__bg-texture"></div>
+    <div class="hero__bg-texture" aria-hidden="true"></div>
     <div class="hero__inner">
 
       <div class="hero__content">
-        <small class="hero__badge">🇿🇦 Built for South African Stokvels</small>
+        <small class="badge hero__badge">🇿🇦 Built for South African Stokvels</small>
         <h1 class="hero__title">
           Save together.<br />
           <em>Grow together.</em>
@@ -30,7 +30,7 @@
           A modern platform for your stokvel — track contributions, manage payouts,
           schedule meetings and keep every member in the loop. No spreadsheets. No confusion.
         </p>
-        <nav class="hero__cta" aria-label="Call to action">
+        <nav class="hero__cta" aria-label="Get started">
           <a href="register.html" class="btn btn--primary btn--lg">Get Started Free</a>
           <a href="login.html"    class="btn btn--outline btn--lg">Sign In</a>
         </nav>
@@ -38,35 +38,41 @@
       </div>
 
       <aside class="hero__visual" aria-hidden="true">
-        <article class="hero__card hero__card--main">
+        <!-- card class from theme.css, hero__card--main adds animation -->
+        <article class="card hero__card--main">
           <small class="hero__card-label">Group Balance</small>
           <p class="hero__card-amount">R 48 500</p>
           <p class="hero__card-meta">12 active members &nbsp;·&nbsp; Payout in 3 weeks</p>
-          <div class="hero__progress-bar" role="progressbar" aria-valuenow="72" aria-valuemin="0" aria-valuemax="100">
+          <div class="hero__progress-bar"
+               role="progressbar"
+               aria-valuenow="72"
+               aria-valuemin="0"
+               aria-valuemax="100">
             <div class="hero__progress-fill" style="width:72%"></div>
           </div>
           <p class="hero__card-sub">72% of monthly target reached</p>
         </article>
-        <article class="hero__card hero__card--side">
+
+        <article class="card hero__card--side">
           <small class="hero__card-label">Latest Contributions</small>
           <ul class="hero__contrib-list">
             <li class="hero__contrib-item">
               <span class="hero__contrib-name">Nomsa M.</span>
-              <span class="hero__contrib-badge hero__contrib-badge--paid">Paid ✓</span>
+              <span class="badge badge--paid">Paid ✓</span>
             </li>
             <li class="hero__contrib-item">
               <span class="hero__contrib-name">Thabo K.</span>
-              <span class="hero__contrib-badge hero__contrib-badge--paid">Paid ✓</span>
+              <span class="badge badge--paid">Paid ✓</span>
             </li>
             <li class="hero__contrib-item">
               <span class="hero__contrib-name">Lerato D.</span>
-              <span class="hero__contrib-badge hero__contrib-badge--pending">Pending</span>
+              <span class="badge badge--pending">Pending</span>
             </li>
           </ul>
         </article>
       </aside>
 
-    </div><!-- /.hero__inner -->
+    </div>
   </section>
 
   <!-- FEATURES -->
@@ -74,43 +80,43 @@
     <div class="container">
       <small class="section-label">Everything your stokvel needs</small>
       <h2 class="section-title">Built for the way South African stokvels actually work</h2>
-      <div class="features__grid">
-        <article class="feature-card">
+      <ul class="features__grid" role="list">
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">💰</span>
           <h3>Contribution Tracking</h3>
           <p>Every member can see their own payment history. Treasurers confirm or flag contributions in one click.</p>
-        </article>
-        <article class="feature-card">
+        </li>
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">📅</span>
           <h3>Meeting Management</h3>
           <p>Schedule meetings, record minutes and get instant in-app notifications when a new meeting is added.</p>
-        </article>
-        <article class="feature-card">
+        </li>
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">🔐</span>
           <h3>Role-Based Access</h3>
           <p>Members, Treasurers and Admins each see exactly what they need — nothing more, nothing less.</p>
-        </article>
-        <article class="feature-card">
+        </li>
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">📊</span>
           <h3>Payout Schedule</h3>
           <p>Clear, ordered payout schedule so every member knows exactly when it's their turn to receive.</p>
-        </article>
-        <article class="feature-card">
+        </li>
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">📈</span>
           <h3>SA Data Insights</h3>
           <p>Live South African financial data — prime rate, inflation — to show how your stokvel savings are growing.</p>
-        </article>
-        <article class="feature-card">
+        </li>
+        <li class="card feature-card">
           <span class="feature-card__icon" aria-hidden="true">☁️</span>
           <h3>Always Available</h3>
           <p>Hosted on Azure, backed by Firebase. Your group's data is safe, synced in real time, and accessible anywhere.</p>
-        </article>
-      </div>
+        </li>
+      </ul>
     </div>
   </section>
 
   <!-- HOW IT WORKS -->
-  <section class="how-it-works">
+  <section class="how-it-works" id="how-it-works">
     <div class="container">
       <small class="section-label">Simple by design</small>
       <h2 class="section-title">Up and running in minutes</h2>
@@ -143,7 +149,7 @@
   </section>
 
   <!-- FINAL CTA -->
-  <section class="cta-section">
+  <section class="cta-section" id="cta">
     <div class="container">
       <h2 class="cta-section__title">Ready to modernise your stokvel?</h2>
       <p class="cta-section__sub">Join the growing number of South African groups managing their savings the smart way.</p>
@@ -154,172 +160,20 @@
     </div>
   </section>
 
-  <!-- FOOTER -->
+  <!-- Footer -->
   <div id="footer-root"></div>
 
-  <!-- Firebase SDKs (must load before firebase-config.js) -->
+  <!--
+    SCRIPT LOAD ORDER — this matters:
+    1. Firebase SDKs first
+    2. firebase-config.js (initialises Firebase using the SDKs)
+    3. navbar.js (renders immediately, then updates on auth state)
+    4. footer.js
+  -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-  <!-- App scripts -->
-  <script src="js/firebase-config.js"></script>
-  <script src="components/navbar.js"></script>
-  <script src="components/footer.js"></script>
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Stokvel — Save Together, Grow Together</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/landing.css" />
-</head>
-<body>
-
-  <!-- NAVBAR -->
-  <div id="navbar-root"></div>
-
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero__bg-texture"></div>
-    <div class="hero__content">
-      <div class="hero__badge">🇿🇦 Built for South African Stokvels</div>
-      <h1 class="hero__title">
-        Save together.<br />
-        <em>Grow together.</em>
-      </h1>
-      <p class="hero__subtitle">
-        A modern platform for your stokvel — track contributions, manage payouts,
-        schedule meetings and keep every member in the loop. No spreadsheets. No confusion.
-      </p>
-      <div class="hero__cta">
-        <a href="register.html" class="btn btn--primary btn--lg">Get Started Free</a>
-        <a href="login.html" class="btn btn--outline btn--lg">Sign In</a>
-      </div>
-      <p class="hero__note">No credit card required &nbsp;·&nbsp; Free for groups up to 20 members</p>
-    </div>
-    <div class="hero__visual">
-      <div class="hero__card hero__card--main">
-        <div class="hero__card-label">Group Balance</div>
-        <div class="hero__card-amount">R 48 500</div>
-        <div class="hero__card-meta">12 active members &nbsp;·&nbsp; Payout in 3 weeks</div>
-        <div class="hero__progress-bar"><div class="hero__progress-fill" style="width:72%"></div></div>
-        <div class="hero__card-sub">72% of monthly target reached</div>
-      </div>
-      <div class="hero__card hero__card--side">
-        <div class="hero__card-label">Latest Contributions</div>
-        <div class="hero__contrib-list">
-          <div class="hero__contrib-item">
-            <span class="hero__contrib-name">Nomsa M.</span>
-            <span class="hero__contrib-badge hero__contrib-badge--paid">Paid ✓</span>
-          </div>
-          <div class="hero__contrib-item">
-            <span class="hero__contrib-name">Thabo K.</span>
-            <span class="hero__contrib-badge hero__contrib-badge--paid">Paid ✓</span>
-          </div>
-          <div class="hero__contrib-item">
-            <span class="hero__contrib-name">Lerato D.</span>
-            <span class="hero__contrib-badge hero__contrib-badge--pending">Pending</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FEATURES -->
-  <section class="features" id="features">
-    <div class="container">
-      <div class="section-label">Everything your stokvel needs</div>
-      <h2 class="section-title">Built for the way South African stokvels actually work</h2>
-      <div class="features__grid">
-        <div class="feature-card">
-          <div class="feature-card__icon">💰</div>
-          <h3>Contribution Tracking</h3>
-          <p>Every member can see their own payment history. Treasurers confirm or flag contributions in one click.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">📅</div>
-          <h3>Meeting Management</h3>
-          <p>Schedule meetings, record minutes and get instant in-app notifications when a new meeting is added.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">🔐</div>
-          <h3>Role-Based Access</h3>
-          <p>Members, Treasurers and Admins each see exactly what they need — nothing more, nothing less.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">📊</div>
-          <h3>Payout Schedule</h3>
-          <p>Clear, ordered payout schedule so every member knows exactly when it's their turn to receive.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">📈</div>
-          <h3>SA Data Insights</h3>
-          <p>Live South African financial data — prime rate, inflation — to show how your stokvel savings are growing.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-card__icon">☁️</div>
-          <h3>Always Available</h3>
-          <p>Hosted on Azure, backed by Firebase. Your group's data is safe, synced in real time, and accessible anywhere.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- HOW IT WORKS -->
-  <section class="how-it-works">
-    <div class="container">
-      <div class="section-label">Simple by design</div>
-      <h2 class="section-title">Up and running in minutes</h2>
-      <div class="steps">
-        <div class="step">
-          <div class="step__number">01</div>
-          <div class="step__content">
-            <h3>Admin creates the group</h3>
-            <p>Set the contribution amount, payout order and meeting frequency. Invite members by email.</p>
-          </div>
-        </div>
-        <div class="step__connector"></div>
-        <div class="step">
-          <div class="step__number">02</div>
-          <div class="step__content">
-            <h3>Members join &amp; contribute</h3>
-            <p>Each member registers, joins their group and logs contributions. The Treasurer confirms each payment.</p>
-          </div>
-        </div>
-        <div class="step__connector"></div>
-        <div class="step">
-          <div class="step__number">03</div>
-          <div class="step__content">
-            <h3>Payouts happen on schedule</h3>
-            <p>The payout schedule is visible to everyone. No disputes, no confusion — just a clear, trusted system.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FINAL CTA -->
-  <section class="cta-section">
-    <div class="container">
-      <h2 class="cta-section__title">Ready to modernise your stokvel?</h2>
-      <p class="cta-section__sub">Join the growing number of South African groups managing their savings the smart way.</p>
-      <div class="cta-section__buttons">
-        <a href="/register.html" class="btn btn--primary btn--lg">Create Your Group</a>
-        <a href="login.html" class="btn btn--ghost btn--lg">I already have an account</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- FOOTER -->
-  <div id="footer-root"></div>
-
+  
   <script src="js/firebase-config.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
