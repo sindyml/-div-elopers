@@ -36,7 +36,9 @@
 
           ${isLanding
             ? `<ul class="navbar__links" role="list">
-                 <li><a href="#features" class="nav__link">Features</a></li>
+                 <li><a href="#features"   class="nav__link">Features</a></li>
+                 <li><a href="#how-it-works" class="nav__link">How It Works</a></li>
+                 <li><a href="#cta"        class="nav__link">Get Started</a></li>
                </ul>`
             : ''}
 
@@ -55,7 +57,11 @@
         </div>
 
         <div class="navbar__mobile-menu" id="nav-mobile-menu" aria-hidden="true">
-          ${isLanding ? '<a href="#features" class="nav__link">Features</a>' : ''}
+          ${isLanding
+            ? `<a href="#features"    class="nav__link">Features</a>
+               <a href="#how-it-works" class="nav__link">How It Works</a>
+               <a href="#cta"         class="nav__link">Get Started</a>`
+            : ''}
           ${user
             ? `<span class="nav__user-name">${user.displayName || user.email}</span>
                <button id="nav-logout-mobile" class="btn btn--outline btn--sm">Sign Out</button>`
@@ -125,7 +131,7 @@
         margin: 0 auto;
         padding: 0 var(--space-6);
         height: 64px;
-        gap: var(--space-6);
+        gap: var(--space-4);
       }
       .navbar__brand {
         display: flex;
@@ -143,18 +149,19 @@
       }
       .navbar__links {
         display: flex;
-        gap: var(--space-6);
+        gap: var(--space-4);
         list-style: none;
         padding: 0;
         margin: 0;
         flex: 1;
       }
       .nav__link {
-        font-size: 0.92rem;
+        font-size: 0.88rem;
         font-weight: 500;
         color: var(--color-text-secondary);
         text-decoration: none;
         transition: color var(--transition);
+        white-space: nowrap;
       }
       .nav__link:hover { color: var(--color-primary); }
       .nav__auth, .nav__user {
@@ -194,7 +201,7 @@
         background: var(--color-surface);
       }
       .navbar__mobile-menu.is-open { display: flex; }
-      @media (max-width: 640px) {
+      @media (max-width: 768px) {
         .navbar__links, .nav__auth, .nav__user { display: none; }
         .navbar__mobile-toggle { display: flex; }
       }
