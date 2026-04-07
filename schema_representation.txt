@@ -1,0 +1,22 @@
+groups (collection)
+  └── groupId (document)
+        name: string
+        contributionAmount: number
+        payoutOrder: array (uids)
+        meetingFrequency: string
+        creatorUid: string
+        createdAt: timestamp
+
+        members (subcollection)
+            └── memberId (document)
+                  uid: string
+                  role: "admin" | "member"
+                  joinedAt: timestamp
+
+invites (collection)
+  └── inviteId (document)
+        email: string
+        groupId: string
+        invitedBy: uid
+        status: "pending" | "accepted"
+        createdAt: timestamp
