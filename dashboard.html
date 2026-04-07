@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="../styles/styles.css"/>
+    <
+</head>
+<body>
+
+    <main>
+        <h2>YOUR GROUPS</h2>
+        <ul id="grouplist"></ul>
+            <section>
+                <h3>Invite Member</h3>
+
+                <input type="email" id="inviteEmail" placeholder="Enter Email" />
+                <button id="inviteBtn">Invite</button>
+
+                <p id="inviteMessage"></p>
+
+            </section>
+
+            <a href="groupCreate.html">
+                <button>Create New Group</button>
+            </a>
+        
+
+    </main>
+
+    <script type="module">
+    import { getUserGroups } from "../src/dashboardService.js";
+    import { sendInvite } from "../src/groupService.js";
+    import { listenForAuth } from "../src/auth.js";
+    import { auth, db } from "../src/firebase.js";
+    import { doc, getDoc } from "firebase/firestore";
+
+    listenForAuth();
+
+    const grouplist = document.getElementById("grouplist");
+    const inviteBtn = document.getElementById("inviteBtn");
+    const inviteMessage = document.getElementById("inviteMessage");
+
+    let selectedGroupId = null;
+    let userRole = null;
+
+    const getUserRole = async (groupID) => {
+        const user = auth.currentUser;
+        const roleDoc = await getDoc(doc(db, "groups",groupID,"members",user.uid));
+
+        if (roleDoc.exists()){
+            return roleDoc.data().role;
+        }
+        return null;
+    };
+
+    const loadGroups = async () => {
+        const groups = await getUserGroups();
+        grouplist.innerHTML="";
+
+        groups.forEacj(group => {
+            const li = document.createElement("li");
+            li.textContent=group.name;
+
+            li.onclick = async () => {
+                selectedGroupId = group.id;
+                userRole = await getUserRole(group.id);
+
+                alert(`Selected: ${group.name} (Role: ${userRole})`);
+            };
+            grouplist.appendChild(li);
+        });
+    };
+
+    inviteBtn.addEventListener("click",async() => {
+        const email = document.getElementById("inviteEmail").value;
+
+        if (!selectedGroupId){
+            alert("Please select a group first");
+            return;
+        }
+
+        if (userRole !== "admin"){
+            alert("Only admins can invite members");
+            return;
+        }
+
+        try{
+            await sendInvite(email,selectedGroupId);
+            inviteMessage.textContent="Invite Sent!";
+        }catch (err){
+            inviteMessage.textContent="Error sending invite";
+            console.error(err);
+        }
+        
+    });
+    loadGroups();
+    </script>
+</body>
+
+
+
+
+
+
+
+
+
+
+
+</html>
+
+
+
+
