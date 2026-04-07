@@ -36,9 +36,7 @@
 
           ${isLanding
             ? `<ul class="navbar__links" role="list">
-                 <li><a href="#features"   class="nav__link">Features</a></li>
-                 <li><a href="#how-it-works" class="nav__link">How It Works</a></li>
-                 <li><a href="#cta"        class="nav__link">Get Started</a></li>
+                 <li><a href="#features" class="nav__link">Features</a></li>
                </ul>`
             : ''}
 
@@ -57,11 +55,7 @@
         </div>
 
         <div class="navbar__mobile-menu" id="nav-mobile-menu" aria-hidden="true">
-          ${isLanding
-            ? `<a href="#features"    class="nav__link">Features</a>
-               <a href="#how-it-works" class="nav__link">How It Works</a>
-               <a href="#cta"         class="nav__link">Get Started</a>`
-            : ''}
+          ${isLanding ? '<a href="#features" class="nav__link">Features</a>' : ''}
           ${user
             ? `<span class="nav__user-name">${user.displayName || user.email}</span>
                <button id="nav-logout-mobile" class="btn btn--outline btn--sm">Sign Out</button>`
