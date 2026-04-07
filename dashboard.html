@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokPal — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body class="app-layout">
+
+  <!-- Navbar injected by navbar.js -->
+  <div id="navbar-root"></div>
+
+  <main class="app-main">
+
+    <!-- PAGE HEADER -->
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">
+          Good morning, <span id="user-display-name">Member</span> 👋
+        </h1>
+        <p class="page-header__sub">Here's what's happening with your stokvel today.</p>
+      </hgroup>
+      <small id="group-name-badge" class="group-badge">Loading group…</small>
+    </header>
+
+    <!-- STAT CARDS -->
+    <ul class="dashboard-grid" aria-label="Key statistics">
+      <li class="stat-card stat-card--primary">
+        <small class="stat-card__label">Group Balance</small>
+        <p class="stat-card__value" id="stat-balance">R 0</p>
+        <small class="stat-card__sub">Total confirmed contributions</small>
+      </li>
+      <li class="stat-card stat-card--accent">
+        <small class="stat-card__label">Active Members</small>
+        <p class="stat-card__value" id="stat-members">—</p>
+        <small class="stat-card__sub">In your stokvel group</small>
+      </li>
+      <li class="stat-card stat-card--warning">
+        <small class="stat-card__label">Next Payout</small>
+        <p class="stat-card__value" id="stat-payout">—</p>
+        <small class="stat-card__sub" id="stat-payout-name">Waiting for data</small>
+      </li>
+      <li class="stat-card">
+        <small class="stat-card__label">Your Contributions</small>
+        <p class="stat-card__value" id="stat-my-contributions">—</p>
+        <small class="stat-card__sub">This sprint period</small>
+      </li>
+    </ul>
+
+    <!-- MAIN + SIDEBAR LAYOUT -->
+    <div class="dashboard-content">
+
+      <!-- LEFT — main content column -->
+      <div class="dashboard-col dashboard-col--main">
+
+        <!-- SA DATA WIDGET (P6) -->
+        <article class="card widget-section" aria-labelledby="sa-widget-heading">
+          <header class="widget-section__header">
+            <h2 id="sa-widget-heading" class="widget-section__title">📈 SA Financial Snapshot</h2>
+            <button class="widget-refresh-btn"
+                    id="sa-refresh-btn"
+                    aria-label="Refresh financial data"
+                    title="Refresh">↻</button>
+          </header>
+          <div id="sa-widget-container" class="sa-widget-container">
+            <!-- Skeleton shown while fetching, replaced by dashboard.js -->
+            <div class="sa-widget-skeleton" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-row">
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+              </div>
+              <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- RECENT CONTRIBUTIONS shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="contributions-heading">
+          <header class="widget-section__header">
+            <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
+            <a href="contributions.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="contributions-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Contribution tracking coming soon — P4 is building this.
+            </p>
+          </section>
+        </article>
+
+      </div><!-- /.dashboard-col--main -->
+
+      <!-- RIGHT — sidebar column -->
+      <aside class="dashboard-col dashboard-col--side">
+
+        <!-- UPCOMING MEETINGS shell (P5 populates this) -->
+        <article class="card widget-section" aria-labelledby="meetings-heading">
+          <header class="widget-section__header">
+            <h2 id="meetings-heading" class="widget-section__title">📅 Upcoming Meetings</h2>
+            <a href="meetings.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="meetings-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Meeting schedule coming soon — P5 is building this.
+            </p>
+          </section>
+        </article>
+
+        <!-- GROUP MEMBERS shell (P3 populates this) -->
+        <article class="card widget-section" aria-labelledby="members-heading">
+          <header class="widget-section__header">
+            <h2 id="members-heading" class="widget-section__title">👥 Group Members</h2>
+            <a href="groups.html" class="widget-section__link">Manage →</a>
+          </header>
+          <section id="members-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Member list coming soon — P3 is building this.
+            </p>
+          </section>
+        </article>
+
+        <!-- PAYOUT SCHEDULE shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="payout-heading">
+          <header class="widget-section__header">
+            <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
+            <a href="contributions.html#payouts" class="widget-section__link">View all →</a>
+          </header>
+          <section id="payout-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Payout schedule coming soon — P4 is building this.
+            </p>
+          </section>
+        </article>
+
+      </aside><!-- /.dashboard-col--side -->
+
+    </div><!-- /.dashboard-content -->
+
+  </main>
+
+  <!-- Live notification region — P5 injects banners here -->
+  <output id="notification-root" aria-live="polite" aria-atomic="true"></output>
+
+  <!-- Footer injected by footer.js -->
+  <div id="footer-root"></div>
+
+  <!-- Firebase SDKs — must load before firebase-config.js -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
+  <script src="js/sa-data.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
