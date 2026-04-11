@@ -54,3 +54,6 @@ export async function loginWithGoogle() {
 
 // 🚪 LOGOUT
 export const logout = () => signOut(auth);
+
+
+
