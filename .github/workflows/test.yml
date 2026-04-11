@@ -11,26 +11,34 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests with coverage
         run: npx vitest run --coverage
 
-      - name: Add coverage to GitHub Summary
+      - name: Show coverage summary in GitHub Actions
+        run: npx vitest run --coverage --reporter=text
+
+      - name: Add coverage header to GitHub Summary
+        run: echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+
+      - name: Append coverage summary to GitHub Summary
         run: |
-          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-          npx vitest run --coverage --reporter=text-summary >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          npx vitest run --coverage --reporter=text >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-report
           path: coverage/
