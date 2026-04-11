@@ -25,15 +25,17 @@ jobs:
       - name: Run tests with coverage
         run: npx vitest run --coverage
 
-      - name: Add coverage to GitHub Summary
-        run: |
-          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat coverage/coverage-summary.json >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+      - name: Add coverage summary
+        run: node .github/scripts/coverage-summary.js
 
-      - name: Upload coverage artifact
+      - name: Upload coverage artifact (optional)
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
+
+      - name: PR coverage comment
+        uses: davelosert/vitest-coverage-report-action@v2
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
