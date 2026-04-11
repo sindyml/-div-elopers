@@ -25,16 +25,11 @@ jobs:
       - name: Run tests with coverage
         run: npx vitest run --coverage
 
-      - name: Show coverage summary in GitHub Actions
-        run: npx vitest run --coverage --reporter=text
-
-      - name: Add coverage header to GitHub Summary
-        run: echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
-
-      - name: Append coverage summary to GitHub Summary
+      - name: Add coverage to GitHub Summary
         run: |
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          npx vitest run --coverage --reporter=text >> $GITHUB_STEP_SUMMARY
+          cat coverage/coverage-summary.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload coverage artifact
