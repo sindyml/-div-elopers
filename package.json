@@ -1,0 +1,26 @@
+{
+  "name": "alondwe",
+  "version": "1.0.0",
+  "description": "> A web-based stokvel management system that enables members to track contributions, monitor payout schedules, communicate, and gain financial insights – designed for South African savings groups.",
+  "main": "index.js",
+  "directories": {
+    "test": "jest"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SindyMl/-div-elopers.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SindyMl/-div-elopers/issues"
+  },
+  "homepage": "https://github.com/SindyMl/-div-elopers#readme",
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
+}
