@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meetings — Stokvel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/meetings.css" />
+</head>
+<body>
+
+  <nav id="navbar-root"></nav>
+
+  <main class="container">
+
+    <header class="page-header">
+      <p class="label">Meetings</p>
+      <h1>Schedule &amp; manage<br /><em>group meetings</em></h1>
+      <p class="subtitle">Organise meetings, record minutes, and keep every member informed in real time.</p>
+    </header>
+
+    <section class="meetings-layout" aria-label="Meetings workspace">
+
+      <!-- ── LEFT: Schedule form ──────────────── -->
+      <section class="card" aria-labelledby="schedule-heading">
+        <h2 id="schedule-heading">
+          <i class="icon" aria-hidden="true">📅</i>
+          Schedule a Meeting
+        </h2>
+
+        <p class="role-note" role="note">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="5.5" stroke="currentColor"/>
+            <path d="M6 5v4M6 3.5v.5" stroke="currentColor" stroke-linecap="round"/>
+          </svg>
+          Treasurer &amp; Admin only
+        </p>
+
+        <form id="schedule-form" novalidate>
+          <fieldset>
+            <legend class="sr-only">Meeting details</legend>
+
+            <label class="full" for="meeting-group"> /*THIS SHOULD BE POPULATED BY FIREBASE, HOW TO CHANGE THIS?*/
+              Group <b class="req" aria-hidden="true">*</b>
+              <select id="meeting-group" name="group" required aria-required="true">
+                <option value="" disabled selected>Select a group</option>
+                <option value="g1">Diepsloot Savings Circle</option>
+                <option value="g2">Soweto Women's Stokvel</option>
+                <option value="g3">Sandton Professional Pool</option>
+              </select>
+            </label>
+
+            <label for="meeting-date"> /*RESTRICT TO CURRENT DATE & FUTURE DATES*/
+              Date <b class="req" aria-hidden="true">*</b>
+              <input type="date" id="meeting-date" name="date" required aria-required="true" />
+            </label>
+
+            <label for="meeting-time"> /*RESTRICT TO BETWEEN 8AM & 8PM*/
+              Time <b class="req" aria-hidden="true">*</b>
+              <input type="time" id="meeting-time" name="time" required aria-required="true" />
+            </label>
+
+            <label class="full" for="meeting-location">
+              Location <b class="req" aria-hidden="true">*</b>
+              <input type="text" id="meeting-location" name="location"
+                     placeholder="e.g. 14 Main Street, Soweto / Google Meet"
+                     required aria-required="true" />
+              <small>Physical address or virtual meeting link</small>
+            </label>
+
+            <label class="full" for="meeting-agenda">
+              Agenda <b class="req" aria-hidden="true">*</b>
+              <textarea id="meeting-agenda" name="agenda"
+                        placeholder="List the key agenda items for this meeting…"
+                        required aria-required="true"></textarea>
+            </label>
+          </fieldset>
+
+          <menu class="form-actions">
+            <li><button type="reset" class="secondary">Clear</button></li>
+            <li>
+              <button type="submit" class="primary">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Schedule Meeting
+              </button>
+            </li>
+          </menu>
+        </form>
+      </section>
+
+      <!-- ── RIGHT: Meeting list ──────────────── -->
+      <section class="card" aria-labelledby="meetings-heading">
+        <h2 id="meetings-heading">
+          <i class="icon" aria-hidden="true">🗓️</i>
+          Meeting List
+        </h2>
+
+        <header class="list-header">
+          <h3>Upcoming</h3>
+          <output id="upcoming-count" for="schedule-form">2 meetings</output>
+        </header>
+
+        <ol class="meeting-list" id="upcoming-list" aria-label="Upcoming meetings">
+          <!-- Meetings are rendered here by meetings.js via Firestore onSnapshot() -->
+        </ol>
+
+        <hr />
+
+        <header class="list-header">
+          <h3>Past</h3>
+          <output>1 meeting</output>
+        </header>
+
+        <ul class="meeting-list" aria-label="Past meetings">
+          <!-- Past meetings are rendered here by meetings.js via Firestore onSnapshot() -->
+        </ul>
+      </section>
+
+    </section><!-- /meetings-layout -->
+  </main>
+
+  <footer id="footer-root"></footer>
+
+  <!-- ── Real-time notification (Firestore onSnapshot) ─── -->
+  <aside id="notification-banner" role="status" aria-live="polite" aria-atomic="true">
+    <figure>
+      <i class="dot" aria-hidden="true"></i>
+      <figcaption>
+        <strong>New meeting scheduled</strong>
+        <p id="notification-body">A new meeting has been added to your group.</p>
+      </figcaption>
+      <button class="close" type="button" onclick="closeBanner()" aria-label="Dismiss notification">&times;</button>
+    </figure>
+  </aside>
+
+  <!-- ── Record Minutes dialog ─────────────────────────── -->
+  <dialog id="minutes-dialog" aria-labelledby="dialog-title">
+    <header>
+      <h2 id="dialog-title">Record Minutes</h2>
+      <button type="button" class="secondary"
+              onclick="document.getElementById('minutes-dialog').close()"
+              aria-label="Close dialog">&times;</button>
+    </header>
+
+    <form id="minutes-form" method="dialog">
+      <label for="minutes-text">
+        Meeting minutes <b class="req" aria-hidden="true">*</b>
+        <textarea id="minutes-text"
+                  placeholder="Record the key decisions, action items, and discussion points…"
+                  required></textarea>
+      </label>
+
+      <menu class="form-actions" style="margin-top:0;">
+        <li>
+          <button type="button" class="secondary"
+                  onclick="document.getElementById('minutes-dialog').close()">Cancel</button>
+        </li>
+        <li>
+          <button type="submit" class="primary" onclick="saveMinutes()">Save Minutes</button>
+        </li>
+      </menu>
+    </form>
+  </dialog>
+
+  <!-- firebase-config.js must run first — it sets window.auth and window.db -->
+  <script src="js/firebase-config.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
+  <script src="js/meetings.js"></script>
+
+</body>
+</html>
