@@ -31,24 +31,19 @@ let currentMeetingId    = null;
 let unsubscribeListener = null;
 
 /* ── Time boundary constants ─────────────────────────────────
-   Meetings may only be scheduled between 08:00 and 20:00.
-   Stored as "HH:MM" strings — lexicographic comparison works
-   correctly for zero-padded 24-hr times.                       */
-const MEETING_TIME_MIN = '08:00'; /* 8:00 AM — earliest allowed */
-const MEETING_TIME_MAX = '20:00'; /* 8:00 PM — latest  allowed  */
+   Meetings may only be scheduled between 08:00 and 20:00.*/
+const MEETING_TIME_MIN = '08:00'; 
+const MEETING_TIME_MAX = '20:00'; 
 
 
 /* ─────────────────────────────────────────────────────────────
    3. ROLE GUARD
    ─────────────────────────────────────────────────────────────
-   Waits for Firebase Auth to resolve, then reads the user's
+   Waits for Firebase Authentication to resolve, then reads the user's
    role from Firestore and resolves their group membership.
 
-   Firestore path assumed:  users/{uid}
-   Document field assumed:  role  ('Admin' | 'Treasurer' | 'Member')
-
-   ← CHANGE "users" if your collection is named differently.
-   ← CHANGE "role"  if your role field has a different name.
+   Firestore path:  users/{uid}
+   Document fields:  role  ('Admin' | 'Treasurer' | 'Member')
 
    What happens per role:
      Admin / Treasurer — schedule form stays visible; page loads.
@@ -78,26 +73,22 @@ auth.onAuthStateChanged(async (user) => {
     currentRole = userDoc.data().role;
 
     /* ── Resolve which group this user belongs to ──────────
-       The groups schema has no memberIds array. Instead, each
+       In place of memberIds array (which is to be added later), each
        group stores members in a subcollection:
          groups/{groupId}/members/{memberId}  →  { uid, role, joinedAt }
 
-       We run a collectionGroup query to find the member doc
+       Run a collectionGroup query to find the member doc
        whose 'uid' field matches the current user. The grandparent
        document id of that result is our groupId.
 
        REQUIRES a Firestore collectionGroup index:
          Collection group : members
          Field            : uid
-         Order            : Ascending
-       Create it in Firebase Console → Firestore → Indexes.
-
-       ← CHANGE 'members' if your subcollection is named differently.
-       ← CHANGE 'uid'     if the field inside each member doc differs. */
+         Order            : Ascending*/
     const memberSnap = await db
       .collectionGroup('members')       /* search ALL 'members' subcollections  */
       .where('uid', '==', user.uid)     /* find the doc belonging to this user  */
-      .limit(1)                         /* at most 1 group per user             */
+      .limit(1)                         /* user is part of 1 group max   */
       .get();
 
     if (!memberSnap.empty) {
@@ -165,9 +156,7 @@ function applyRoleUI(role) {
    Because a user belongs to at most 1 group, the <select>
    becomes a single-option confirmation rather than a multi-
    choice picker.
-
-   ← CHANGE 'groups' if your collection is named differently.
-   ← CHANGE 'name'   if your group name field differs.          */
+  */
 
 async function loadUserGroups(uid, role) {
   const select = document.getElementById('meeting-group');
@@ -177,6 +166,7 @@ async function loadUserGroups(uid, role) {
 
   if (!currentGroupId) {
     /* No group resolved — show informational disabled option */
+    /*perhaps redirect to login*/
     const opt    = document.createElement('option');
     opt.disabled = true;
     opt.textContent = 'You are not in any groups yet';
@@ -195,7 +185,7 @@ async function loadUserGroups(uid, role) {
 
     const opt    = document.createElement('option');
     opt.value    = groupDoc.id;
-    opt.textContent = groupDoc.data().name; /* ← CHANGE 'name' if your field differs */
+    opt.textContent = groupDoc.data().name; 
     opt.selected = true;                    /* auto-select the only available group   */
     select.appendChild(opt);
 
@@ -211,14 +201,11 @@ async function loadUserGroups(uid, role) {
    Attaches a Firestore onSnapshot() listener to the meetings
    collection. Now that currentGroupId is known, we filter
    server-side with .where('groupId', '==', currentGroupId) so
-   only this group's meetings stream to the client. This removes
-   the need for the previous client-side membership check.
+   only this group's meetings stream to the client. 
 
    INDEX REQUIRED: groupId (ASC) + date (ASC) — create in
    Firebase Console → Firestore → Indexes → Composite.
-
-   ← CHANGE 'meetings' if your collection is named differently.
-   ← CHANGE field names above if yours differ.                  */
+*/
 
 function startMeetingListener(uid, role) {
   if (unsubscribeListener) unsubscribeListener();
@@ -365,19 +352,15 @@ function buildMeetingItem(meeting, role) {
 /* ─────────────────────────────────────────────────────────────
    9. SCHEDULE MEETING FORM  (Task 1 + Task 2)
    ─────────────────────────────────────────────────────────────
-   Handles form submission. Validates all required fields, then
+   Handles form submission. Validates required fields, then
    writes a new document to the Firestore meetings collection.
 
-   TIME VALIDATION is intentionally duplicated here (in addition
-   to the HTML min/max set in applyRoleUI) because HTML
-   attributes can be removed or bypassed via DevTools.
+   Additional time validation because HTML
+   attributes can be removed or bypassed via DevTools. Not that anyone would for this though tbh.
 
    groupId written to Firestore is always currentGroupId — the
    value resolved from the members subcollection in Section 3,
-   not the <select> value (which is just a visual confirmation).
-
-   ← CHANGE 'meetings' if your collection is named differently.
-   ← CHANGE field names if your data model uses different keys.  */
+   not the <select> value (which is just a visual confirmation).*/
 
 document.getElementById('schedule-form').addEventListener('submit', async function (e) {
   e.preventDefault();
@@ -402,12 +385,7 @@ document.getElementById('schedule-form').addEventListener('submit', async functi
     return;
   }
 
-  /* ── Time window: 08:00–20:00 ──────────────────────────────
-     Lexicographic string comparison works correctly here because
-     times are zero-padded 24-hr "HH:MM" strings:
-       "07:59" < "08:00"  →  true  (blocked)
-       "20:01" > "20:00"  →  true  (blocked)
-       "14:30" is within  →  passes                           */
+  /* ── Time window: 08:00–20:00 ───────────── */
   if (data.time < MEETING_TIME_MIN || data.time > MEETING_TIME_MAX) {
     alert('Meeting time must be between 8:00 AM and 8:00 PM.');
     return;
@@ -425,7 +403,7 @@ document.getElementById('schedule-form').addEventListener('submit', async functi
       time:      data.time,                                    /* "HH:MM", within 08:00–20:00 */
       location:  data.location,
       agenda:    data.agenda,
-      minutes:   '',                                           /* filled via Task 5 later     */
+      minutes:   '',                                           
       createdBy: currentUser.uid,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
@@ -456,10 +434,7 @@ document.getElementById('schedule-form').addEventListener('submit', async functi
 
    meetingId   — Firestore doc id, stored in data-meeting-id.
    title       — display name shown in the dialog heading.
-   canEdit     — true for Admin/Treasurer, false for Members.
-
-   For Members (canEdit = false) the textarea is set to
-   readonly so they can read existing minutes but not write.     */
+   canEdit     — true for Admin/Treasurer, false for Members. Textarea is readonly for plebs*/
 
 function openMinutes(meetingId, title, canEdit) {
   currentMeetingId = meetingId;
@@ -490,7 +465,7 @@ function openMinutes(meetingId, title, canEdit) {
    11. RECORD MINUTES — save  (Task 5)
    ─────────────────────────────────────────────────────────────
    Writes the minutes text back to the meeting's Firestore
-   document using update() so other fields are preserved.
+   document using update().
 
    Also stamps minutesUpdatedAt and minutesUpdatedBy for audit.  */
 
