@@ -4,49 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - My Contributions</title>
-    <!-- CSS will be added later -->
 </head>
+<link rel="stylesheet" href="contributions.css">
 <body>
 
-    <!-- HEADER: StokPal logo + navigation buttons -->
     <header>
         <h1>StokPal</h1>
         <nav>
             <button id="dashboardButton">Dashboard</button>
+            <button id="backButton">Back</button>
             <button id="logoutButton">Logout</button>
         </nav>
     </header>
 
-    <!-- MAIN CONTENT -->
     <main>
         <h1>Contribution Tracking</h1>
-
-        <!-- Container where dynamic content will be inserted -->
         <section id="dynamicContent"></section>
     </main>
 
     <script type="module">
-        // ============================================================
-        // IMPORTS
-        // ============================================================
-        import { auth, db } from '../firebase-config.js';
+        import { auth } from '../js/firebase-config.js';
         import { 
             getCurrentUserId,
-            listenToMemberContributions,
-            getPayoutSchedule 
+            getUserGroups,
+            listenToMemberContributions
         } from './contributions.js';
 
-        // ============================================================
-        // GLOBAL VARIABLES
-        // ============================================================
-        let activeGroupId = null;      // Tracks which group's table is currently visible
-        let activeUnsubscribe = null;  // Tracks real-time listener for active group
+        let activeGroupId = null;
+        let activeUnsubscribe = null;
+        let activeTableSection = null;
 
-        // ============================================================
-        // NAVIGATION FUNCTIONS
-        // ============================================================
-
-        // Logout function
         async function logout() {
             try {
                 await auth.signOut();
@@ -56,66 +43,55 @@
             }
         }
 
-        // Go to dashboard
         function goToDashboard() {
             window.location.href = 'dashboard.html';
         }
 
-        // ============================================================
-        // FETCH USER'S GROUPS (from Person 3's 'groups' collection)
-        // ============================================================
-        // This reads from: 'groups' collection (created by Person 3)
-        // Expects: 'groups' collection has fields: 'id', 'name', 'members' (array of userIds)
-        // For Treasurer view, also expects 'treasurerId' field
-        // ============================================================
-
-        async function getUserGroups(userId) {
-            // Query the 'groups' collection to find groups where this user is a member
-            // This assumes Person 3 stores 'members' as an array of user IDs
-            const groupsSnapshot = await db.collection('groups')
-                .where('members', 'array-contains', userId)
-                .get();
-            
-            return groupsSnapshot.docs.map(document => ({
-                id: document.id,
-                name: document.data().name,
-                ...document.data()
-            }));
+        function goBack() {
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         }
 
-        // ============================================================
-        // DISPLAY CONTRIBUTIONS TABLE FOR A SPECIFIC GROUP
-        // ============================================================
-        // This reads from: YOUR 'contributions' collection
-        // Expects: 'contributions' collection has fields: userId, groupId, amount, date, status
-        // ============================================================
-
-        function displayContributionsTable(groupId, groupName, containerElement) {
-            // Clear any existing table in this container
-            const existingTable = containerElement.querySelector(`#contributions-table-${groupId}`);
-            if (existingTable) {
-                existingTable.remove();
+        function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
+            // Remove active table if exists
+            if (activeTableSection && activeTableSection.parentNode) {
+                activeTableSection.remove();
             }
-
-            // Stop any existing real-time listener for previous group
             if (activeUnsubscribe) {
                 activeUnsubscribe();
                 activeUnsubscribe = null;
             }
 
-            // Create a section to hold the table
             const tableSection = document.createElement('section');
             tableSection.id = `contributions-table-${groupId}`;
             
-            // Add heading
             const heading = document.createElement('h3');
             heading.textContent = `Contributions for ${groupName}`;
             tableSection.appendChild(heading);
 
-            // Create table
-            const table = document.createElement('table');
+            // Only add Collapse button if showCollapseButton is true (for 2+ groups)
+            if (showCollapseButton) {
+                const collapseButton = document.createElement('button');
+                collapseButton.textContent = 'Collapse';
+                collapseButton.style.marginBottom = '1rem';
+                collapseButton.addEventListener('click', () => {
+                    if (activeTableSection && activeTableSection.parentNode) {
+                        activeTableSection.remove();
+                    }
+                    if (activeUnsubscribe) {
+                        activeUnsubscribe();
+                        activeUnsubscribe = null;
+                    }
+                    activeTableSection = null;
+                    activeGroupId = null;
+                });
+                tableSection.appendChild(collapseButton);
+            }
 
-            // Table header
+            const table = document.createElement('table');
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
             const headers = ['Amount', 'Date', 'Status'];
@@ -127,48 +103,26 @@
             thead.appendChild(headerRow);
             table.appendChild(thead);
 
-            // Table body (will be populated by real-time listener)
             const tbody = document.createElement('tbody');
             tbody.id = `contributions-body-${groupId}`;
             table.appendChild(tbody);
             tableSection.appendChild(table);
 
-            // Add "View Payout Schedule" button below the table
-            const payoutButton = document.createElement('button');
-            payoutButton.textContent = 'View Payout Schedule';
-            payoutButton.addEventListener('click', () => {
-                window.location.href = `payout.html?groupId=${groupId}`;
-            });
-            tableSection.appendChild(payoutButton);
-
-            // Add the table section to the container
             containerElement.appendChild(tableSection);
+            activeTableSection = tableSection;
 
-            // Set up real-time listener for this group's contributions
-            // This listener will update the table automatically when data changes
             activeUnsubscribe = listenToMemberContributions(getCurrentUserId(), (allContributions) => {
-                // Filter contributions for this specific group
                 const groupContributions = allContributions.filter(c => c.groupId === groupId);
-                
-                // Get the tbody and clear it
                 const targetTbody = document.getElementById(`contributions-body-${groupId}`);
                 if (!targetTbody) return;
                 
                 targetTbody.innerHTML = '';
                 
-                // Add each contribution as a row
                 groupContributions.forEach(contribution => {
                     const row = targetTbody.insertRow();
+                    row.insertCell(0).textContent = `R${contribution.amount}`;
+                    row.insertCell(1).textContent = contribution.date;
                     
-                    // Amount cell
-                    const amountCell = row.insertCell(0);
-                    amountCell.textContent = `R${contribution.amount}`;
-                    
-                    // Date cell
-                    const dateCell = row.insertCell(1);
-                    dateCell.textContent = contribution.date;
-                    
-                    // Status cell
                     const statusCell = row.insertCell(2);
                     if (contribution.status === 'confirmed') {
                         statusCell.textContent = '✅ Confirmed';
@@ -177,40 +131,17 @@
                     } else {
                         statusCell.textContent = '⏳ Pending';
                     }
-                    
-                    row.appendChild(amountCell);
-                    row.appendChild(dateCell);
-                    row.appendChild(statusCell);
                 });
             });
         }
 
-        // ============================================================
-        // REMOVE ACTIVE CONTRIBUTIONS TABLE
-        // ============================================================
-
-        function removeActiveTable() {
-            if (activeUnsubscribe) {
-                activeUnsubscribe();
-                activeUnsubscribe = null;
-            }
-            activeGroupId = null;
-        }
-
-        // ============================================================
-        // DISPLAY LIST OF GROUPS (for 2+ groups case)
-        // ============================================================
-
         function displayGroupList(groups, container) {
-            // Clear container
             container.innerHTML = '';
             
-            // Add instructions
             const instructions = document.createElement('p');
             instructions.textContent = 'Your groups:';
             container.appendChild(instructions);
             
-            // Create a list for groups
             const groupList = document.createElement('ul');
             groupList.style.listStyle = 'none';
             groupList.style.padding = '0';
@@ -222,33 +153,23 @@
                 listItem.style.border = '1px solid #ddd';
                 listItem.style.borderRadius = '8px';
                 
-                // Group name
                 const groupName = document.createElement('strong');
                 groupName.textContent = group.name;
                 listItem.appendChild(groupName);
-                
-                // Spacing
                 listItem.appendChild(document.createElement('br'));
                 
-                // View Contributions button
                 const viewContributionsBtn = document.createElement('button');
                 viewContributionsBtn.textContent = 'View Contributions';
                 viewContributionsBtn.style.marginRight = '0.5rem';
                 viewContributionsBtn.addEventListener('click', () => {
-                    // Remove previous active table
-                    removeActiveTable();
-                    // Set new active group
-                    activeGroupId = group.id;
-                    // Display contributions table for this group
-                    displayContributionsTable(group.id, group.name, container);
+                    displayContributionsTable(group.id, group.name, container, true);
                 });
                 listItem.appendChild(viewContributionsBtn);
                 
-                // View Payout button
                 const viewPayoutBtn = document.createElement('button');
                 viewPayoutBtn.textContent = 'View Payout Schedule';
                 viewPayoutBtn.addEventListener('click', () => {
-                    window.location.href = `payout.html?groupId=${group.id}`;
+                    window.location.href = `payout.html?groupId=${group.id}&returnTo=my`;
                 });
                 listItem.appendChild(viewPayoutBtn);
                 
@@ -258,25 +179,24 @@
             container.appendChild(groupList);
         }
 
-        // ============================================================
-        // DISPLAY SINGLE GROUP TABLE (for 1 group case)
-        // ============================================================
-
         function displaySingleGroupTable(groups, container) {
             const singleGroup = groups[0];
-            
-            // Display heading
             const heading = document.createElement('h2');
             heading.textContent = `Your contributions for group: ${singleGroup.name}`;
             container.appendChild(heading);
             
-            // Display contributions table
-            displayContributionsTable(singleGroup.id, singleGroup.name, container);
+            // Add View Payout button for single group
+            const payoutBtn = document.createElement('button');
+            payoutBtn.textContent = 'View Payout Schedule';
+            payoutBtn.style.marginBottom = '1rem';
+            payoutBtn.addEventListener('click', () => {
+                window.location.href = `payout.html?groupId=${singleGroup.id}&returnTo=my`;
+            });
+            container.appendChild(payoutBtn);
+            
+            // NO collapse button for single group (showCollapseButton = false)
+            displayContributionsTable(singleGroup.id, singleGroup.name, container, false);
         }
-
-        // ============================================================
-        // DISPLAY NO GROUPS MESSAGE (for 0 groups case)
-        // ============================================================
 
         function displayNoGroupsMessage(container) {
             container.innerHTML = `
@@ -285,52 +205,30 @@
             `;
         }
 
-        // ============================================================
-        // MAIN FUNCTION
-        // ============================================================
-
         async function loadMyPage() {
-            // Check if user is logged in
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
                 window.location.href = 'login.html';
                 return;
             }
             
-            // Get user's groups (from Person 3's 'groups' collection)
             const groups = await getUserGroups(currentUserId);
-            
-            // Get the dynamic content container
             const container = document.getElementById('dynamicContent');
-            
-            // Clear container
             container.innerHTML = '';
-            removeActiveTable();
             
-            // Case 1: No groups
             if (groups.length === 0) {
                 displayNoGroupsMessage(container);
-            }
-            // Case 2: One group - show table directly
-            else if (groups.length === 1) {
+            } else if (groups.length === 1) {
                 displaySingleGroupTable(groups, container);
-            }
-            // Case 3: Multiple groups - show list with buttons
-            else {
+            } else {
                 displayGroupList(groups, container);
             }
         }
 
-        // ============================================================
-        // SET UP EVENT LISTENERS
-        // ============================================================
-
-        document.getElementById('logoutButton').addEventListener('click', logout);
         document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
+        document.getElementById('backButton').addEventListener('click', goBack);
+        document.getElementById('logoutButton').addEventListener('click', logout);
 
-        // ============================================================
-        // START THE APP
-        // ============================================================
         loadMyPage();
     </script>
 </body>

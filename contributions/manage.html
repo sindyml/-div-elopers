@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Manage Contributions</title>
 </head>
+<link rel="stylesheet" href="contributions.css">
 <body>
 
     <header>
         <h1>StokPal</h1>
         <nav>
             <button id="dashboardButton">Dashboard</button>
+            <button id="backButton">Back</button>
             <button id="logoutButton">Logout</button>
         </nav>
     </header>
@@ -21,25 +23,18 @@
     </main>
 
     <script type="module">
-        // ============================================================
-        // IMPORTS
-        // ============================================================
-        import { auth, db } from '../firebase-config.js';
+        import { auth } from '../js/firebase-config.js';
         import { 
             getCurrentUserId,
+            getCurrentUserRole,
+            getTreasurerGroups,
+            getMemberName,
             updateContributionStatus,
             listenToGroupContributions
         } from './contributions.js';
 
-        // ============================================================
-        // GLOBAL VARIABLES
-        // ============================================================
-        let activeGroupId = null;           // Currently selected group
-        let activeUnsubscribe = null;       // Real-time listener for current group
-
-        // ============================================================
-        // NAVIGATION FUNCTIONS
-        // ============================================================
+        let activeGroupId = null;
+        let activeUnsubscribe = null;
 
         async function logout() {
             try {
@@ -54,28 +49,13 @@
             window.location.href = 'dashboard.html';
         }
 
-        // ============================================================
-        // FETCH GROUPS WHERE USER IS TREASURER (from Person 3's 'groups' collection)
-        // ============================================================
-        // Reads from: 'groups' collection (created by Person 3)
-        // Expects: 'groups' collection has fields: 'treasurerId' (string), 'name' (string)
-        // ============================================================
-
-        async function getTreasurerGroups(treasurerId) {
-            const groupsSnapshot = await db.collection('groups')
-                .where('treasurerId', '==', treasurerId)
-                .get();
-            
-            return groupsSnapshot.docs.map(document => ({
-                id: document.id,
-                name: document.data().name,
-                ...document.data()
-            }));
+        function goBack() {
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         }
-
-        // ============================================================
-        // DISPLAY GROUP LIST (when no group selected yet)
-        // ============================================================
 
         function displayGroupList(groups, container) {
             container.innerHTML = '';
@@ -98,7 +78,6 @@
                 const groupName = document.createElement('strong');
                 groupName.textContent = group.name;
                 listItem.appendChild(groupName);
-
                 listItem.appendChild(document.createElement('br'));
 
                 const selectButton = document.createElement('button');
@@ -114,41 +93,31 @@
             container.appendChild(groupList);
         }
 
-        // ============================================================
-        // DISPLAY CONTRIBUTIONS TABLE FOR SELECTED GROUP
-        // ============================================================
-        // Reads from: YOUR 'contributions' collection (via real-time listener)
-        // Expects: 'contributions' collection has fields: userId, groupId, amount, date, status
-        // Also reads from: 'users' collection (Person 1/2) to get member names
-        // ============================================================
-
         async function displayContributionsTable(groupId, groupName, container) {
-            // Clear container
+            if (activeUnsubscribe) {
+                activeUnsubscribe();
+                activeUnsubscribe = null;
+            }
+
             container.innerHTML = '';
 
-            // Show which group we are managing
             const groupHeading = document.createElement('h2');
             groupHeading.textContent = `Managing group: ${groupName}`;
             container.appendChild(groupHeading);
 
-            // Change Group button
-            const changeGroupButton = document.createElement('button');
-            changeGroupButton.textContent = 'Change Group';
-            changeGroupButton.addEventListener('click', () => {
-                // Stop real-time listener
+            const backToGroupsButton = document.createElement('button');
+            backToGroupsButton.textContent = 'Back to Groups';
+            backToGroupsButton.style.marginBottom = '1rem';
+            backToGroupsButton.addEventListener('click', () => {
                 if (activeUnsubscribe) {
                     activeUnsubscribe();
                     activeUnsubscribe = null;
                 }
-                activeGroupId = null;
-                // Reload the group list
                 loadManagePage();
             });
-            container.appendChild(changeGroupButton);
+            container.appendChild(backToGroupsButton);
 
-            // Create table structure
             const table = document.createElement('table');
-
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
             const headers = ['Member', 'Amount', 'Date', 'Status', 'Action'];
@@ -165,26 +134,17 @@
             table.appendChild(tbody);
             container.appendChild(table);
 
-            // View Payout Schedule button
             const payoutButton = document.createElement('button');
             payoutButton.textContent = 'View Payout Schedule';
+            payoutButton.style.marginTop = '1rem';
             payoutButton.addEventListener('click', () => {
                 window.location.href = `payout.html?groupId=${groupId}&returnTo=manage`;
             });
             container.appendChild(payoutButton);
 
-            // ============================================================
-            // REAL-TIME LISTENER for contributions of this group
-            // This updates automatically when Treasurer confirms/misses
-            // ============================================================
-            if (activeUnsubscribe) {
-                activeUnsubscribe();
-            }
-
             activeUnsubscribe = listenToGroupContributions(groupId, async (contributions) => {
                 const tbodyElement = document.getElementById(`contributions-tbody-${groupId}`);
                 if (!tbodyElement) return;
-
                 tbodyElement.innerHTML = '';
 
                 if (contributions.length === 0) {
@@ -195,28 +155,14 @@
                     return;
                 }
 
-                // For each contribution, we need the member's name
-                // Member name is stored in Person 1/2's 'users' collection
                 for (const contribution of contributions) {
                     const row = tbodyElement.insertRow();
+                    const memberName = await getMemberName(contribution.userId);
 
-                    // Get member name from 'users' collection using userId
-                    const userDocument = await db.collection('users').doc(contribution.userId).get();
-                    const memberName = userDocument.exists ? userDocument.data().name || contribution.userId : contribution.userId;
+                    row.insertCell(0).textContent = memberName;
+                    row.insertCell(1).textContent = `R${contribution.amount}`;
+                    row.insertCell(2).textContent = contribution.date;
 
-                    // Member Name cell
-                    const nameCell = row.insertCell(0);
-                    nameCell.textContent = memberName;
-
-                    // Amount cell
-                    const amountCell = row.insertCell(1);
-                    amountCell.textContent = `R${contribution.amount}`;
-
-                    // Date cell
-                    const dateCell = row.insertCell(2);
-                    dateCell.textContent = contribution.date;
-
-                    // Status cell
                     const statusCell = row.insertCell(3);
                     if (contribution.status === 'confirmed') {
                         statusCell.textContent = '✅ Confirmed';
@@ -226,22 +172,21 @@
                         statusCell.textContent = '⏳ Pending';
                     }
 
-                    // Action cell (only show buttons if status is pending)
                     const actionCell = row.insertCell(4);
                     if (contribution.status === 'pending') {
                         const confirmButton = document.createElement('button');
                         confirmButton.textContent = 'Confirm';
+                        confirmButton.className = 'confirm';
                         confirmButton.style.marginRight = '0.5rem';
                         confirmButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'confirmed');
-                            // Table will update automatically via real-time listener
                         });
 
                         const missButton = document.createElement('button');
                         missButton.textContent = 'Miss';
+                        missButton.className = 'miss';
                         missButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'missed');
-                            // Table will update automatically via real-time listener
                         });
 
                         actionCell.appendChild(confirmButton);
@@ -253,70 +198,57 @@
             });
         }
 
-        // ============================================================
-        // LOAD CONTRIBUTIONS FOR A SPECIFIC GROUP
-        // ============================================================
-
         async function loadContributionsForGroup(groupId, groupName) {
             activeGroupId = groupId;
             const container = document.getElementById('manageContent');
             await displayContributionsTable(groupId, groupName, container);
         }
 
-        // ============================================================
-        // DISPLAY NO GROUPS MESSAGE (when treasurer manages no groups)
-        // ============================================================
-
         function displayNoGroupsMessage(container) {
             container.innerHTML = `
                 <p>You are not assigned as a treasurer for any group.</p>
                 <p>Ask an Admin to assign you as treasurer.</p>
+                <button id="dashboardBtn">Go to Dashboard</button>
             `;
+            document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
         }
 
-        // ============================================================
-        // MAIN FUNCTION
-        // ============================================================
-
         async function loadManagePage() {
-            // Check if user is logged in
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            // Get groups where this user is treasurer (from Person 3's 'groups' collection)
-            const groups = await getTreasurerGroups(currentUserId);
+            const userRole = await getCurrentUserRole();
+            if (userRole !== 'Treasurer' && userRole !== 'Admin') {
+                document.getElementById('manageContent').innerHTML = `
+                    <p>Access denied. Only Treasurers and Admins can access this page.</p>
+                    <button id="dashboardBtn">Go to Dashboard</button>
+                `;
+                document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
+                return;
+            }
 
+            const groups = await getTreasurerGroups(currentUserId);
             const container = document.getElementById('manageContent');
 
-            // Stop any active real-time listener
             if (activeUnsubscribe) {
                 activeUnsubscribe();
                 activeUnsubscribe = null;
             }
 
-            // Case 1: No groups managed
             if (groups.length === 0) {
                 displayNoGroupsMessage(container);
-            }
-            // Case 2: Show group list for treasurer to choose
-            else {
+            } else {
                 displayGroupList(groups, container);
             }
         }
 
-        // ============================================================
-        // SET UP EVENT LISTENERS
-        // ============================================================
-
-        document.getElementById('logoutButton').addEventListener('click', logout);
         document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
+        document.getElementById('backButton').addEventListener('click', goBack);
+        document.getElementById('logoutButton').addEventListener('click', logout);
 
-        // ============================================================
-        // START THE APP
-        // ============================================================
         loadManagePage();
     </script>
 </body>

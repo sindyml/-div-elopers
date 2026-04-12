@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Payout Schedule</title>
 </head>
+<link rel="stylesheet" href="contributions.css">
 <body>
 
     <header>
         <h1>StokPal</h1>
         <nav>
+            <button id="dashboardButton">Dashboard</button>
+            <button id="backButton">Back</button>
             <button id="logoutButton">Logout</button>
         </nav>
     </header>
@@ -20,23 +23,18 @@
     </main>
 
     <script type="module">
-        // ============================================================
-        // IMPORTS
-        // ============================================================
-        import { auth, db } from '../firebase-config.js';
-        import { getPayoutSchedule } from './contributions.js';
+        import { auth } from '../js/firebase-config.js';
+        import { 
+            getPayoutSchedule,
+            getGroupById,
+            getCurrentUserId
+        } from './contributions.js';
 
-        // ============================================================
-        // GET URL PARAMETERS
-        // ============================================================
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
 
-        // ============================================================
-        // LOGOUT FUNCTION
-        // ============================================================
         async function logout() {
             try {
                 await auth.signOut();
@@ -46,34 +44,26 @@
             }
         }
 
-        // ============================================================
-        // GET GROUP NAME FROM PERSON 3'S 'groups' COLLECTION
-        // Reads from: groups collection (created by Person 3)
-        // Expects: groups collection has field 'name'
-        // ============================================================
-        async function getGroupName(groupId) {
-            const groupDocument = await db.collection('groups').doc(groupId).get();
-            if (groupDocument.exists) {
-                return groupDocument.data().name;
-            }
-            return null;
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
         }
 
-        // ============================================================
-        // DISPLAY PAYOUT SCHEDULE
-        // Reads from: YOUR 'payouts' collection
-        // Expects: payouts collection has fields: order, userDisplayName, payoutDate, amount
-        // ============================================================
-        async function displayPayoutSchedule(groupId, groupName, returnTo) {
+        function goBack() {
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        async function displayPayoutSchedule(groupId, groupName) {
             const container = document.getElementById('payoutContent');
             container.innerHTML = '';
 
-            // Display group name
             const groupHeading = document.createElement('h2');
             groupHeading.textContent = `Group: ${groupName}`;
             container.appendChild(groupHeading);
 
-            // Fetch payout schedule from YOUR collection
             const payouts = await getPayoutSchedule(groupId);
 
             if (payouts.length === 0) {
@@ -81,10 +71,7 @@
                 noDataMessage.textContent = 'No payout schedule found for this group.';
                 container.appendChild(noDataMessage);
             } else {
-                // Create table
                 const table = document.createElement('table');
-
-                // Table header
                 const thead = document.createElement('thead');
                 const headerRow = document.createElement('tr');
                 const headers = ['Order', 'Member Name', 'Payout Date', 'Amount'];
@@ -96,7 +83,6 @@
                 thead.appendChild(headerRow);
                 table.appendChild(thead);
 
-                // Table body
                 const tbody = document.createElement('tbody');
                 payouts.forEach(payout => {
                     const row = tbody.insertRow();
@@ -108,86 +94,40 @@
                 table.appendChild(tbody);
                 container.appendChild(table);
             }
-
-            // ============================================================
-            // BACK BUTTON - returns to previous screen
-            // ============================================================
-            const backButton = document.createElement('button');
-            
-            if (returnTo === 'my') {
-                backButton.textContent = 'Back to My Contributions';
-                backButton.addEventListener('click', () => {
-                    window.location.href = 'my.html';
-                });
-            } else if (returnTo === 'manage') {
-                backButton.textContent = 'Back to Manage Contributions';
-                backButton.addEventListener('click', () => {
-                    window.location.href = 'manage.html';
-                });
-            } else {
-                // Default fallback
-                backButton.textContent = 'Back';
-                backButton.addEventListener('click', () => {
-                    window.location.href = 'dashboard.html';
-                });
-            }
-            
-            container.appendChild(backButton);
         }
 
-        // ============================================================
-        // DISPLAY ERROR MESSAGE
-        // ============================================================
         function displayError(message) {
             const container = document.getElementById('payoutContent');
-            container.innerHTML = `
-                <p>${message}</p>
-                <button id="errorBackButton">Back to Dashboard</button>
-            `;
-            document.getElementById('errorBackButton').addEventListener('click', () => {
-                window.location.href = 'dashboard.html';
-            });
+            container.innerHTML = `<p>${message}</p>`;
         }
 
-        // ============================================================
-        // MAIN FUNCTION
-        // ============================================================
         async function loadPayoutPage() {
-            // Check if user is logged in
-            const currentUser = auth.currentUser;
-            if (!currentUser) {
+            const currentUserId = getCurrentUserId();
+            if (!currentUserId) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            // Get groupId from URL
             const groupId = getUrlParameter('groupId');
-            const returnTo = getUrlParameter('returnTo');
 
             if (!groupId) {
                 displayError('No group selected. Please go back and choose a group.');
                 return;
             }
 
-            // Get group name from Person 3's collection
-            const groupName = await getGroupName(groupId);
-            if (!groupName) {
+            const group = await getGroupById(groupId);
+            if (!group) {
                 displayError('Group not found. Please go back and try again.');
                 return;
             }
 
-            // Display the payout schedule
-            await displayPayoutSchedule(groupId, groupName, returnTo);
+            await displayPayoutSchedule(groupId, group.name);
         }
 
-        // ============================================================
-        // SET UP EVENT LISTENERS
-        // ============================================================
+        document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
+        document.getElementById('backButton').addEventListener('click', goBack);
         document.getElementById('logoutButton').addEventListener('click', logout);
 
-        // ============================================================
-        // START THE APP
-        // ============================================================
         loadPayoutPage();
     </script>
 </body>
