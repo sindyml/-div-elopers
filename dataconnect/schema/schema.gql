@@ -1,0 +1,29 @@
+type User @table {
+  email: String!
+  displayName: String!
+  createdAt: Timestamp!
+  photoUrl: String
+}
+
+type Group @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+}
+
+type Membership @table(key: ["user", "group"]) {
+  user: User!
+  group: Group!
+  role: String!
+  createdAt: Timestamp!
+}
+
+type Meeting @table {
+  group: Group!
+  title: String!
+  scheduledAt: Timestamp!
+  createdAt: Timestamp!
+  caller: User!
+  description: String
+  location: String
+}
