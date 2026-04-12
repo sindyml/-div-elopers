@@ -1,74 +1,62 @@
 /* =============================================================
-   meetings.js  —  Person 5 | Meeting Management
-   Stokvel Management Platform | Software Design 2026
-   
-   Covers all P5 Sprint 1 tasks:
      Task 1 — Schedule Meeting form (Treasurer/Admin only)
      Task 2 — Save meeting document to Firestore
      Task 3 — Meeting List view for all roles
      Task 4 — Real-time in-app notification via onSnapshot()
      Task 5 — Record Minutes feature
 
-   HOW TO CONNECT TO FIRESTORE:
-   ─────────────────────────────
-   This file assumes firebase-config.js has already run and
-   exposed these globals on the window object:
-
-     window.auth — firebase.auth()
-     window.db   — firebase.firestore()
-
-   If your firebase-config.js uses different variable names,
-   update the two lines marked  ← CHANGE  in the
-   "Firebase references" section below.
-   ============================================================= */
-
-
-/* ── 1. Firebase references ──────────────────────────────────
-   Pull the auth and db instances that firebase-config.js sets
-   up. Adjust the property names if yours differ.               */
-
-//const auth = window.auth;   /* ← CHANGE if your config exports auth differently  */
-//const db   = window.db;     /* ← CHANGE if your config exports db differently    */
+/* ── 1. Firebase references ──────────────────────────────────*/
 const db   = firebase.firestore();
 const auth = firebase.auth();
 
 
 /* ── 2. Module-level state ───────────────────────────────────
-   currentUser   — populated once onAuthStateChanged fires.
-   currentRole   — 'Admin' | 'Treasurer' | 'Member', read from
-                   the user's Firestore document.
+   currentUser      — populated once onAuthStateChanged fires.
+   currentRole      — 'Admin' | 'Treasurer' | 'Member', read
+                      from the user's Firestore document.
+   currentGroupId   — the single group this user belongs to.
+                      Resolved via the members subcollection
+                      (groups/{groupId}/members/{memberId}).
+                      Null if the user has no group yet.
+                      ASSUMPTION: a user is in at most 1 group.
    currentMeetingId — the Firestore doc id of the meeting whose
-                   minutes modal is currently open.
+                      minutes modal is currently open.
    unsubscribeListener — holds the onSnapshot unsubscribe fn so
-                   we can detach it when the user logs out.      */
+                      we can detach it when the user logs out.   */
 
 let currentUser         = null;
 let currentRole         = null;
+let currentGroupId      = null;   
 let currentMeetingId    = null;
 let unsubscribeListener = null;
+
+/* ── Time boundary constants ─────────────────────────────────
+   Meetings may only be scheduled between 08:00 and 20:00.
+   Stored as "HH:MM" strings — lexicographic comparison works
+   correctly for zero-padded 24-hr times.                       */
+const MEETING_TIME_MIN = '08:00'; /* 8:00 AM — earliest allowed */
+const MEETING_TIME_MAX = '20:00'; /* 8:00 PM — latest  allowed  */
 
 
 /* ─────────────────────────────────────────────────────────────
    3. ROLE GUARD
    ─────────────────────────────────────────────────────────────
    Waits for Firebase Auth to resolve, then reads the user's
-   role from Firestore.
+   role from Firestore and resolves their group membership.
 
    Firestore path assumed:  users/{uid}
-   Document field assumed:  role  (value: 'Admin' | 'Treasurer' | 'Member')
+   Document field assumed:  role  ('Admin' | 'Treasurer' | 'Member')
 
    ← CHANGE "users" if your collection is named differently.
    ← CHANGE "role"  if your role field has a different name.
 
    What happens per role:
      Admin / Treasurer — schedule form stays visible; page loads.
-     Member            — schedule form is hidden; page loads
-                         (members can still VIEW the meeting list).
+     Member            — schedule form is hidden; page loads.
      Not logged in     — redirected to /login.html immediately.   */
 
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
-    /* No active session — send to login */
     window.location.href = 'login.html';
     return;
   }
@@ -76,19 +64,51 @@ auth.onAuthStateChanged(async (user) => {
   currentUser = user;
 
   try {
-    /* ── Fetch the user's role document from Firestore ── */
+    /* ── Fetch the user's app-level role from Firestore ── */
     const userDoc = await db
-      .collection('users')    /* ← CHANGE collection name if needed */
+      .collection('users')
       .doc(user.uid)
       .get();
 
     if (!userDoc.exists) {
-      /* Document missing — treat as unauthorised */
       window.location.href = 'login.html';
       return;
     }
 
-    currentRole = userDoc.data().role; /* ← CHANGE 'role' if your field differs */
+    currentRole = userDoc.data().role;
+
+    /* ── Resolve which group this user belongs to ──────────
+       The groups schema has no memberIds array. Instead, each
+       group stores members in a subcollection:
+         groups/{groupId}/members/{memberId}  →  { uid, role, joinedAt }
+
+       We run a collectionGroup query to find the member doc
+       whose 'uid' field matches the current user. The grandparent
+       document id of that result is our groupId.
+
+       REQUIRES a Firestore collectionGroup index:
+         Collection group : members
+         Field            : uid
+         Order            : Ascending
+       Create it in Firebase Console → Firestore → Indexes.
+
+       ← CHANGE 'members' if your subcollection is named differently.
+       ← CHANGE 'uid'     if the field inside each member doc differs. */
+    const memberSnap = await db
+      .collectionGroup('members')       /* search ALL 'members' subcollections  */
+      .where('uid', '==', user.uid)     /* find the doc belonging to this user  */
+      .limit(1)                         /* at most 1 group per user             */
+      .get();
+
+    if (!memberSnap.empty) {
+      /* Path: groups/{groupId}/members/{memberId}
+         .parent       → CollectionReference for 'members'
+         .parent.parent → DocumentReference for the group doc
+         .id           → the groupId string we need            */
+      currentGroupId = memberSnap.docs[0].ref.parent.parent.id;
+    }
+    /* If empty, currentGroupId stays null.
+       The UI will show an empty state and the listener won't fire. */
 
     /* ── Apply role-based UI adjustments ── */
     applyRoleUI(currentRole);
@@ -110,42 +130,44 @@ auth.onAuthStateChanged(async (user) => {
    4. ROLE UI  —  show/hide the schedule form
    ─────────────────────────────────────────────────────────────
    Members can view the meeting list but cannot schedule.
-   The form section is hidden entirely for Members so they
-   cannot interact with or submit it even via DevTools.          */
+   The form section is hidden entirely for Members.
+
+   Also sets min/max on the time input to restrict the browser's
+   native picker to the 08:00–20:00 window. A second validation
+   check in the form submit handler (Section 9) ensures this
+   cannot be bypassed via DevTools.                              */
 
 function applyRoleUI(role) {
   const scheduleCard = document.querySelector('section[aria-labelledby="schedule-heading"]');
 
   if (role === 'Member') {
-    /* Hide the entire schedule card for Members */
     scheduleCard.hidden = true;
-
-    /* Expand the meeting list to full width since the form is gone */
     document.querySelector('section.meetings-layout').style.gridTemplateColumns = '1fr';
   }
 
-  /* Admin and Treasurer: no changes — form is visible by default */
+  /* ── Enforce time picker boundaries (8 AM – 8 PM) ── */
+  const timeInput = document.getElementById('meeting-time');
+  if (timeInput) {
+    timeInput.min = MEETING_TIME_MIN; /* '08:00' */
+    timeInput.max = MEETING_TIME_MAX; /* '20:00' */
+  }
 }
 
 
 /* ─────────────────────────────────────────────────────────────
-   5. LOAD USER'S GROUPS into the <select>
+   5. LOAD USER'S GROUP into the <select>
    ─────────────────────────────────────────────────────────────
-   Replaces the hardcoded <option> elements in the HTML with
-   the actual groups this user belongs to.
+   BEFORE: queried groups with .where('memberIds','array-contains',uid)
+   AFTER:  currentGroupId was already resolved in Section 3 via
+           the members subcollection collectionGroup query.
+           We simply fetch that one group's name and render it.
 
-   Firestore path assumed:
-     groups/{groupId}
-   Group document fields assumed:
-     name      — display name of the group  (string)
-     memberIds — array of user uids          (array of strings)
+   Because a user belongs to at most 1 group, the <select>
+   becomes a single-option confirmation rather than a multi-
+   choice picker.
 
-   ← CHANGE 'groups'    if your collection is named differently.
-   ← CHANGE 'memberIds' if your membership field differs.
-   ← CHANGE 'name'      if your group name field differs.
-
-   For Admins/Treasurers we load only groups they belong to.
-   Extend the query if Admins should see all groups.             */
+   ← CHANGE 'groups' if your collection is named differently.
+   ← CHANGE 'name'   if your group name field differs.          */
 
 async function loadUserGroups(uid, role) {
   const select = document.getElementById('meeting-group');
@@ -153,29 +175,32 @@ async function loadUserGroups(uid, role) {
   /* Clear existing hardcoded options except the placeholder */
   select.innerHTML = '<option value="" disabled selected>Select a group</option>';
 
+  if (!currentGroupId) {
+    /* No group resolved — show informational disabled option */
+    const opt    = document.createElement('option');
+    opt.disabled = true;
+    opt.textContent = 'You are not in any groups yet';
+    select.appendChild(opt);
+    return;
+  }
+
   try {
-    const snapshot = await db
-      .collection('groups')                  /* ← CHANGE collection name if needed */
-      .where('memberIds', 'array-contains', uid) /* ← CHANGE 'memberIds' if needed */
+    /* Fetch the single group document by its resolved id */
+    const groupDoc = await db
+      .collection('groups')
+      .doc(currentGroupId)
       .get();
 
-    if (snapshot.empty) {
-      const opt = document.createElement('option');
-      opt.disabled = true;
-      opt.textContent = 'You are not in any groups yet';
-      select.appendChild(opt);
-      return;
-    }
+    if (!groupDoc.exists) return;
 
-    snapshot.forEach((doc) => {
-      const opt = document.createElement('option');
-      opt.value = doc.id;
-      opt.textContent = doc.data().name; /* ← CHANGE 'name' if your field differs */
-      select.appendChild(opt);
-    });
+    const opt    = document.createElement('option');
+    opt.value    = groupDoc.id;
+    opt.textContent = groupDoc.data().name; /* ← CHANGE 'name' if your field differs */
+    opt.selected = true;                    /* auto-select the only available group   */
+    select.appendChild(opt);
 
   } catch (err) {
-    console.error('Failed to load groups:', err);
+    console.error('Failed to load group:', err);
   }
 }
 
@@ -184,51 +209,30 @@ async function loadUserGroups(uid, role) {
    6. REAL-TIME MEETING LISTENER  (Task 3 + Task 4)
    ─────────────────────────────────────────────────────────────
    Attaches a Firestore onSnapshot() listener to the meetings
-   collection, filtered to groups the current user belongs to.
+   collection. Now that currentGroupId is known, we filter
+   server-side with .where('groupId', '==', currentGroupId) so
+   only this group's meetings stream to the client. This removes
+   the need for the previous client-side membership check.
 
-   Firestore path assumed:  meetings/{meetingId}
-   Document fields assumed:
-     groupId   — id of the group this meeting belongs to (string)
-     title     — first agenda line / meeting title        (string)
-     date      — ISO date string e.g. "2026-04-19"        (string)
-     time      — 24-hr time string e.g. "14:00"           (string)
-     location  — address or URL                           (string)
-     agenda    — full agenda text                         (string)
-     minutes   — recorded minutes text (may be empty)    (string)
-     createdAt — Firestore server timestamp
+   INDEX REQUIRED: groupId (ASC) + date (ASC) — create in
+   Firebase Console → Firestore → Indexes → Composite.
 
-   ← CHANGE 'meetings'  if your collection is named differently.
-   ← CHANGE field names above if yours differ.
-
-   The listener fires once immediately (loads existing data) and
-   again whenever a document is added, modified, or removed.
-   New additions trigger the in-app notification banner.         */
+   ← CHANGE 'meetings' if your collection is named differently.
+   ← CHANGE field names above if yours differ.                  */
 
 function startMeetingListener(uid, role) {
-  /* Clean up any previous listener before attaching a new one */
   if (unsubscribeListener) unsubscribeListener();
 
-  /* Clear the hardcoded placeholder list items from the HTML */
   document.getElementById('upcoming-list').innerHTML = '';
   document.querySelector('ul.meeting-list[aria-label="Past meetings"]').innerHTML = '';
 
-  /* ── Build the Firestore query ──
-     We query all meetings; the filter by group membership
-     happens client-side in renderMeeting() because Firestore
-     does not support array-contains on a user-level field
-     combined with a group-level field in a single query without
-     a composite index.
-
-     ← CHANGE: If you create a composite index in Firestore
-       (groupId + date), replace the query below with:
-       db.collection('meetings')
-         .where('groupId', 'in', userGroupIds)
-         .orderBy('date', 'asc')
-       where userGroupIds is an array of the user's group ids.   */
+  /* Nothing to listen to if the user has no group yet */
+  if (!currentGroupId) return;
 
   unsubscribeListener = db
-    .collection('meetings')               /* ← CHANGE collection name if needed */
-    .orderBy('date', 'asc')               /* ← requires a Firestore index on 'date' */
+    .collection('meetings')
+    .where('groupId', '==', currentGroupId) /* ← scoped to user's single group */
+    .orderBy('date', 'asc')
     .onSnapshot(
       (snapshot) => {
         snapshot.docChanges().forEach((change) => {
@@ -237,11 +241,6 @@ function startMeetingListener(uid, role) {
           if (change.type === 'added') {
             renderMeeting(meeting, role);
 
-            /* Only show notification for genuinely new docs, not
-               the initial load. Firestore marks initial load docs
-               as 'added' too, so we check the hasPendingWrites
-               flag — new real-time additions have it false after
-               the server confirms the write.                     */
             if (!change.doc.metadata.hasPendingWrites) {
               showNotification(
                 `New meeting scheduled: "${meeting.title || 'Untitled'}" on ${formatDate(meeting.date)}`
@@ -250,13 +249,11 @@ function startMeetingListener(uid, role) {
           }
 
           if (change.type === 'modified') {
-            /* Re-render the updated meeting item in the list */
             const existing = document.querySelector(`[data-meeting-id="${meeting.id}"]`);
             if (existing) existing.replaceWith(buildMeetingItem(meeting, role));
           }
 
           if (change.type === 'removed') {
-            /* Remove the meeting item from the list */
             const existing = document.querySelector(`[data-meeting-id="${meeting.id}"]`);
             if (existing) existing.remove();
             updateUpcomingCount();
@@ -284,18 +281,14 @@ function startMeetingListener(uid, role) {
    Firestore security rules on the backend.                     */
 
 function renderMeeting(meeting, role) {
-  const item = buildMeetingItem(meeting, role);
+  const item  = buildMeetingItem(meeting, role);
   const today = new Date().toISOString().slice(0, 10);
 
   if (meeting.date >= today) {
-    /* Upcoming */
-    const list = document.getElementById('upcoming-list');
-    list.appendChild(item);
+    document.getElementById('upcoming-list').appendChild(item);
     updateUpcomingCount();
   } else {
-    /* Past */
-    const list = document.querySelector('ul.meeting-list[aria-label="Past meetings"]');
-    list.appendChild(item);
+    document.querySelector('ul.meeting-list[aria-label="Past meetings"]').appendChild(item);
   }
 }
 
@@ -318,14 +311,13 @@ function buildMeetingItem(meeting, role) {
   const safeTitle = title.replace(/'/g, "\\'");
   const hasMinutes = !!(meeting.minutes && meeting.minutes.trim());
 
-  /* Members can only view minutes, not write them */
-  const canEditMinutes = role === 'Admin' || role === 'Treasurer';
+  const canEditMinutes  = role === 'Admin' || role === 'Treasurer';
   const minutesBtnLabel = hasMinutes
     ? (canEditMinutes ? 'Edit' : 'View')
     : 'Minutes';
 
   const li = document.createElement('li');
-  li.className = isPast ? 'past' : 'upcoming';
+  li.className         = isPast ? 'past' : 'upcoming';
   li.dataset.meetingId = meeting.id;
 
   li.innerHTML = `
@@ -376,16 +368,13 @@ function buildMeetingItem(meeting, role) {
    Handles form submission. Validates all required fields, then
    writes a new document to the Firestore meetings collection.
 
-   The document written has these fields:
-     groupId   — selected group's Firestore doc id
-     title     — first line of the agenda (used as display name)
-     date      — ISO date string
-     time      — 24-hr time string
-     location  — address or URL
-     agenda    — full agenda text
-     minutes   — empty string (filled in later via Record Minutes)
-     createdBy — uid of the Treasurer/Admin who scheduled it
-     createdAt — Firestore server timestamp
+   TIME VALIDATION is intentionally duplicated here (in addition
+   to the HTML min/max set in applyRoleUI) because HTML
+   attributes can be removed or bypassed via DevTools.
+
+   groupId written to Firestore is always currentGroupId — the
+   value resolved from the members subcollection in Section 3,
+   not the <select> value (which is just a visual confirmation).
 
    ← CHANGE 'meetings' if your collection is named differently.
    ← CHANGE field names if your data model uses different keys.  */
@@ -393,8 +382,6 @@ function buildMeetingItem(meeting, role) {
 document.getElementById('schedule-form').addEventListener('submit', async function (e) {
   e.preventDefault();
 
-  /* Only Admin and Treasurer may submit — belt-and-suspenders
-     check in case the form was somehow un-hidden.              */
   if (currentRole !== 'Admin' && currentRole !== 'Treasurer') {
     alert('Only Admins and Treasurers can schedule meetings.');
     return;
@@ -402,48 +389,61 @@ document.getElementById('schedule-form').addEventListener('submit', async functi
 
   const data = Object.fromEntries(new FormData(this));
 
-  /* ── Client-side validation ── */
+  /* ── Required fields ── */
   if (!data.group || !data.date || !data.time || !data.location || !data.agenda) {
     alert('Please fill in all required fields.');
     return;
   }
 
-  /* Prevent scheduling meetings in the past */
+  /* ── Future date ── */
   const today = new Date().toISOString().slice(0, 10);
   if (data.date < today) {
     alert('Please select a future date.');
     return;
   }
 
+  /* ── Time window: 08:00–20:00 ──────────────────────────────
+     Lexicographic string comparison works correctly here because
+     times are zero-padded 24-hr "HH:MM" strings:
+       "07:59" < "08:00"  →  true  (blocked)
+       "20:01" > "20:00"  →  true  (blocked)
+       "14:30" is within  →  passes                           */
+  if (data.time < MEETING_TIME_MIN || data.time > MEETING_TIME_MAX) {
+    alert('Meeting time must be between 8:00 AM and 8:00 PM.');
+    return;
+  }
+
   const submitBtn = this.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
+  submitBtn.disabled    = true;
   submitBtn.textContent = 'Saving…';
 
   try {
-    /* ── Write to Firestore ── */
-    await db.collection('meetings').add({  /* ← CHANGE 'meetings' if needed */
-      groupId:   data.group,               /* ← CHANGE field name if needed */
-      title:     data.agenda.split('\n')[0].substring(0, 60), /* ← CHANGE 'title' if needed */
-      date:      data.date,                /* ← CHANGE field name if needed */
-      time:      data.time,                /* ← CHANGE field name if needed */
-      location:  data.location,            /* ← CHANGE field name if needed */
-      agenda:    data.agenda,              /* ← CHANGE field name if needed */
-      minutes:   '',                       /* ← CHANGE field name if needed */
-      createdBy: currentUser.uid,          /* ← CHANGE field name if needed */
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(), /* server timestamp */
+    await db.collection('meetings').add({
+      groupId:   currentGroupId,                               /* resolved group id           */
+      title:     data.agenda.split('\n')[0].substring(0, 60), /* first line of agenda        */
+      date:      data.date,                                    /* "YYYY-MM-DD"                */
+      time:      data.time,                                    /* "HH:MM", within 08:00–20:00 */
+      location:  data.location,
+      agenda:    data.agenda,
+      minutes:   '',                                           /* filled via Task 5 later     */
+      createdBy: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
 
-    /* onSnapshot() will automatically re-render the new meeting
-       in the list and trigger the notification banner for all
-       members — no manual DOM update needed here.              */
-
     this.reset();
+
+    /* Re-apply time constraints — form.reset() clears min/max  */
+    const timeInput = document.getElementById('meeting-time');
+    if (timeInput) {
+      timeInput.min = MEETING_TIME_MIN;
+      timeInput.max = MEETING_TIME_MAX;
+    }
 
   } catch (err) {
     console.error('Failed to schedule meeting:', err);
     alert('Something went wrong. Please try again.');
   } finally {
-    submitBtn.disabled = false;
+    submitBtn.disabled    = false;
     submitBtn.textContent = 'Schedule Meeting';
   }
 });
@@ -470,14 +470,11 @@ function openMinutes(meetingId, title, canEdit) {
   const textarea  = document.getElementById('minutes-text');
   const saveBtn   = document.querySelector('#minutes-form button[type="submit"]');
 
-  /* Fetch the existing minutes for this meeting from Firestore */
-  db.collection('meetings')           /* ← CHANGE 'meetings' if needed */
+  db.collection('meetings')
     .doc(meetingId)
     .get()
     .then((doc) => {
-      textarea.value = doc.exists ? (doc.data().minutes || '') : '';
-
-      /* Members can read but not edit */
+      textarea.value    = doc.exists ? (doc.data().minutes || '') : '';
       textarea.readOnly = !canEdit;
       saveBtn.hidden    = !canEdit;
 
@@ -495,11 +492,9 @@ function openMinutes(meetingId, title, canEdit) {
    Writes the minutes text back to the meeting's Firestore
    document using update() so other fields are preserved.
 
-   ← CHANGE 'meetings' if your collection is named differently.
-   ← CHANGE 'minutes'  if your minutes field is named differently. */
+   Also stamps minutesUpdatedAt and minutesUpdatedBy for audit.  */
 
 async function saveMinutes() {
-  /* Guard: Members should never reach this path */
   if (currentRole !== 'Admin' && currentRole !== 'Treasurer') return;
 
   const text = document.getElementById('minutes-text').value.trim();
@@ -509,16 +504,15 @@ async function saveMinutes() {
   }
 
   const saveBtn = document.querySelector('#minutes-form button[type="submit"]');
-  saveBtn.disabled = true;
+  saveBtn.disabled    = true;
   saveBtn.textContent = 'Saving…';
 
   try {
-    /* ── Update the minutes field on the meeting document ── */
     await db
-      .collection('meetings')             /* ← CHANGE 'meetings' if needed */
+      .collection('meetings')
       .doc(currentMeetingId)
       .update({
-        minutes: text,                    /* ← CHANGE 'minutes' if needed  */
+        minutes:          text,
         minutesUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         minutesUpdatedBy: currentUser.uid,
       });
@@ -530,7 +524,7 @@ async function saveMinutes() {
     console.error('Failed to save minutes:', err);
     alert('Could not save minutes. Please try again.');
   } finally {
-    saveBtn.disabled = false;
+    saveBtn.disabled    = false;
     saveBtn.textContent = 'Save Minutes';
   }
 }
@@ -549,7 +543,6 @@ function showNotification(message) {
   document.getElementById('notification-body').textContent = message;
   banner.style.display = 'block';
 
-  /* Auto-dismiss after 6 seconds */
   clearTimeout(showNotification._timer);
   showNotification._timer = setTimeout(closeBanner, 6000);
 }
@@ -597,3 +590,4 @@ function formatDate(isoDate) {
 window.addEventListener('beforeunload', () => {
   if (unsubscribeListener) unsubscribeListener();
 });
+
