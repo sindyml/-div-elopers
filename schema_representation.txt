@@ -10,7 +10,7 @@ groups (collection)
         members (subcollection)
             └── memberId (document)
                   uid: string
-                  role: "admin" | "member"
+                  role: "admin" | "member" | "treasurer"
                   joinedAt: timestamp
 
 invites (collection)
