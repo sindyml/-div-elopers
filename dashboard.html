@@ -100,16 +100,17 @@
       <!-- RIGHT — sidebar column -->
       <aside class="dashboard-col dashboard-col--side">
 
-        <!-- UPCOMING MEETINGS shell (P5 populates this) -->
+        <!-- UPCOMING MEETINGS widget (P5) -->
         <article class="card widget-section" aria-labelledby="meetings-heading">
           <header class="widget-section__header">
             <h2 id="meetings-heading" class="widget-section__title">📅 Upcoming Meetings</h2>
             <a href="meetings.html" class="widget-section__link">View all →</a>
           </header>
           <section id="meetings-container" aria-live="polite">
-            <p class="coming-soon-placeholder">
-              🔧 Meeting schedule coming soon — P5 is building this.
-            </p>
+            <div class="meetings-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
           </section>
         </article>
 
@@ -313,6 +314,140 @@
       if (user) {
         await checkInvites(user);
         await loadGroups();
+      }
+    });
+  })();
+  </script>
+
+  <!-- P5: Upcoming Meetings widget — real-time via Firestore onSnapshot() -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const meetingsContainer = document.getElementById('meetings-container');
+    const notificationRoot  = document.getElementById('notification-root');
+    let   unsubMeetings     = null;
+
+    /* ── Resolve which groups this user belongs to ───────── */
+    async function getUserGroupIds(uid) {
+      const snap = await db
+        .collection('memberships')
+        .where('uid', '==', uid)
+        .get();
+      return snap.docs.map(d => d.data().groupId);
+    }
+
+    /* ── Format helpers ──────────────────────────────────── */
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    }
+
+    function fmtTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      const hr = parseInt(h, 10);
+      const ampm = hr >= 12 ? 'PM' : 'AM';
+      return ((hr % 12) || 12) + ':' + m + ' ' + ampm;
+    }
+
+    /* ── Build a compact meeting card for the dashboard ──── */
+    function buildMeetingWidget(meeting) {
+      const d        = new Date(meeting.date);
+      const day      = d.getDate();
+      const monthStr = d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase();
+      const title    = (meeting.title || meeting.agenda?.split('\n')[0] || 'Untitled').substring(0, 50);
+
+      const li = document.createElement('li');
+      li.className = 'meeting-widget-item';
+      li.dataset.meetingId = meeting.id;
+      li.innerHTML = `
+        <time class="meeting-widget-date" datetime="${meeting.date}">
+          <strong>${day}</strong>
+          <span>${monthStr}</span>
+        </time>
+        <div class="meeting-widget-info">
+          <p class="meeting-widget-title">${title}</p>
+          <small class="meeting-widget-meta">
+            ${meeting.time ? fmtTime(meeting.time) : ''}${meeting.location ? ' · ' + meeting.location : ''}
+          </small>
+        </div>
+      `;
+      return li;
+    }
+
+    /* ── Render the empty state ──────────────────────────── */
+    function showEmpty() {
+      meetingsContainer.innerHTML =
+        '<p class="meetings-widget-empty">No upcoming meetings scheduled.</p>';
+    }
+
+    /* ── Show real-time notification banner ───────────────── */
+    function showMeetingNotification(meeting) {
+      if (!notificationRoot) return;
+      notificationRoot.innerHTML = `
+        <div class="notification-banner notification-banner--meeting">
+          <span>📅 New meeting: <strong>${meeting.title || 'Untitled'}</strong> on ${fmtDate(meeting.date)}</span>
+          <button type="button" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
+        </div>
+      `;
+      setTimeout(() => { notificationRoot.innerHTML = ''; }, 6000);
+    }
+
+    /* ── Attach onSnapshot listener for upcoming meetings ── */
+    function startDashboardMeetingListener(groupIds) {
+      if (unsubMeetings) unsubMeetings();
+      if (!groupIds.length) { showEmpty(); return; }
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      /* Firestore 'in' queries support up to 10 values */
+      unsubMeetings = db
+        .collection('meetings')
+        .where('groupId', 'in', groupIds.slice(0, 10))
+        .where('date', '>=', today)
+        .orderBy('date', 'asc')
+        .limit(5)
+        .onSnapshot(
+          (snapshot) => {
+            /* Full re-render on each snapshot for simplicity in the widget */
+            const meetings = [];
+            snapshot.forEach(doc => meetings.push({ id: doc.id, ...doc.data() }));
+
+            if (!meetings.length) { showEmpty(); return; }
+
+            const ul = document.createElement('ul');
+            ul.className = 'meeting-widget-list';
+            ul.setAttribute('aria-label', 'Upcoming meetings');
+            meetings.forEach(m => ul.appendChild(buildMeetingWidget(m)));
+            meetingsContainer.innerHTML = '';
+            meetingsContainer.appendChild(ul);
+
+            /* Notification for newly added docs (not from cache) */
+            snapshot.docChanges().forEach(change => {
+              if (change.type === 'added' && !change.doc.metadata.hasPendingWrites) {
+                showMeetingNotification({ id: change.doc.id, ...change.doc.data() });
+              }
+            });
+          },
+          (err) => {
+            console.error('[Meetings Widget] Listener error:', err);
+            meetingsContainer.innerHTML =
+              '<p class="meetings-widget-empty">Could not load meetings.</p>';
+          }
+        );
+    }
+
+    /* ── Init when auth resolves ─────────────────────────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      try {
+        const groupIds = await getUserGroupIds(user.uid);
+        startDashboardMeetingListener(groupIds);
+      } catch (err) {
+        console.error('[Meetings Widget]', err);
+        showEmpty();
       }
     });
   })();
