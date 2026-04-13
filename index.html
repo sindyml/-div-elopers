@@ -4,226 +4,97 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>FundCircle | Group Savings Made Simple</title>
-  <!-- External Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
-  <!-- Google Fonts + Font Awesome Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
 <div class="container">
-  <!-- Navigation -->
   <nav class="navbar">
-    <div class="logo">
-      <h1>FUNDCIRCLE</h1>
-      <span>Turn Small Contributions into Big Wins</span>
-    </div>
+    <div class="logo"><h1>FUNDCIRCLE</h1><span>Turn Small Contributions into Big Wins</span></div>
     <div class="nav-links">
-      <a href="#">Home</a>
-      <a href="#">Features</a>
-      <a href="#">About</a>
+      <a href="#">Home</a><a href="#">Features</a><a href="#">About</a>
       <div class="nav-buttons">
-        <button id = "Login" class ="btn-primary">Login</button>
-        <button class="btn-primary">Signup</button>
+        <button class="btn-primary" onclick="window.location.href='public/login.html'">Login</button>
+        <button class="btn-primary" onclick="window.location.href='public/login.html'">Signup</button>
       </div>
     </div>
   </nav>
 
-  <!-- Hero Section -->
-  <!--<div class="hero">
-    <div class="particles"></div>
+  <div class="hero">
     <div class="hero-content">
       <div class="hero-badge">✨ Group savings reimagined</div>
       <h2>Save Smarter. Together.</h2>
       <p>Because building wealth is better as a group. Stay connected, stay accountable, and grow your savings with people you trust.</p>
-      <button class="btn-primary btn-large">Start a Circle →</button>
+      <button class="btn-primary btn-large" onclick="window.location.href='public/login.html'">Start a Circle →</button>
     </div>
     <div class="hero-image">
       <i class="fas fa-users"></i>
-      <p>💰 collective power • shared wins</p>
+      <p style="margin-top: 12px;">💰 collective power • shared wins</p>
       <i class="fas fa-chart-line" style="font-size: 2rem; margin-top: 12px;"></i>
     </div>
   </div>
-</div>-->
-<div class="hero">
-  <div class="particles"></div>
-
-  <div class="hero-content">
-    <div class="hero-badge">✨ Group savings reimagined</div>
-    <h2>Save Smarter. Together.</h2>
-    <p>Because building wealth is better as a group. Stay connected, stay accountable, and grow your savings with people you trust.</p>
-    <button class="btn-primary btn-large">Start a Circle →</button>
-  </div>
-
-  <div class="hero-image">
-    <i class="fas fa-users"></i>
-    <p>💰 collective power • shared wins</p>
-    <i class="fas fa-chart-line" style="font-size: 2rem; margin-top: 12px;"></i>
-  </div>
 </div>
 
-
-<!-- Why choose us? (Secure, Transparent, Track Money, Easy) -->
 <div class="section">
   <div class="container">
     <div class="section-title">Why choose us?</div>
     <div class="grid-4">
-      <div class="card">
-        <div class="card-icon"><i class="fas fa-shield-alt"></i></div>
-        <h3>Secure</h3>
-        <p>Bank-grade encryption & private group controls.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon"><i class="fas fa-eye"></i></div>
-        <h3>Transparent</h3>
-        <p>Every transaction visible to all members — zero hidden fees.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon"><i class="fas fa-coins"></i></div>
-        <h3>Track Money</h3>
-        <p>Real-time dashboards and contribution analytics.</p>
-      </div>
-      <div class="card">
-        <div class="card-icon"><i class="fas fa-bolt"></i></div>
-        <h3>Easy</h3>
-        <p>Intuitive setup, automated reminders & one-click payouts.</p>
-      </div>
+      <div class="card"><div class="card-icon"><i class="fas fa-shield-alt"></i></div><h3>Secure</h3><p>Bank-grade encryption & private group controls.</p></div>
+      <div class="card"><div class="card-icon"><i class="fas fa-eye"></i></div><h3>Transparent</h3><p>Every transaction visible to all members — zero hidden fees.</p></div>
+      <div class="card"><div class="card-icon"><i class="fas fa-coins"></i></div><h3>Track Money</h3><p>Real-time dashboards and contribution analytics.</p></div>
+      <div class="card"><div class="card-icon"><i class="fas fa-bolt"></i></div><h3>Easy</h3><p>Intuitive setup, automated reminders & one-click payouts.</p></div>
     </div>
   </div>
 </div>
 
-<!-- How it works? -->
-<div class="section" style="background-color: #f8fafd;">
+<div class="section" style="background:#f8fafd;">
   <div class="container">
     <div class="section-title">How it works?</div>
     <div class="steps-grid">
-      <div class="card">
-        <div class="step-number">1</div>
-        <h3>Create a group</h3>
-        <p>Start a savings circle, set contribution rules & goals.</p>
-      </div>
-      <div class="card">
-        <div class="step-number">2</div>
-        <h3>Invite members</h3>
-        <p>Add friends, family, or colleagues via link or email.</p>
-      </div>
-      <div class="card">
-        <div class="step-number">3</div>
-        <h3>Track contributions</h3>
-        <p>See live updates, payment status, and member progress.</p>
-      </div>
-      <div class="card">
-        <div class="step-number">4</div>
-        <h3>Get payouts easily</h3>
-        <p>Automated payouts to bank or mobile wallets, on schedule.</p>
-      </div>
+      <div class="card"><div class="step-number">1</div><h3>Create a group</h3><p>Start a savings circle, set contribution rules & goals.</p></div>
+      <div class="card"><div class="step-number">2</div><h3>Invite members</h3><p>Add friends, family, or colleagues via link or email.</p></div>
+      <div class="card"><div class="step-number">3</div><h3>Track contributions</h3><p>See live updates, payment status, and member progress.</p></div>
+      <div class="card"><div class="step-number">4</div><h3>Get payouts easily</h3><p>Automated payouts to bank or mobile wallets, on schedule.</p></div>
     </div>
   </div>
 </div>
 
-<!-- Features Section -->
 <div class="section">
   <div class="container">
     <div class="section-title">Features</div>
     <div class="features-grid">
-      <div class="card">
-        <i class="fas fa-chart-simple card-icon"></i>
-        <h3>Contribution tracking</h3>
-        <p>Monitor every deposit with detailed history and graphs.</p>
-      </div>
-      <div class="card">
-        <i class="fas fa-calendar-check card-icon"></i>
-        <h3>Payout Scheduling</h3>
-        <p>Set recurring or one-off payout dates, no manual work.</p>
-      </div>
-      <div class="card">
-        <i class="fas fa-layer-group card-icon"></i>
-        <h3>Group Management</h3>
-        <p>Admins tools, roles, member limits, and approval flows.</p>
-      </div>
-      <div class="card">
-        <i class="fas fa-bullhorn card-icon"></i>
-        <h3>Announcements & Meetings</h3>
-        <p>In-app announcements, polls, and meeting scheduling.</p>
-      </div>
-      <div class="card">
-        <i class="fas fa-chart-line card-icon"></i>
-        <h3>Financial Insights</h3>
-        <p>Smart reports, savings trends, and personalized tips.</p>
-      </div>
+      <div class="card"><i class="fas fa-chart-simple card-icon"></i><h3>Contribution tracking</h3><p>Monitor every deposit with detailed history and graphs.</p></div>
+      <div class="card"><i class="fas fa-calendar-check card-icon"></i><h3>Payout Scheduling</h3><p>Set recurring or one-off payout dates, no manual work.</p></div>
+      <div class="card"><i class="fas fa-layer-group card-icon"></i><h3>Group Management</h3><p>Admins tools, roles, member limits, and approval flows.</p></div>
+      <div class="card"><i class="fas fa-bullhorn card-icon"></i><h3>Announcements & Meetings</h3><p>In-app announcements, polls, and meeting scheduling.</p></div>
+      <div class="card"><i class="fas fa-chart-line card-icon"></i><h3>Financial Insights</h3><p>Smart reports, savings trends, and personalized tips.</p></div>
     </div>
   </div>
 </div>
 
-<!-- Testimonials section -->
-<div class="section" style="background-color: #f9fbfe;">
+<div class="section" style="background:#f9fbfe;">
   <div class="container">
     <div class="section-title">Trusted by savers</div>
     <div class="grid-3">
-      <div class="testimonial-card">
-        <i class="fas fa-quote-left"></i>
-        <p>“FundCircle turned our random chama into a seamless system. We saved 40% more in 6 months!”</p>
-        <div class="testimonial-author"><i class="fas fa-user-circle"></i> James M. — Group Admin</div>
-      </div>
-      <div class="testimonial-card">
-        <i class="fas fa-quote-left"></i>
-        <p>“I love the transparency. No more arguments about who paid what — everyone sees contributions live.”</p>
-        <div class="testimonial-author"><i class="fas fa-user-circle"></i> Diana K. — Member</div>
-      </div>
-      <div class="testimonial-card">
-        <i class="fas fa-quote-left"></i>
-        <p>“Payout scheduling is a lifesaver. My investment group receives funds automatically each quarter.”</p>
-        <div class="testimonial-author"><i class="fas fa-user-circle"></i> Samuel O. — Circle Lead</div>
-      </div>
+      <div class="testimonial-card"><i class="fas fa-quote-left"></i><p>“FundCircle turned our random chama into a seamless system. We saved 40% more in 6 months!”</p><div class="testimonial-author"><i class="fas fa-user-circle"></i> James M. — Group Admin</div></div>
+      <div class="testimonial-card"><i class="fas fa-quote-left"></i><p>“I love the transparency. No more arguments about who paid what — everyone sees contributions live.”</p><div class="testimonial-author"><i class="fas fa-user-circle"></i> Diana K. — Member</div></div>
+      <div class="testimonial-card"><i class="fas fa-quote-left"></i><p>“Payout scheduling is a lifesaver. My investment group receives funds automatically each quarter.”</p><div class="testimonial-author"><i class="fas fa-user-circle"></i> Samuel O. — Circle Lead</div></div>
     </div>
   </div>
 </div>
 
-<!-- Footer -->
-<footer class="footer">
+<footer>
   <div class="container">
     <div class="footer-content">
-      <div class="footer-col">
-        <h4>FUNDCIRCLE</h4>
-        <p style="color:#b9cee8; margin-bottom: 12px;">Small contributions,<br>big community wins.</p>
-      </div>
-      <div class="footer-col">
-        <h4>Links</h4>
-        <a href="#">Home</a>
-        <a href="#">Features</a>
-        <a href="#">About</a>
-        <a href="#">Pricing</a>
-      </div>
-      <div class="footer-col">
-        <h4>Contact</h4>
-        <a href="#">help@fundcircle.com</a>
-        <a href="#">+1 (888) 452-9876</a>
-        <a href="#">Support Center</a>
-      </div>
-      <div class="footer-col">
-        <h4>Socials</h4>
-        <div class="social-icons">
-          <a href="#"><i class="fab fa-twitter"></i></a>
-          <a href="#"><i class="fab fa-instagram"></i></a>
-          <a href="#"><i class="fab fa-linkedin-in"></i></a>
-          <a href="#"><i class="fab fa-facebook-f"></i></a>
-        </div>
-      </div>
-      <div class="footer-col">
-        <h4>Terms</h4>
-        <a href="#">Terms and Conditions</a>
-        <a href="#">Privacy Policy</a>
-        <a href="#">Cookie Policy</a>
-      </div>
+      <div class="footer-col"><h4>FUNDCIRCLE</h4><p style="color:#5b6e8c;">Small contributions,<br>big community wins.</p></div>
+      <div class="footer-col"><h4>Links</h4><a href="#">Home</a><a href="#">Features</a><a href="#">About</a><a href="#">Pricing</a></div>
+      <div class="footer-col"><h4>Contact</h4><a href="#">help@fundcircle.com</a><a href="#">+1 (888) 452-9876</a><a href="#">Support Center</a></div>
+      <div class="footer-col"><h4>Socials</h4><div class="social-icons"><a href="#"><i class="fab fa-twitter"></i></a><a href="#"><i class="fab fa-instagram"></i></a><a href="#"><i class="fab fa-linkedin-in"></i></a><a href="#"><i class="fab fa-facebook-f"></i></a></div></div>
+      <div class="footer-col"><h4>Terms</h4><a href="#">Terms and Conditions</a><a href="#">Privacy Policy</a><a href="#">Cookie Policy</a></div>
     </div>
-    <div class="copyright">
-      © 2026 FundCircle — Turn Small Contributions into Big Wins. All rights reserved.
-    </div>
+    <div class="copyright">© 2026 FundCircle — Turn Small Contributions into Big Wins. All rights reserved.</div>
   </div>
 </footer>
-
-
-<script type="module" src="/src/main.js"></script>
-  
+</body>
 </html>

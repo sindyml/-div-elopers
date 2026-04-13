@@ -1,22 +1,472 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FundCircle | Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    /* Chat widget custom styles (overrides) */
+    .chat-widget-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .chat-toggle {
+      background: linear-gradient(105deg, #1e3c72, #2a5298);
+      border: none;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      color: white;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    .chat-toggle:hover {
+      transform: scale(1.05);
+    }
+    .chat-window {
+      position: absolute;
+      bottom: 80px;
+      right: 0;
+      width: 350px;
+      height: 500px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: all 0.3s ease;
+      border: 1px solid #e2e8f0;
+    }
+    .chat-window.hidden {
+      display: none;
+    }
+    .chat-header {
+      background: #1e3c72;
+      color: white;
+      padding: 15px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-header i {
+      cursor: pointer;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      background: #f9fafb;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .user-message {
+      background: #1e3c72;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .bot-message {
+      background: white;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .typing-indicator {
+      background: #e2e8f0;
+      color: #475569;
+      font-style: italic;
+      padding: 8px 14px;
+      border-radius: 18px;
+      align-self: flex-start;
+    }
+    .chat-input-area {
+      display: flex;
+      padding: 10px;
+      border-top: 1px solid #e2e8f0;
+      background: white;
+    }
+    .chat-input-area input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 40px;
+      font-family: 'Inter', sans-serif;
+      margin-right: 8px;
+    }
+    .chat-input-area button {
+      background: #1e3c72;
+      border: none;
+      padding: 0 16px;
+      border-radius: 40px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+  <!-- Firebase SDK (modular) – adjust version if needed -->
+<script type="importmap">
+  {
+    "imports": {
+      "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+      "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js",
+      "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js"
+    }
+  }
+</script>
+
+<!-- Your existing firebase-config.js (assumed to be in the same folder or a relative path) -->
+<script type="module" src="../src/firebase-config.js"></script>
 </head>
 <body>
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1><i class="fas fa-chart-line"></i> FundCircle Dashboard</h1>
+    <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  </div>
 
-  <h1>Welcome to Dashboard</h1>
+  <div class="stats-grid">
+    <div class="stat-card"><i class="fas fa-users"></i><h3>Active Circles</h3><div class="value">3</div></div>
+    <div class="stat-card"><i class="fas fa-coins"></i><h3>Total Saved</h3><div class="value">$12,450</div></div>
+    <div class="stat-card"><i class="fas fa-calendar-week"></i><h3>Next Payout</h3><div class="value">Apr 30</div></div>
+  </div>
 
-  <button id="logoutBtn">Logout</button>
+  <div class="welcome-card">
+    <i class="fas fa-hand-peace" style="font-size: 2.5rem; color: #2b4c7c;"></i>
+    <h2>Welcome back, Saver!</h2>
+    <p>Track contributions, invite friends, and watch your group grow. Your savings journey just got smarter.</p>
+    <button class="btn-primary" onclick="alert('✨ New circle creation – coming soon!')">+ Start a new circle</button>
+  </div>
 
-  <script type="module">
-    import { logout } from "/src/auth.js";
+  <!-- Chat Room Section -->
+<div class="chat-room">
+  <h3><i class="fas fa-comments"></i> Stokvel Chat Room</h3>
+  <div id="chatMessagesList" class="messages-list"></div>
+  <div class="chat-input-area">
+    <input type="text" id="chatMessageInput" placeholder="Type your message...">
+    <button id="chatSendBtn"><i class="fas fa-paper-plane"></i> Send</button>
+  </div>
+</div>
+</div>
 
-    document.getElementById("logoutBtn").addEventListener("click", async () => {
-      await logout();
-      window.location.href = "index.html";
+<footer style="margin-top: 60px; text-align: center; padding: 24px; border-top: 1px solid #e2e8f0; background: transparent;">
+  © 2026 FundCircle — Small contributions, big wins.
+</footer>
+
+<!-- Floating chat widget -->
+<div class="chat-widget-container">
+  <button class="chat-toggle" id="chatToggleBtn"><i class="fas fa-comment-dots"></i></button>
+  <div id="chatWindow" class="chat-window hidden">
+    <div class="chat-header">
+      <span><i class="fas fa-robot"></i> Stokvel Assistant</span>
+      <i class="fas fa-times" id="closeChatBtn"></i>
+    </div>
+    <div id="chatMessages" class="chat-messages">
+      <div class="message bot-message">👋 Hi! Ask me anything about your stokvel – contributions, rules, payouts, or group management.</div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Ask a question..." autocomplete="off">
+      <button id="sendChatBtn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { logout } from "../src/auth.js";
+
+// Logout functionality
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await logout();
+  window.location.href = "../index.html";
+});
+
+// ---------- Semantic AI Chatbot (Google Gemini) ----------
+const GEMINI_API_KEY = "AIzaSyAtUZZ1uYXPk3ii_OLeNbu20X_SLqwVz6I";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// Stokvel knowledge base (same as before)
+const STOKVEL_CONTEXT = `
+You are a helpful assistant for a stokvel (group savings) app called FundCircle.
+Answer questions based on the following information:
+
+- Members contribute $50 per month per person.
+- Contributions are due by the 5th of each month.
+- Payouts happen on the last day of every quarter (March, June, September, December).
+- Late fee: $10 if contribution is more than 5 days late.
+- The group has 12 members.
+- Total saved so far: $12,450.
+- Next payout date: April 30 (special one-time early payout).
+- Group rules: No withdrawals before payout date, all decisions by majority vote.
+- Admin can schedule meetings and send announcements.
+
+If the user asks about something not covered, politely say you don't know and suggest they contact the group admin.
+Be concise, friendly, and helpful.
+`;
+
+// DOM elements
+const chatWindow = document.getElementById('chatWindow');
+const chatToggleBtn = document.getElementById('chatToggleBtn');
+const closeChatBtn = document.getElementById('closeChatBtn');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendChatBtn');
+
+// State management
+let isProcessing = false;
+let lastRequestTime = 0;
+const MIN_INTERVAL_MS = 3000; // 3 seconds between requests (more conservative)
+const answerCache = new Map();
+
+// Rate limit cooldown state
+let isRateLimited = false;
+let rateLimitExpiry = 0;
+
+// Helper: Add message to chat
+function addMessage(text, sender) {
+  const msgDiv = document.createElement('div');
+  msgDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+  msgDiv.innerText = text;
+  chatMessages.appendChild(msgDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Helper: Show typing indicator
+function showTypingIndicator() {
+  const typingDiv = document.createElement('div');
+  typingDiv.classList.add('typing-indicator');
+  typingDiv.innerText = 'Assistant is typing...';
+  typingDiv.id = 'typing-' + Date.now();
+  chatMessages.appendChild(typingDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return typingDiv.id;
+}
+
+// Helper: Remove typing indicator
+function removeTypingIndicator(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// Mock response (used when rate limited or API fails)
+function getMockResponse(userQuery) {
+  const lowerQuery = userQuery.toLowerCase();
+  if (lowerQuery.includes('payout') || lowerQuery.includes('when is') || lowerQuery.includes('schedule')) {
+    return "📅 Payouts are scheduled for the last day of each quarter (March, June, September, December). The next special payout is on **April 30th**.";
+  } else if (lowerQuery.includes('contribution') || lowerQuery.includes('how much') || lowerQuery.includes('pay')) {
+    return "💰 Monthly contributions are **$50 per member**, due by the **5th of each month**. Late contributions incur a **$10 fee** if paid after the 10th.";
+  } else if (lowerQuery.includes('total saved') || lowerQuery.includes('balance') || lowerQuery.includes('savings')) {
+    return "📊 The group has saved a total of **$12,450** so far.";
+  } else if (lowerQuery.includes('rule') || lowerQuery.includes('withdraw')) {
+    return "📜 Group rules: No withdrawals before payout date, all decisions by majority vote. Late fees apply after the 10th.";
+  } else {
+    return "🤝 I can help with contribution rules, payout dates, group totals, late fees, and group rules. What would you like to know?";
+  }
+}
+
+// Actual API call (with rate limit detection)
+async function callGeminiAPI(userQuery) {
+  // If currently rate-limited, throw immediately
+  if (isRateLimited && Date.now() < rateLimitExpiry) {
+    throw new Error("RATE_LIMITED");
+  }
+
+  const fullPrompt = `${STOKVEL_CONTEXT}\n\nUser question: ${userQuery}\n\nAnswer:`;
+  const requestBody = {
+    contents: [{ parts: [{ text: fullPrompt }] }]
+  };
+
+  const response = await fetch(GEMINI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody)
+  });
+
+  if (response.status === 429) {
+    // Set rate limit cooldown for 60 seconds
+    isRateLimited = true;
+    rateLimitExpiry = Date.now() + 60000; // 1 minute
+    console.warn("Rate limit hit. Switching to mock responses for 60 seconds.");
+    throw new Error("RATE_LIMITED");
+  }
+
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!reply) throw new Error("Empty response");
+  return reply;
+}
+
+// Main response function (caching + fallback)
+async function getGeminiResponse(userQuery) {
+  const normalized = userQuery.toLowerCase().trim();
+  
+  // Check cache first
+  if (answerCache.has(normalized)) {
+    return answerCache.get(normalized);
+  }
+
+  let reply;
+  try {
+    reply = await callGeminiAPI(userQuery);
+    // If we got a real reply, clear rate limit flag (we're back)
+    if (reply && !reply.includes("RATE_LIMITED")) {
+      isRateLimited = false;
+    }
+  } catch (error) {
+    if (error.message === "RATE_LIMITED") {
+      reply = "⏳ *The AI assistant is currently busy due to high demand.* I'll use my offline knowledge base for now.\n\n" + getMockResponse(userQuery);
+    } else {
+      console.error("API error:", error);
+      reply = "⚠️ I'm having trouble connecting. Here's what I know from our records:\n\n" + getMockResponse(userQuery);
+    }
+  }
+  
+  // Cache the final reply
+  answerCache.set(normalized, reply);
+  return reply;
+}
+
+// Send message with rate limiting and processing lock
+async function sendMessage() {
+  if (isProcessing) {
+    addMessage("⏳ Please wait, I'm still answering your previous question.", 'bot');
+    return;
+  }
+
+  const now = Date.now();
+  if (now - lastRequestTime < MIN_INTERVAL_MS) {
+    const waitSeconds = ((MIN_INTERVAL_MS - (now - lastRequestTime)) / 1000).toFixed(1);
+    addMessage(`🐢 Please wait ${waitSeconds} seconds before sending another message.`, 'bot');
+    return;
+  }
+
+  const userText = chatInput.value.trim();
+  if (!userText) return;
+
+  isProcessing = true;
+  lastRequestTime = now;
+
+  addMessage(userText, 'user');
+  chatInput.value = '';
+
+  const typingId = showTypingIndicator();
+  try {
+    const botReply = await getGeminiResponse(userText);
+    removeTypingIndicator(typingId);
+    addMessage(botReply, 'bot');
+  } catch (error) {
+    removeTypingIndicator(typingId);
+    addMessage("⚠️ Sorry, something went wrong. Please try again in a moment.", 'bot');
+    console.error(error);
+  } finally {
+    isProcessing = false;
+  }
+}
+
+// Toggle chat window
+chatToggleBtn.addEventListener('click', () => {
+  chatWindow.classList.toggle('hidden');
+});
+closeChatBtn.addEventListener('click', () => {
+  chatWindow.classList.add('hidden');
+});
+
+// Event listeners
+sendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+//code logic for chat room
+// Import your existing Firebase db and auth
+import { db, auth } from "../src/firebase-config.js";
+import { ref, push, onChildAdded, query, limitToLast } from "firebase/database";
+
+// Get current user (from your existing auth system)
+const user = auth.currentUser;
+let currentUserName = user?.displayName || user?.email?.split('@')[0] || "Member";
+
+// If you have a way to get the member's name from your own backend, use that instead.
+
+// Reference to the chat messages node in Realtime Database
+const messagesRef = ref(db, 'stokvelChat');
+
+// Helper: escape HTML to prevent XSS
+function escapeHtml(str) {
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// Display a single message
+function displayMessage(messageData) {
+  const messagesDiv = document.getElementById('chatMessagesList');
+  const msgDiv = document.createElement('div');
+  msgDiv.classList.add('message');
+  msgDiv.classList.add(messageData.name === currentUserName ? 'message-user' : 'message-other');
+  msgDiv.innerHTML = `
+    <strong>${escapeHtml(messageData.name)}</strong><br>
+    ${escapeHtml(messageData.text)}<br>
+    <div class="message-meta">${new Date(messageData.timestamp).toLocaleTimeString()}</div>
+  `;
+  messagesDiv.appendChild(msgDiv);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+// Load last 50 messages and listen for new ones
+const recentMessagesQuery = query(messagesRef, limitToLast(50));
+onChildAdded(recentMessagesQuery, (snapshot) => {
+  const msg = snapshot.val();
+  displayMessage(msg);
+});
+
+// Send a new message
+document.getElementById('chatSendBtn').addEventListener('click', async () => {
+  const input = document.getElementById('chatMessageInput');
+  const text = input.value.trim();
+  if (text === '') return;
+
+  try {
+    await push(messagesRef, {
+      name: currentUserName,
+      text: text,
+      timestamp: Date.now(),
+      userId: auth.currentUser?.uid || 'anonymous'
     });
-  </script>
+    input.value = '';
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    alert("Could not send message. Check your Firebase permissions.");
+  }
+});
 
+// Allow Enter key to send
+document.getElementById('chatMessageInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') document.getElementById('chatSendBtn').click();
+});
+</script>
 </body>
 </html>
