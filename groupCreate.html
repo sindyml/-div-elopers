@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang=" en">
+    <head>
+        <meta charset=" UTF-8"/>
+        <title>CREATE YOUR GROUP</title> 
+        <link rel="stylesheet" href="..styles/styles.css" />
+    </head>
+    
+    <body>
+        <main>
+            <h2>CREATE STOKVEL GROUP</h2>
+            <form id="groupForm">
+                <input type="text" id="name" placeholder="Group Name" required />
+                <input type="number" id="amount" placeholder="Contribution Amount" required />
+                <input type="text" id="payout" placeholder="Payout Order (comma separated UIDs)" />
+
+                <select id="frequency">
+                    <option value="weekly">Weekly </option> 
+                    <option value="monthly">Monthly </option> 
+                </select>
+
+                <button type="submit">CREATE GROUP</button>
+            </form>
+
+            <p id="message"></p>
+            <a href="dashboard.html">BACK TO DASHBOARD</a>
+        </main>
+        <script type="module">
+            import {createGroup} from "../src/groupService.js";
+            import {listenForAuth} from "../src/auth.js";
+            import { auth } from "../src/firebase.js";
+
+            listenForAuth();
+
+            const form = document.getElementById("groupForm");
+            const message = document.getElementById("message");
+
+            form.addEventListener("submit",async (e) => e.preventDefault());
+
+            const name = document.getElementById("name").value;
+            const amount = document.getElementById("amount").value;
+            const payout = document.getElementById("payout").value;
+            const frequency = document.getElementById("frequency").value;
+
+            const payoutOrder = payout.split(",").map(p => p.trim());
+
+            message.textContent = "Creating group...";
+
+            try {
+      if (!auth.currentUser) {
+        message.textContent = "❌ You must be logged in";
+        return;
+      }
+
+      await createGroup({
+        name,
+        contributionAmount: amount,
+        payoutOrder,
+        meetingFrequency: frequency
+      });
+
+      message.textContent = "✅ Group created successfully!";
+      form.reset();
+
+    } catch (err) {
+      console.error(err);
+      message.textContent = "❌ Error: " + err.message;
+    }
+  
+    
+        </script>
+
+
+
+
+
+
+
+
+
+
+
+
+    </body>
+
+
+
+
+</html>

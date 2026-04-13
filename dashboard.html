@@ -113,16 +113,35 @@
           </section>
         </article>
 
-        <!-- GROUP MEMBERS shell (P3 populates this) -->
+        <!-- GROUP MEMBERS & MANAGEMENT (P3 — integrated) -->
         <article class="card widget-section" aria-labelledby="members-heading">
           <header class="widget-section__header">
             <h2 id="members-heading" class="widget-section__title">👥 Group Members</h2>
             <a href="groups.html" class="widget-section__link">Manage →</a>
           </header>
           <section id="members-container" aria-live="polite">
-            <p class="coming-soon-placeholder">
-              🔧 Member list coming soon — P3 is building this.
-            </p>
+
+            <!-- Your Groups list (P3) -->
+            <div class="group-list-section">
+              <h3>Your Groups</h3>
+              <ul id="grouplist" aria-label="List of your stokvel groups"></ul>
+            </div>
+
+            <!-- Invite Member form (P3) -->
+            <div class="invite-member-section">
+              <h3>Invite Member</h3>
+              <form id="invite-form" aria-label="Invite a member by email">
+                <input type="email" id="inviteEmail" placeholder="Enter Email" aria-label="Member email address" required />
+                <button type="submit" id="inviteBtn">Invite</button>
+              </form>
+              <p id="inviteMessage" role="status" aria-live="polite"></p>
+            </div>
+
+            <!-- Create New Group (P3) -->
+            <a href="groupCreate.html" class="widget-section__link">
+              <button type="button" aria-label="Create a new stokvel group">Create New Group</button>
+            </a>
+
           </section>
         </article>
 
@@ -161,5 +180,132 @@
   <script src="components/footer.js"></script>
   <script src="js/sa-data.js"></script>
   <script src="js/dashboard.js"></script>
+
+  <!-- P3: Group management — lists groups, handles invites, creates groups -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const grouplist     = document.getElementById('grouplist');
+    const inviteForm    = document.getElementById('invite-form');
+    const inviteMessage = document.getElementById('inviteMessage');
+
+    let selectedGroupId = null;
+    let userRole        = null;
+
+    /* ── Fetch the current user's role within a group ────── */
+    const getUserRole = async (groupID) => {
+      const user = auth.currentUser;
+      if (!user) return null;
+      const roleDoc = await db
+        .collection('groups').doc(groupID)
+        .collection('members').doc(user.uid)
+        .get();
+      return roleDoc.exists ? roleDoc.data().role : null;
+    };
+
+    /* ── Load and render the user's groups ────────────────── */
+    const loadGroups = async () => {
+      const user = auth.currentUser;
+      if (!user || !grouplist) return;
+
+      const snapshot = await db
+        .collection('memberships')
+        .where('uid', '==', user.uid)
+        .get();
+
+      grouplist.innerHTML = '';
+
+      for (const membership of snapshot.docs) {
+        const { groupId } = membership.data();
+        const groupDoc = await db.collection('groups').doc(groupId).get();
+
+        if (groupDoc.exists) {
+          const group = { id: groupId, ...groupDoc.data() };
+          const li = document.createElement('li');
+          li.textContent = group.name;
+          li.setAttribute('role', 'button');
+          li.setAttribute('tabindex', '0');
+          li.onclick = async () => {
+            selectedGroupId = group.id;
+            userRole = await getUserRole(group.id);
+            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+          };
+          grouplist.appendChild(li);
+        }
+      }
+    };
+
+    /* ── Handle invite form submission ────────────────────── */
+    if (inviteForm) {
+      inviteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('inviteEmail').value.trim();
+
+        if (!selectedGroupId) {
+          alert('Please select a group first');
+          return;
+        }
+        if (userRole !== 'admin') {
+          alert('Only admins can invite members');
+          return;
+        }
+
+        try {
+          await db.collection('invites').add({
+            email:     email,
+            groupId:   selectedGroupId,
+            invitedBy: auth.currentUser.uid,
+            status:    'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          inviteMessage.textContent = 'Invite Sent!';
+        } catch (err) {
+          inviteMessage.textContent = 'Error sending invite';
+          console.error(err);
+        }
+      });
+    }
+
+    /* ── Accept any pending invites for the signed-in user ── */
+    const checkInvites = async (user) => {
+      const snapshot = await db.collection('invites')
+        .where('email',  '==', user.email)
+        .where('status', '==', 'pending')
+        .get();
+
+      for (const docSnap of snapshot.docs) {
+        const invite = docSnap.data();
+
+        // Add user to the group members sub-collection
+        await db.collection('groups').doc(invite.groupId)
+          .collection('members').doc(user.uid)
+          .set({
+            uid:      user.uid,
+            role:     'member',
+            joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+        // Create a membership record for quick dashboard lookups
+        await db.collection('memberships').doc(user.uid + '_' + invite.groupId).set({
+          uid:     user.uid,
+          groupId: invite.groupId
+        });
+
+        // Mark the invite as accepted
+        await docSnap.ref.update({ status: 'invite accepted' });
+      }
+    };
+
+    /* ── Auth listener: check invites then load groups ────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        await checkInvites(user);
+        await loadGroups();
+      }
+    });
+  })();
+  </script>
 </body>
 </html>
