@@ -86,12 +86,14 @@
         <article class="card widget-section" aria-labelledby="contributions-heading">
           <header class="widget-section__header">
             <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
-            <a href="contributions.html" class="widget-section__link">View all →</a>
+            <a href="contributions/my.html" class="widget-section__link">View all →</a>
           </header>
           <section id="contributions-container" aria-live="polite">
-            <p class="coming-soon-placeholder">
-              🔧 Contribution tracking coming soon — P4 is building this.
-            </p>
+            <div class="contributions-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
           </section>
         </article>
 
@@ -150,12 +152,13 @@
         <article class="card widget-section" aria-labelledby="payout-heading">
           <header class="widget-section__header">
             <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
-            <a href="contributions.html#payouts" class="widget-section__link">View all →</a>
+            <a id="payout-view-all" href="contributions/payout.html" class="widget-section__link">View all →</a>
           </header>
           <section id="payout-container" aria-live="polite">
-            <p class="coming-soon-placeholder">
-              🔧 Payout schedule coming soon — P4 is building this.
-            </p>
+            <div class="payout-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
           </section>
         </article>
 
@@ -448,6 +451,218 @@
       } catch (err) {
         console.error('[Meetings Widget]', err);
         showEmpty();
+      }
+    });
+  })();
+  </script>
+
+  <!-- P4: Contributions & Payout widgets — real-time via Firestore onSnapshot() -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const contributionsContainer = document.getElementById('contributions-container');
+    const payoutContainer        = document.getElementById('payout-container');
+    const statMyContributions    = document.getElementById('stat-my-contributions');
+    const statBalance            = document.getElementById('stat-balance');
+    const statPayout             = document.getElementById('stat-payout');
+    const statPayoutName         = document.getElementById('stat-payout-name');
+    const payoutViewAll          = document.getElementById('payout-view-all');
+
+    let unsubContributions = null;
+
+    /* ── Resolve which groups this user belongs to ───────── */
+    async function getUserGroupIds(uid) {
+      const snap = await db
+        .collection('memberships')
+        .where('uid', '==', uid)
+        .get();
+      return snap.docs.map(d => d.data().groupId);
+    }
+
+    /* ── Format a date string as "1 Apr" ─────────────────── */
+    function fmtDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    }
+
+    /* ── Format currency ─────────────────────────────────── */
+    function fmtRand(amount) {
+      return 'R ' + Number(amount).toLocaleString('en-ZA');
+    }
+
+    /* ── Status badge helper ──────────────────────────────── */
+    function statusBadge(status) {
+      switch (status) {
+        case 'confirmed': return '<span class="badge badge--success">✅ Confirmed</span>';
+        case 'missed':    return '<span class="badge badge--danger">❌ Missed</span>';
+        default:          return '<span class="badge badge--warning">⏳ Pending</span>';
+      }
+    }
+
+    /* ── Build a contribution row for the widget ──────────── */
+    function buildContributionItem(c, groupName) {
+      const li = document.createElement('li');
+      li.className = 'contribution-widget-item';
+      li.innerHTML = `
+        <div class="contribution-widget-info">
+          <p class="contribution-widget-amount">${fmtRand(c.amount)}</p>
+          <small class="contribution-widget-meta">${groupName} · ${fmtDate(c.date)}</small>
+        </div>
+        <div class="contribution-widget-status">${statusBadge(c.status)}</div>
+      `;
+      return li;
+    }
+
+    /* ── Render contributions widget ──────────────────────── */
+    function renderContributions(contributions, groupMap) {
+      if (!contributions.length) {
+        contributionsContainer.innerHTML =
+          '<p class="widget-empty">No contributions recorded yet.</p>';
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'contribution-widget-list';
+      ul.setAttribute('aria-label', 'Recent contributions');
+
+      /* Show the 5 most recent */
+      contributions.slice(0, 5).forEach(c => {
+        const groupName = groupMap[c.groupId] || 'Unknown group';
+        ul.appendChild(buildContributionItem(c, groupName));
+      });
+
+      contributionsContainer.innerHTML = '';
+      contributionsContainer.appendChild(ul);
+    }
+
+    /* ── Update stat cards from contribution data ─────────── */
+    function updateContributionStats(contributions) {
+      if (!contributions.length) return;
+
+      /* Your Contributions — count confirmed this period */
+      const confirmed = contributions.filter(c => c.status === 'confirmed');
+      const totalAmount = confirmed.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      if (statMyContributions) {
+        statMyContributions.textContent = fmtRand(totalAmount);
+      }
+    }
+
+    /* ── Start real-time listener for user's contributions ── */
+    function startContributionListener(uid, groupMap) {
+      if (unsubContributions) unsubContributions();
+
+      unsubContributions = db.collection('contributions')
+        .where('userId', '==', uid)
+        .orderBy('date', 'desc')
+        .limit(10)
+        .onSnapshot(
+          (snapshot) => {
+            const contributions = [];
+            snapshot.forEach(doc => contributions.push({ id: doc.id, ...doc.data() }));
+            renderContributions(contributions, groupMap);
+            updateContributionStats(contributions);
+          },
+          (err) => {
+            console.error('[Contributions Widget] Listener error:', err);
+            contributionsContainer.innerHTML =
+              '<p class="widget-empty">Could not load contributions.</p>';
+          }
+        );
+    }
+
+    /* ── Build a payout row for the widget ────────────────── */
+    function buildPayoutItem(p, isCurrentUser) {
+      const li = document.createElement('li');
+      li.className = 'payout-widget-item' + (isCurrentUser ? ' payout-widget-item--you' : '');
+      li.innerHTML = `
+        <div class="payout-widget-order">#${p.order}</div>
+        <div class="payout-widget-info">
+          <p class="payout-widget-name">${p.userDisplayName}${isCurrentUser ? ' (You)' : ''}</p>
+          <small class="payout-widget-date">${fmtDate(p.payoutDate)}</small>
+        </div>
+        <div class="payout-widget-amount">${fmtRand(p.amount)}</div>
+      `;
+      return li;
+    }
+
+    /* ── Load payout schedule for the user's first group ──── */
+    async function loadPayoutWidget(uid, groupIds) {
+      if (!groupIds.length) {
+        payoutContainer.innerHTML =
+          '<p class="widget-empty">Join a group to see payout schedules.</p>';
+        return;
+      }
+
+      try {
+        /* Load payouts for all user groups, pick the first with data */
+        let payouts = [];
+        let activeGroupId = null;
+
+        for (const gid of groupIds.slice(0, 5)) {
+          const snap = await db.collection('payouts')
+            .where('groupId', '==', gid)
+            .orderBy('order', 'asc')
+            .get();
+          if (!snap.empty) {
+            payouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            activeGroupId = gid;
+            break;
+          }
+        }
+
+        if (!payouts.length) {
+          payoutContainer.innerHTML =
+            '<p class="widget-empty">No payout schedule set up yet.</p>';
+          return;
+        }
+
+        /* Update View all link with groupId */
+        if (payoutViewAll && activeGroupId) {
+          payoutViewAll.href = 'contributions/payout.html?groupId=' + activeGroupId;
+        }
+
+        /* Update stat card — next payout */
+        const today = new Date().toISOString().slice(0, 10);
+        const upcoming = payouts.find(p => p.payoutDate >= today);
+        if (upcoming) {
+          if (statPayout) statPayout.textContent = fmtDate(upcoming.payoutDate);
+          if (statPayoutName) statPayoutName.textContent = upcoming.userDisplayName + "'s turn";
+        }
+
+        /* Render list */
+        const ul = document.createElement('ul');
+        ul.className = 'payout-widget-list';
+        ul.setAttribute('aria-label', 'Payout schedule');
+        payouts.forEach(p => ul.appendChild(buildPayoutItem(p, p.userId === uid)));
+        payoutContainer.innerHTML = '';
+        payoutContainer.appendChild(ul);
+
+      } catch (err) {
+        console.error('[Payout Widget] Error:', err);
+        payoutContainer.innerHTML =
+          '<p class="widget-empty">Could not load payout schedule.</p>';
+      }
+    }
+
+    /* ── Init when auth resolves ─────────────────────────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      try {
+        const groupIds = await getUserGroupIds(user.uid);
+
+        /* Build a groupId → name map for contribution labels */
+        const groupMap = {};
+        for (const gid of groupIds) {
+          const doc = await db.collection('groups').doc(gid).get();
+          if (doc.exists) groupMap[gid] = doc.data().name;
+        }
+
+        startContributionListener(user.uid, groupMap);
+        await loadPayoutWidget(user.uid, groupIds);
+      } catch (err) {
+        console.error('[P4 Widget Init]', err);
       }
     });
   })();
