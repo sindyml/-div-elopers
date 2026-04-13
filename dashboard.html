@@ -119,28 +119,28 @@
             <h2 id="members-heading" class="widget-section__title">👥 Group Members</h2>
             <a href="groups.html" class="widget-section__link">Manage →</a>
           </header>
-          <section id="members-container" aria-live="polite">
+          <section id="members-container" class="members-widget" aria-live="polite">
 
             <!-- Your Groups list (P3) -->
-            <div class="group-list-section">
-              <h3>Your Groups</h3>
-              <ul id="grouplist" aria-label="List of your stokvel groups"></ul>
+            <div class="members-widget__block">
+              <h3 class="members-widget__heading">Your Groups</h3>
+              <ul id="grouplist" class="members-widget__list" aria-label="List of your stokvel groups"></ul>
             </div>
 
             <!-- Invite Member form (P3) -->
-            <div class="invite-member-section">
-              <h3>Invite Member</h3>
-              <form id="invite-form" aria-label="Invite a member by email">
-                <input type="email" id="inviteEmail" placeholder="Enter Email" aria-label="Member email address" required />
-                <button type="submit" id="inviteBtn">Invite</button>
+            <div class="members-widget__block">
+              <h3 class="members-widget__heading">Invite Member</h3>
+              <form id="invite-form" class="members-widget__invite-form" aria-label="Invite a member by email">
+                <input type="email" id="inviteEmail" class="form-input" placeholder="Enter email address" aria-label="Member email address" required />
+                <button type="submit" id="inviteBtn" class="btn btn--primary btn--sm">Invite</button>
               </form>
               <p id="inviteMessage" role="status" aria-live="polite"></p>
             </div>
 
             <!-- Create New Group (P3) -->
-            <a href="groupCreate.html" class="widget-section__link">
-              <button type="button" aria-label="Create a new stokvel group">Create New Group</button>
-            </a>
+            <div class="members-widget__block">
+              <a href="groupCreate.html" class="btn btn--outline btn--sm" aria-label="Create a new stokvel group">+ Create New Group</a>
+            </div>
 
           </section>
         </article>
