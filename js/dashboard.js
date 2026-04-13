@@ -15,6 +15,11 @@
 
 (function () {
 
+  // ── Firestore reference (compat SDK) ─────────────────────
+  const db = typeof firebase !== 'undefined' && firebase.firestore
+    ? firebase.firestore()
+    : null;
+
   // ── SA Data config (updated each sprint) ─────────────────
   // Current as of Sprint 1 (April 2026)
   // Source: SARB MPC decision March 26 2026 — rate held at 6.75% repo

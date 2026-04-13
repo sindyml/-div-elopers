@@ -43,6 +43,7 @@ async function handleOAuthSignIn(provider, providerName) {
         // Save their info to Firestore so other pages know their role
         await setDoc(doc(db, "users", user.uid), {
           email: user.email,
+          displayName: user.displayName || "",
           role: role,
           provider: providerName,  // Track which OAuth they used
           createdAt: new Date().toISOString()  // Timestamp for record keeping
