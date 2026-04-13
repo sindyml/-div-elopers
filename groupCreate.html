@@ -1,89 +1,119 @@
 <!DOCTYPE html>
-<html lang=" en">
-    <head>
-        <meta charset=" UTF-8"/>
-        <title>CREATE YOUR GROUP</title> 
-        <link rel="stylesheet" href="..styles/styles.css" />
-    </head>
-    
-    <body>
-        <main>
-            <h2>CREATE STOKVEL GROUP</h2>
-            <form id="groupForm">
-                <input type="text" id="name" placeholder="Group Name" required />
-                <input type="number" id="amount" placeholder="Contribution Amount" required />
-                <input type="text" id="payout" placeholder="Payout Order (comma separated UIDs)" />
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Group — StokPal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/register.css" />
+</head>
+<body>
+  <main class="register-page">
+    <article class="register-card">
+      <header class="register-card__header">
+        <strong class="register-card__logo">StokPal</strong>
+        <h1 class="register-card__title">Create Stokvel Group</h1>
+        <p class="register-card__sub">Set up a new group and start saving together</p>
+      </header>
 
-                <select id="frequency">
-                    <option value="weekly">Weekly </option> 
-                    <option value="monthly">Monthly </option> 
-                </select>
+      <section class="register-card__body">
+        <aside id="message" class="alert alert--hidden" aria-live="polite"></aside>
 
-                <button type="submit">CREATE GROUP</button>
-            </form>
+        <form id="groupForm" class="register-form">
+          <div class="form-group">
+            <label for="name" class="form-label">Group Name</label>
+            <input type="text" id="name" class="form-input" placeholder="e.g. Kasi Savers" required />
+          </div>
 
-            <p id="message"></p>
-            <a href="dashboard.html">BACK TO DASHBOARD</a>
-        </main>
-        <script type="module">
-            import {createGroup} from "../src/groupService.js";
-            import {listenForAuth} from "../src/auth.js";
-            import { auth } from "../src/firebase.js";
+          <div class="form-group">
+            <label for="amount" class="form-label">Contribution Amount (R)</label>
+            <input type="number" id="amount" class="form-input" placeholder="e.g. 500" required />
+          </div>
 
-            listenForAuth();
+          <div class="form-group">
+            <label for="payout" class="form-label">Payout Order</label>
+            <input type="text" id="payout" class="form-input" placeholder="Comma-separated member UIDs" />
+          </div>
 
-            const form = document.getElementById("groupForm");
-            const message = document.getElementById("message");
+          <div class="form-group">
+            <label for="frequency" class="form-label">Meeting Frequency</label>
+            <select id="frequency" class="form-input form-select">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
 
-            form.addEventListener("submit",async (e) => e.preventDefault());
+          <button type="submit" class="btn btn--primary btn--full">Create Group</button>
+        </form>
+      </section>
 
-            const name = document.getElementById("name").value;
-            const amount = document.getElementById("amount").value;
-            const payout = document.getElementById("payout").value;
-            const frequency = document.getElementById("frequency").value;
+      <footer class="register-card__footer">
+        <p><a href="dashboard.html">← Back to Dashboard</a></p>
+      </footer>
+    </article>
+  </main>
 
-            const payoutOrder = payout.split(",").map(p => p.trim());
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
 
-            message.textContent = "Creating group...";
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
 
-            try {
+    const form    = document.getElementById('groupForm');
+    const message = document.getElementById('message');
+
+    function showMsg(text, type) {
+      message.textContent = text;
+      message.className = 'alert alert--' + type;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const name      = document.getElementById('name').value.trim();
+      const amount    = document.getElementById('amount').value;
+      const payout    = document.getElementById('payout').value;
+      const frequency = document.getElementById('frequency').value;
+      const payoutOrder = payout ? payout.split(',').map(p => p.trim()) : [];
+
       if (!auth.currentUser) {
-        message.textContent = "❌ You must be logged in";
+        showMsg('You must be logged in.', 'error');
         return;
       }
 
-      await createGroup({
-        name,
-        contributionAmount: amount,
-        payoutOrder,
-        meetingFrequency: frequency
-      });
+      showMsg('Creating group…', 'success');
 
-      message.textContent = "✅ Group created successfully!";
-      form.reset();
+      try {
+        const groupRef = await db.collection('groups').add({
+          name,
+          contributionAmount: Number(amount),
+          payoutOrder,
+          meetingFrequency: frequency,
+          createdBy: auth.currentUser.uid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-    } catch (err) {
-      console.error(err);
-      message.textContent = "❌ Error: " + err.message;
-    }
-  
-    
-        </script>
+        await groupRef.collection('members').doc(auth.currentUser.uid).set({
+          role: 'admin',
+          joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
 
-
-
-
-
-
-
-
-
-
-
-
-    </body>
-
-
-
-
+        showMsg('Group created successfully!', 'success');
+        form.reset();
+      } catch (err) {
+        console.error(err);
+        showMsg('Error: ' + err.message, 'error');
+      }
+    });
+  })();
+  </script>
+</body>
 </html>
