@@ -1,115 +1,311 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"/>
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="../styles/styles.css"/>
-    <
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokPal — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
 </head>
-<body>
+<body class="app-layout">
 
-    <main>
-        <h2>YOUR GROUPS</h2>
-        <ul id="grouplist"></ul>
-            <section>
-                <h3>Invite Member</h3>
+  <!-- Navbar injected by navbar.js -->
+  <div id="navbar-root"></div>
 
-                <input type="email" id="inviteEmail" placeholder="Enter Email" />
-                <button id="inviteBtn">Invite</button>
+  <main class="app-main">
 
-                <p id="inviteMessage"></p>
+    <!-- PAGE HEADER -->
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">
+          Good morning, <span id="user-display-name">Member</span> 👋
+        </h1>
+        <p class="page-header__sub">Here's what's happening with your stokvel today.</p>
+      </hgroup>
+      <small id="group-name-badge" class="group-badge">Loading group…</small>
+    </header>
 
-            </section>
+    <!-- STAT CARDS -->
+    <ul class="dashboard-grid" aria-label="Key statistics">
+      <li class="stat-card stat-card--primary">
+        <small class="stat-card__label">Group Balance</small>
+        <p class="stat-card__value" id="stat-balance">R 0</p>
+        <small class="stat-card__sub">Total confirmed contributions</small>
+      </li>
+      <li class="stat-card stat-card--accent">
+        <small class="stat-card__label">Active Members</small>
+        <p class="stat-card__value" id="stat-members">—</p>
+        <small class="stat-card__sub">In your stokvel group</small>
+      </li>
+      <li class="stat-card stat-card--warning">
+        <small class="stat-card__label">Next Payout</small>
+        <p class="stat-card__value" id="stat-payout">—</p>
+        <small class="stat-card__sub" id="stat-payout-name">Waiting for data</small>
+      </li>
+      <li class="stat-card">
+        <small class="stat-card__label">Your Contributions</small>
+        <p class="stat-card__value" id="stat-my-contributions">—</p>
+        <small class="stat-card__sub">This sprint period</small>
+      </li>
+    </ul>
 
-            <a href="groupCreate.html">
-                <button>Create New Group</button>
+    <!-- MAIN + SIDEBAR LAYOUT -->
+    <div class="dashboard-content">
+
+      <!-- LEFT — main content column -->
+      <div class="dashboard-col dashboard-col--main">
+
+        <!-- SA DATA WIDGET (P6) -->
+        <article class="card widget-section" aria-labelledby="sa-widget-heading">
+          <header class="widget-section__header">
+            <h2 id="sa-widget-heading" class="widget-section__title">📈 SA Financial Snapshot</h2>
+            <button class="widget-refresh-btn"
+                    id="sa-refresh-btn"
+                    aria-label="Refresh financial data"
+                    title="Refresh">↻</button>
+          </header>
+          <div id="sa-widget-container" class="sa-widget-container">
+            <!-- Skeleton shown while fetching, replaced by dashboard.js -->
+            <div class="sa-widget-skeleton" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-row">
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+              </div>
+              <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- RECENT CONTRIBUTIONS shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="contributions-heading">
+          <header class="widget-section__header">
+            <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
+            <a href="contributions.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="contributions-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Contribution tracking coming soon — P4 is building this.
+            </p>
+          </section>
+        </article>
+
+      </div><!-- /.dashboard-col--main -->
+
+      <!-- RIGHT — sidebar column -->
+      <aside class="dashboard-col dashboard-col--side">
+
+        <!-- UPCOMING MEETINGS shell (P5 populates this) -->
+        <article class="card widget-section" aria-labelledby="meetings-heading">
+          <header class="widget-section__header">
+            <h2 id="meetings-heading" class="widget-section__title">📅 Upcoming Meetings</h2>
+            <a href="meetings.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="meetings-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Meeting schedule coming soon — P5 is building this.
+            </p>
+          </section>
+        </article>
+
+        <!-- GROUP MEMBERS & MANAGEMENT (P3 — integrated) -->
+        <article class="card widget-section" aria-labelledby="members-heading">
+          <header class="widget-section__header">
+            <h2 id="members-heading" class="widget-section__title">👥 Group Members</h2>
+            <a href="groups.html" class="widget-section__link">Manage →</a>
+          </header>
+          <section id="members-container" aria-live="polite">
+
+            <!-- Your Groups list (P3) -->
+            <div class="group-list-section">
+              <h3>Your Groups</h3>
+              <ul id="grouplist" aria-label="List of your stokvel groups"></ul>
+            </div>
+
+            <!-- Invite Member form (P3) -->
+            <div class="invite-member-section">
+              <h3>Invite Member</h3>
+              <form id="invite-form" aria-label="Invite a member by email">
+                <input type="email" id="inviteEmail" placeholder="Enter Email" aria-label="Member email address" required />
+                <button type="submit" id="inviteBtn">Invite</button>
+              </form>
+              <p id="inviteMessage" role="status" aria-live="polite"></p>
+            </div>
+
+            <!-- Create New Group (P3) -->
+            <a href="groupCreate.html" class="widget-section__link">
+              <button type="button" aria-label="Create a new stokvel group">Create New Group</button>
             </a>
-        
 
-    </main>
+          </section>
+        </article>
 
-    <script type="module">
-    import { getUserGroups } from "../src/dashboardService.js";
-    import { sendInvite } from "../src/groupService.js";
-    import { listenForAuth } from "../src/auth.js";
-    import { auth, db } from "../src/firebase.js";
-    import { doc, getDoc } from "firebase/firestore";
+        <!-- PAYOUT SCHEDULE shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="payout-heading">
+          <header class="widget-section__header">
+            <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
+            <a href="contributions.html#payouts" class="widget-section__link">View all →</a>
+          </header>
+          <section id="payout-container" aria-live="polite">
+            <p class="coming-soon-placeholder">
+              🔧 Payout schedule coming soon — P4 is building this.
+            </p>
+          </section>
+        </article>
 
-    listenForAuth();
+      </aside><!-- /.dashboard-col--side -->
 
-    const grouplist = document.getElementById("grouplist");
-    const inviteBtn = document.getElementById("inviteBtn");
-    const inviteMessage = document.getElementById("inviteMessage");
+    </div><!-- /.dashboard-content -->
+
+  </main>
+
+  <!-- Live notification region — P5 injects banners here -->
+  <output id="notification-root" aria-live="polite" aria-atomic="true"></output>
+
+  <!-- Footer injected by footer.js -->
+  <div id="footer-root"></div>
+
+  <!-- Firebase SDKs — must load before firebase-config.js -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
+  <script src="js/sa-data.js"></script>
+  <script src="js/dashboard.js"></script>
+
+  <!-- P3: Group management — lists groups, handles invites, creates groups -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const grouplist     = document.getElementById('grouplist');
+    const inviteForm    = document.getElementById('invite-form');
+    const inviteMessage = document.getElementById('inviteMessage');
 
     let selectedGroupId = null;
-    let userRole = null;
+    let userRole        = null;
 
+    /* ── Fetch the current user's role within a group ────── */
     const getUserRole = async (groupID) => {
-        const user = auth.currentUser;
-        const roleDoc = await getDoc(doc(db, "groups",groupID,"members",user.uid));
-
-        if (roleDoc.exists()){
-            return roleDoc.data().role;
-        }
-        return null;
+      const user = auth.currentUser;
+      if (!user) return null;
+      const roleDoc = await db
+        .collection('groups').doc(groupID)
+        .collection('members').doc(user.uid)
+        .get();
+      return roleDoc.exists ? roleDoc.data().role : null;
     };
 
+    /* ── Load and render the user's groups ────────────────── */
     const loadGroups = async () => {
-        const groups = await getUserGroups();
-        grouplist.innerHTML="";
+      const user = auth.currentUser;
+      if (!user || !grouplist) return;
 
-        groups.forEacj(group => {
-            const li = document.createElement("li");
-            li.textContent=group.name;
+      const snapshot = await db
+        .collection('memberships')
+        .where('uid', '==', user.uid)
+        .get();
 
-            li.onclick = async () => {
-                selectedGroupId = group.id;
-                userRole = await getUserRole(group.id);
+      grouplist.innerHTML = '';
 
-                alert(`Selected: ${group.name} (Role: ${userRole})`);
-            };
-            grouplist.appendChild(li);
-        });
+      for (const membership of snapshot.docs) {
+        const { groupId } = membership.data();
+        const groupDoc = await db.collection('groups').doc(groupId).get();
+
+        if (groupDoc.exists) {
+          const group = { id: groupId, ...groupDoc.data() };
+          const li = document.createElement('li');
+          li.textContent = group.name;
+          li.setAttribute('role', 'button');
+          li.setAttribute('tabindex', '0');
+          li.onclick = async () => {
+            selectedGroupId = group.id;
+            userRole = await getUserRole(group.id);
+            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+          };
+          grouplist.appendChild(li);
+        }
+      }
     };
 
-    inviteBtn.addEventListener("click",async() => {
-        const email = document.getElementById("inviteEmail").value;
+    /* ── Handle invite form submission ────────────────────── */
+    if (inviteForm) {
+      inviteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('inviteEmail').value.trim();
 
-        if (!selectedGroupId){
-            alert("Please select a group first");
-            return;
+        if (!selectedGroupId) {
+          alert('Please select a group first');
+          return;
+        }
+        if (userRole !== 'admin') {
+          alert('Only admins can invite members');
+          return;
         }
 
-        if (userRole !== "admin"){
-            alert("Only admins can invite members");
-            return;
+        try {
+          await db.collection('invites').add({
+            email:     email,
+            groupId:   selectedGroupId,
+            invitedBy: auth.currentUser.uid,
+            status:    'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          inviteMessage.textContent = 'Invite Sent!';
+        } catch (err) {
+          inviteMessage.textContent = 'Error sending invite';
+          console.error(err);
         }
+      });
+    }
 
-        try{
-            await sendInvite(email,selectedGroupId);
-            inviteMessage.textContent="Invite Sent!";
-        }catch (err){
-            inviteMessage.textContent="Error sending invite";
-            console.error(err);
-        }
-        
+    /* ── Accept any pending invites for the signed-in user ── */
+    const checkInvites = async (user) => {
+      const snapshot = await db.collection('invites')
+        .where('email',  '==', user.email)
+        .where('status', '==', 'pending')
+        .get();
+
+      for (const docSnap of snapshot.docs) {
+        const invite = docSnap.data();
+
+        // Add user to the group members sub-collection
+        await db.collection('groups').doc(invite.groupId)
+          .collection('members').doc(user.uid)
+          .set({
+            uid:      user.uid,
+            role:     'member',
+            joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+        // Create a membership record for quick dashboard lookups
+        await db.collection('memberships').doc(user.uid + '_' + invite.groupId).set({
+          uid:     user.uid,
+          groupId: invite.groupId
+        });
+
+        // Mark the invite as accepted
+        await docSnap.ref.update({ status: 'invite accepted' });
+      }
+    };
+
+    /* ── Auth listener: check invites then load groups ────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        await checkInvites(user);
+        await loadGroups();
+      }
     });
-    loadGroups();
-    </script>
+  })();
+  </script>
 </body>
-
-
-
-
-
-
-
-
-
-
-
 </html>
-
-
-
-
