@@ -27,7 +27,8 @@
 
   // ── Frankfurter API — no key, no CORS issues ─────────────
   // Returns ZAR per 1 USD
-  const FRANKFURTER_URL = 'https://api.frankfurter.dev/v2/rates?base=USD&quotes=ZAR';
+  const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
+  const AZURE_FALLBACK  = '/api/getSAData';
   const CACHE_KEY        = 'stokpal_usd_zar';
   const CACHE_DURATION   = 4 * 60 * 60 * 1000; // 4 hours
 
@@ -61,20 +62,39 @@
     const cached = readCache();
     if (cached) return { zarPerUsd: cached.value, fromCache: true, live: false };
 
+    // 1. Try Frankfurter API directly
     try {
       const controller = new AbortController();
-      setTimeout(() => controller.abort(), 5000);
+      const timer = setTimeout(() => controller.abort(), 5000);
       const res  = await fetch(FRANKFURTER_URL, { signal: controller.signal });
+      clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // data.rates.ZAR = how many ZAR per 1 USD
+      // Frankfurter v1 response: { amount:1, base:"USD", date:"...", rates:{ ZAR:18.xx } }
       const zarPerUsd = data.rates?.ZAR ?? 18.5;
       writeCache(zarPerUsd);
       return { zarPerUsd, fromCache: false, live: true };
     } catch (err) {
       console.warn('[SA Data] Frankfurter API failed:', err.message);
-      return { zarPerUsd: 18.50, fromCache: false, live: false };
     }
+
+    // 2. Fallback: Azure Function proxy (avoids CORS)
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(AZURE_FALLBACK, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+      const data = await res.json();
+      const zarPerUsd = data.usdZar ?? data.rates?.ZAR ?? 18.5;
+      writeCache(zarPerUsd);
+      return { zarPerUsd, fromCache: false, live: true };
+    } catch (err) {
+      console.warn('[SA Data] Azure proxy failed:', err.message);
+    }
+
+    // 3. Static fallback
+    return { zarPerUsd: 18.50, fromCache: false, live: false };
   }
 
   // ── Render the SA Widget ──────────────────────────────────
