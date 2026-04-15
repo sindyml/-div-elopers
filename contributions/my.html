@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - My Contributions</title>
+    <link rel="stylesheet" href="contributions.css">
 </head>
-<link rel="stylesheet" href="contributions.css">
 <body>
 
     <header>
@@ -24,6 +24,7 @@
 
     <script type="module">
         import { auth } from '../js/firebase-config.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getCurrentUserId,
             getUserGroups,
@@ -36,7 +37,7 @@
 
         async function logout() {
             try {
-                await auth.signOut();
+                await signOut(auth);
                 window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
@@ -120,10 +121,15 @@
                 
                 groupContributions.forEach(contribution => {
                     const row = targetTbody.insertRow();
-                    row.insertCell(0).textContent = `R${contribution.amount}`;
-                    row.insertCell(1).textContent = contribution.date;
+                    const amountCell = row.insertCell(0);
+                    amountCell.setAttribute('data-label', 'Amount');
+                    amountCell.textContent = `R${contribution.amount}`;
+                    const dateCell = row.insertCell(1);
+                    dateCell.setAttribute('data-label', 'Date');
+                    dateCell.textContent = contribution.date;
                     
                     const statusCell = row.insertCell(2);
+                    statusCell.setAttribute('data-label', 'Status');
                     if (contribution.status === 'confirmed') {
                         statusCell.textContent = '✅ Confirmed';
                     } else if (contribution.status === 'missed') {

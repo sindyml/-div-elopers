@@ -1,5 +1,17 @@
 // contributions/contributions.js
 import { auth, db } from '../js/firebase-config.js';
+import {
+    collection,
+    collectionGroup,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    where,
+    orderBy,
+    onSnapshot,
+    updateDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ============================================================
 // MOCK MODE SWITCH
@@ -30,8 +42,8 @@ async function getCurrentUserRole() {
     }
     const currentUserId = getCurrentUserId();
     if (!currentUserId) return null;
-    const userDocument = await db.collection('users').doc(currentUserId).get();
-    if (!userDocument.exists) return null;
+    const userDocument = await getDoc(doc(db, 'users', currentUserId));
+    if (!userDocument.exists()) return null;
     return userDocument.data().role;
 }
 
@@ -48,61 +60,61 @@ async function getUserGroups(userId) {
         const groupIds = memberRecords.map(m => m.groupId);
         return mockData.groups.filter(group => groupIds.includes(group.id));
     }
-    
+
     // REAL MODE: Query members subcollection across all groups
-    const membersSnapshot = await db.collectionGroup('members')
-        .where('uid', '==', userId)
-        .get();
-    
+    const membersSnapshot = await getDocs(
+        query(collectionGroup(db, 'members'), where('uid', '==', userId))
+    );
+
     // Extract unique group IDs from document paths
-    const groupIds = [...new Set(membersSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
-    
-    // Fetch each group's details
-    const groups = [];
-    for (const groupId of groupIds) {
-        const groupDoc = await db.collection('groups').doc(groupId).get();
-        if (groupDoc.exists) {
-            groups.push({
-                id: groupDoc.id,
-                name: groupDoc.data().name,
-                ...groupDoc.data()
-            });
-        }
-    }
-    return groups;
+    const groupIds = [...new Set(membersSnapshot.docs.map(d => d.ref.parent.parent.id))];
+
+    // Fetch each group's details in parallel
+    const groupDocs = await Promise.all(
+        groupIds.map(groupId => getDoc(doc(db, 'groups', groupId)))
+    );
+    return groupDocs
+        .filter(groupDoc => groupDoc.exists())
+        .map(groupDoc => ({
+            id: groupDoc.id,
+            name: groupDoc.data().name,
+            ...groupDoc.data()
+        }));
 }
 
 // Get groups where user is a treasurer or admin (for Treasurer view)
 async function getTreasurerGroups(userId) {
     if (USE_MOCK) {
         // Find member records where uid matches and role is treasurer or admin
-        const memberRecords = mockData.members.filter(m => 
+        const memberRecords = mockData.members.filter(m =>
             m.uid === userId && (m.role === 'treasurer' || m.role === 'admin')
         );
         const groupIds = memberRecords.map(m => m.groupId);
         return mockData.groups.filter(group => groupIds.includes(group.id));
     }
-    
+
     // REAL MODE: Query members subcollection for treasurer/admin role
-    const membersSnapshot = await db.collectionGroup('members')
-        .where('uid', '==', userId)
-        .where('role', 'in', ['treasurer', 'admin'])
-        .get();
-    
-    const groupIds = [...new Set(membersSnapshot.docs.map(doc => doc.ref.parent.parent.id))];
-    
-    const groups = [];
-    for (const groupId of groupIds) {
-        const groupDoc = await db.collection('groups').doc(groupId).get();
-        if (groupDoc.exists) {
-            groups.push({
-                id: groupDoc.id,
-                name: groupDoc.data().name,
-                ...groupDoc.data()
-            });
-        }
-    }
-    return groups;
+    const membersSnapshot = await getDocs(
+        query(
+            collectionGroup(db, 'members'),
+            where('uid', '==', userId),
+            where('role', 'in', ['treasurer', 'admin'])
+        )
+    );
+
+    const groupIds = [...new Set(membersSnapshot.docs.map(d => d.ref.parent.parent.id))];
+
+    // Fetch each group's details in parallel
+    const groupDocs = await Promise.all(
+        groupIds.map(groupId => getDoc(doc(db, 'groups', groupId)))
+    );
+    return groupDocs
+        .filter(groupDoc => groupDoc.exists())
+        .map(groupDoc => ({
+            id: groupDoc.id,
+            name: groupDoc.data().name,
+            ...groupDoc.data()
+        }));
 }
 
 // Get single group by ID
@@ -111,8 +123,8 @@ async function getGroupById(groupId) {
         const group = mockData.groups.find(g => g.id === groupId);
         return group || null;
     }
-    const groupDocument = await db.collection('groups').doc(groupId).get();
-    if (!groupDocument.exists) return null;
+    const groupDocument = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDocument.exists()) return null;
     return {
         id: groupDocument.id,
         name: groupDocument.data().name,
@@ -126,15 +138,10 @@ async function getGroupById(groupId) {
 
 async function getMemberName(userId) {
     if (USE_MOCK) {
-        const mockNames = {
-            "user_123": "Thabo",
-            "user_106": "Amina",
-            "user_345": "Belinda"
-        };
-        return mockNames[userId] || userId;
+        return mockData.memberNames[userId] || userId;
     }
-    const userDocument = await db.collection('users').doc(userId).get();
-    if (!userDocument.exists) return userId;
+    const userDocument = await getDoc(doc(db, 'users', userId));
+    if (!userDocument.exists()) return userId;
     return userDocument.data().name || userId;
 }
 
@@ -146,10 +153,9 @@ async function getContributionsByMember(userId) {
     if (USE_MOCK) {
         return mockData.contributions.filter(c => c.userId === userId);
     }
-    const contributionsSnapshot = await db.collection('contributions')
-        .where('userId', '==', userId)
-        .orderBy('date', 'desc')
-        .get();
+    const contributionsSnapshot = await getDocs(
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc'))
+    );
     return contributionsSnapshot.docs.map(document => ({
         id: document.id,
         ...document.data()
@@ -160,10 +166,9 @@ async function getContributionsByGroup(groupId) {
     if (USE_MOCK) {
         return mockData.contributions.filter(c => c.groupId === groupId);
     }
-    const contributionsSnapshot = await db.collection('contributions')
-        .where('groupId', '==', groupId)
-        .orderBy('date', 'desc')
-        .get();
+    const contributionsSnapshot = await getDocs(
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc'))
+    );
     return contributionsSnapshot.docs.map(document => ({
         id: document.id,
         ...document.data()
@@ -181,7 +186,7 @@ async function updateContributionStatus(contributionId, newStatus) {
         }
         return;
     }
-    await db.collection('contributions').doc(contributionId).update({
+    await updateDoc(doc(db, 'contributions', contributionId), {
         status: newStatus,
         confirmedAt: new Date()
     });
@@ -204,16 +209,16 @@ function listenToMemberContributions(userId, onUpdateCallback) {
             if (index > -1) mockMemberCallbacks.splice(index, 1);
         };
     }
-    const unsubscribe = db.collection('contributions')
-        .where('userId', '==', userId)
-        .orderBy('date', 'desc')
-        .onSnapshot((snapshot) => {
+    const unsubscribe = onSnapshot(
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc')),
+        (snapshot) => {
             const contributions = snapshot.docs.map(document => ({
                 id: document.id,
                 ...document.data()
             }));
             onUpdateCallback(contributions);
-        });
+        }
+    );
     return unsubscribe;
 }
 
@@ -230,16 +235,16 @@ function listenToGroupContributions(groupId, onUpdateCallback) {
             if (index > -1) mockGroupCallbacks.splice(index, 1);
         };
     }
-    const unsubscribe = db.collection('contributions')
-        .where('groupId', '==', groupId)
-        .orderBy('date', 'desc')
-        .onSnapshot((snapshot) => {
+    const unsubscribe = onSnapshot(
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc')),
+        (snapshot) => {
             const contributions = snapshot.docs.map(document => ({
                 id: document.id,
                 ...document.data()
             }));
             onUpdateCallback(contributions);
-        });
+        }
+    );
     return unsubscribe;
 }
 
@@ -251,10 +256,9 @@ async function getPayoutSchedule(groupId) {
     if (USE_MOCK) {
         return mockData.payouts.filter(p => p.groupId === groupId);
     }
-    const payoutsSnapshot = await db.collection('payouts')
-        .where('groupId', '==', groupId)
-        .orderBy('order', 'asc')
-        .get();
+    const payoutsSnapshot = await getDocs(
+        query(collection(db, 'payouts'), where('groupId', '==', groupId), orderBy('order', 'asc'))
+    );
     return payoutsSnapshot.docs.map(document => ({
         id: document.id,
         ...document.data()

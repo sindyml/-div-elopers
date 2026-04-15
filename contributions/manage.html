@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Manage Contributions</title>
+    <link rel="stylesheet" href="contributions.css">
 </head>
-<link rel="stylesheet" href="contributions.css">
 <body>
 
     <header>
@@ -24,6 +24,7 @@
 
     <script type="module">
         import { auth } from '../js/firebase-config.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getCurrentUserId,
             getCurrentUserRole,
@@ -33,12 +34,11 @@
             listenToGroupContributions
         } from './contributions.js';
 
-        let activeGroupId = null;
         let activeUnsubscribe = null;
 
         async function logout() {
             try {
-                await auth.signOut();
+                await signOut(auth);
                 window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
@@ -159,11 +159,18 @@
                     const row = tbodyElement.insertRow();
                     const memberName = await getMemberName(contribution.userId);
 
-                    row.insertCell(0).textContent = memberName;
-                    row.insertCell(1).textContent = `R${contribution.amount}`;
-                    row.insertCell(2).textContent = contribution.date;
+                    const memberCell = row.insertCell(0);
+                    memberCell.setAttribute('data-label', 'Member');
+                    memberCell.textContent = memberName;
+                    const amountCell = row.insertCell(1);
+                    amountCell.setAttribute('data-label', 'Amount');
+                    amountCell.textContent = `R${contribution.amount}`;
+                    const dateCell = row.insertCell(2);
+                    dateCell.setAttribute('data-label', 'Date');
+                    dateCell.textContent = contribution.date;
 
                     const statusCell = row.insertCell(3);
+                    statusCell.setAttribute('data-label', 'Status');
                     if (contribution.status === 'confirmed') {
                         statusCell.textContent = '✅ Confirmed';
                     } else if (contribution.status === 'missed') {
@@ -173,6 +180,7 @@
                     }
 
                     const actionCell = row.insertCell(4);
+                    actionCell.setAttribute('data-label', 'Action');
                     if (contribution.status === 'pending') {
                         const confirmButton = document.createElement('button');
                         confirmButton.textContent = 'Confirm';
@@ -199,7 +207,6 @@
         }
 
         async function loadContributionsForGroup(groupId, groupName) {
-            activeGroupId = groupId;
             const container = document.getElementById('manageContent');
             await displayContributionsTable(groupId, groupName, container);
         }

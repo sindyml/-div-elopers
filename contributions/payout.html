@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Payout Schedule</title>
+    <link rel="stylesheet" href="contributions.css">
 </head>
-<link rel="stylesheet" href="contributions.css">
 <body>
 
     <header>
@@ -24,6 +24,7 @@
 
     <script type="module">
         import { auth } from '../js/firebase-config.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getPayoutSchedule,
             getGroupById,
@@ -37,7 +38,7 @@
 
         async function logout() {
             try {
-                await auth.signOut();
+                await signOut(auth);
                 window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
@@ -86,10 +87,18 @@
                 const tbody = document.createElement('tbody');
                 payouts.forEach(payout => {
                     const row = tbody.insertRow();
-                    row.insertCell(0).textContent = payout.order;
-                    row.insertCell(1).textContent = payout.userDisplayName;
-                    row.insertCell(2).textContent = payout.payoutDate;
-                    row.insertCell(3).textContent = `R${payout.amount}`;
+                    const orderCell = row.insertCell(0);
+                    orderCell.setAttribute('data-label', 'Order');
+                    orderCell.textContent = payout.order;
+                    const nameCell = row.insertCell(1);
+                    nameCell.setAttribute('data-label', 'Member Name');
+                    nameCell.textContent = payout.userDisplayName;
+                    const dateCell = row.insertCell(2);
+                    dateCell.setAttribute('data-label', 'Payout Date');
+                    dateCell.textContent = payout.payoutDate;
+                    const amountCell = row.insertCell(3);
+                    amountCell.setAttribute('data-label', 'Amount');
+                    amountCell.textContent = `R${payout.amount}`;
                 });
                 table.appendChild(tbody);
                 container.appendChild(table);
@@ -98,7 +107,10 @@
 
         function displayError(message) {
             const container = document.getElementById('payoutContent');
-            container.innerHTML = `<p>${message}</p>`;
+            container.innerHTML = '';
+            const p = document.createElement('p');
+            p.textContent = message;
+            container.appendChild(p);
         }
 
         async function loadPayoutPage() {
