@@ -1,23 +1,20 @@
 /* ============================================================
    sa-data.js — SA Financial Data Integration (P6 Task 3b)
    
-   Fetches live South African financial data.
-   Falls back to an Azure Function proxy if CORS blocks the
-   direct browser request, and to cached/static values if
-   both fail (so the widget never breaks the page).
+   Fetches live South African financial data using the
+   Frankfurter API (no key required, CORS-friendly).
+   Falls back to an Azure Function proxy if direct browser
+   fetch is blocked, and to cached/static values if both
+   fail (so the widget never breaks the page).
    ============================================================ */
 
 // ── CONFIG ──────────────────────────────────────────────────
 const SA_DATA_CONFIG = {
-  // Primary: SARB publicly available data (replace with real endpoint once researched)
-  // Options found during research:
-  //   - https://custom.resbank.co.za/SarbWebApi/WebIndicators/ (SARB Web API)
-  //   - https://www.statssa.gov.za (Stats SA — requires scraping, not ideal)
-  //   - ExchangeRate-API for USD/ZAR: https://open.er-api.com/v6/latest/ZAR
-  primaryUrl: 'https://open.er-api.com/v6/latest/ZAR',
+  // Primary: Frankfurter API — free, no key, CORS-friendly
+  primaryUrl: 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR',
 
   // Fallback: Azure Function proxy (deployed alongside the app)
-  // P6 deploys this function to avoid CORS issues with external APIs
+  // Proxies the same Frankfurter request server-side to avoid CORS
   azureFunctionUrl: '/api/getSAData',
 
   // Cache key and duration
@@ -31,11 +28,12 @@ const SA_DATA_CONFIG = {
 // ── STATIC FALLBACK VALUES ───────────────────────────────────
 // Used only if both the API and Azure Function are unreachable.
 // Update these at the start of each sprint with current values.
+// Source: SARB MPC decision March 2026 — repo held at 6.75%
 const SA_DATA_FALLBACK = {
-  primeRate:      11.75,   // % — SARB prime lending rate
-  inflationRate:   4.4,   // % — CPI year-on-year (Stats SA)
-  usdZar:         18.50,  // USD/ZAR exchange rate
-  source:         'Static fallback (last updated Sprint 1)',
+  primeRate:      10.25,   // % — Prime = repo (6.75%) + 3.5%
+  inflationRate:   4.0,    // % — SARB Q2 2026 forecast
+  usdZar:         18.50,   // USD/ZAR exchange rate
+  source:         'Static fallback (last updated March 2026)',
   isFallback:     true,
 };
 
@@ -88,26 +86,25 @@ function writeCache(data) {
   }
 }
 
-// ── PRIMARY FETCH: Direct API ────────────────────────────────
+// ── PRIMARY FETCH: Frankfurter API ───────────────────────────
 async function fetchFromPrimaryAPI() {
   const response = await fetchWithTimeout(SA_DATA_CONFIG.primaryUrl);
   if (!response.ok) throw new Error(`API responded with ${response.status}`);
 
   const json = await response.json();
 
-  // ExchangeRate-API response shape: json.rates.USD gives ZAR per USD
-  // We want USD/ZAR so we invert: 1 / rates.USD = ZAR per 1 USD
-  const usdZar = json.rates && json.rates.USD
-    ? parseFloat((1 / json.rates.USD).toFixed(2))
+  // Frankfurter response: { amount: 1, base: "USD", date: "...", rates: { ZAR: 18.xx } }
+  const usdZar = json.rates && json.rates.ZAR
+    ? parseFloat(json.rates.ZAR.toFixed(2))
     : SA_DATA_FALLBACK.usdZar;
 
   return {
     usdZar,
-    // Prime rate and inflation aren't available from ExchangeRate-API.
-    // They'll be fetched via Azure Function or fall back to static values.
+    // Prime rate and inflation are SARB/Stats SA values — not available from Frankfurter.
+    // We use known static values (updated each sprint).
     primeRate:     SA_DATA_FALLBACK.primeRate,
     inflationRate: SA_DATA_FALLBACK.inflationRate,
-    source:        'ExchangeRate-API (live)',
+    source:        'Frankfurter API (live)',
     isFallback:    false,
   };
 }

@@ -1,19 +1,26 @@
 {
-  "name": "-div-elopers",
+  "name": "stockpal-app",
   "version": "1.0.0",
   "description": "> A web-based stokvel management system that enables members to track contributions, monitor payout schedules, communicate, and gain financial insights – designed for South African savings groups.",
-  "main": "index.js",
+  "main": "server.js",
+  "directories": {
+    "test": "jest"
+  },
   "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SindyMl/-div-elopers.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["stokvel", "firebase", "azure"],
+  "author": "Sindiswa, Alondwe, Ziya, Owen, Athandwa & Kwezi",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/SindyMl/-div-elopers/issues"
   },

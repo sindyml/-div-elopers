@@ -4,65 +4,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Register — Stokvel</title>
+  <title>Register — StokPal</title>
+  <!-- Google Fonts for the clean, modern look - DM Serif for headings, DM Sans for body text -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <!-- theme.css has all the colours, fonts, spacing - the design system for the whole app -->
   <link rel="stylesheet" href="css/theme.css" />
+  <!-- register.css has page-specific styles like the card layout and OAuth buttons -->
   <link rel="stylesheet" href="css/register.css" />
 </head>
 <body>
-  <div class="register-page">
-    <div class="register-card">
-      <div class="register-card__header">
-        <div class="register-card__logo">Stokvel</div>
+  <!-- Main container - centers everything on the page with a gradient background -->
+  <main class="register-page">
+    <!-- White card that contains the form - looks clean and professional -->
+    <article class="register-card">
+      <!-- Green header section - matches the brand colour from the landing page -->
+      <header class="register-card__header">
+        <strong class="register-card__logo">StokPal</strong>
         <h1 class="register-card__title">Create an account</h1>
         <p class="register-card__sub">Join your stokvel and start saving together</p>
-      </div>
+      </header>
 
-      <div class="register-card__body">
-        <div id="alertMessage" class="alert alert--hidden"></div>
+      <section class="register-card__body">
+        <!-- This div shows error or success messages - hidden by default, appears when needed -->
+        <aside id="alertMessage" class="alert alert--hidden" aria-live="polite"></aside>
 
+        <!-- Main registration form - email, password, and role dropdown -->
         <form id="registerForm">
           <div class="form-group">
-            <label class="form-label">Email</label>
+            <label class="form-label" for="email">Email</label>
             <input type="email" id="email" class="form-input" placeholder="you@example.com" required>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Password</label>
+            <label class="form-label" for="password">Password</label>
             <input type="password" id="password" class="form-input" placeholder="Create a strong password" required>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Role</label>
-            <select id="role" class="form-select">
+          <fieldset class="form-group">
+            <legend class="form-label">Role</legend>
+            <!-- Dropdown lets user choose their role - determines what they can see/do in the app -->
+            <select id="role" class="form-select" aria-label="Select your role">
               <option value="Member">Member</option>
               <option value="Treasurer">Treasurer</option>
               <option value="Admin">Admin</option>
             </select>
-          </div>
-      
+          </fieldset>
 
           <button type="submit" class="btn btn--primary btn--full">Create account</button>
         </form>
 
-        <!-- Add this after your existing form, before the footer -->
-<div class="divider">
-  <span>or</span>
-</div>
+        <!-- Divider with "or continue with" - separates email signup from OAuth options -->
+        <hr class="divider" aria-label="or continue with" />
 
-<button type="button" id="googleRegisterBtn" class="btn btn--outline btn--full">
-  Continue with Google
-</button>
-      </div>
-
-      <div class="register-card__footer">
-        <p>Already have an account? <a href="login.html">Sign in</a></p>
-      </div>
-    </div>
-  </div>
-
+        <!-- Three OAuth buttons - Google, GitHub, LinkedIn - let users sign up with existing accounts -->
+        <section class="oauth-buttons" aria-label="Sign up with social accounts">
+          <button type="button" id="googleRegisterBtn" class="btn btn--outline oauth-btn">
+            Google
+          </button>
+          <button type="button" id="githubRegisterBtn" class="btn btn--outline oauth-btn">
+            GitHub
+          </button>
+          <button type="button" id="linkedinRegisterBtn" class="btn btn--outline oauth-btn">
+            LinkedIn
+          </button>
+        </section>
+      </section>
+    </article>
+  </main>
+  <!-- Firebase logic is in register.js - handles form submission and OAuth popups -->
   <script type="module" src="js/register.js"></script>
 </body>
 </html>
