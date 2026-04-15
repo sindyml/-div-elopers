@@ -50,6 +50,16 @@
         }
 
         function goBack() {
+            if (activeGroupId) {
+                if (activeUnsubscribe) {
+                    activeUnsubscribe();
+                    activeUnsubscribe = null;
+                }
+                activeGroupId = null;
+                window.location.href = 'manage.html';
+                return;
+            }
+
             if (document.referrer && document.referrer !== '') {
                 window.history.back();
             } else {
