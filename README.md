@@ -199,51 +199,82 @@ Exchange rate data is cached in `localStorage` for 4 hours to minimise API reque
 
 ```
 stockpal/
-├── index.html               # Landing page
-├── login.html               # Sign-in page
-├── register.html            # Registration page
-├── dashboard.html           # Member dashboard
-├── meetings.html            # Meeting management
-├── groupCreate.html         # Group creation form
-├── server.js                # Node.js static server + SA data API proxy
-├── firestore.rules          # Firestore security rules
-├── firestore.indexes.json   # Composite index definitions
-├── staticwebapp.config.json # Azure routing and auth config
+├── backend/                        # Server-side code
+│   ├── server.js                   # Node.js static server + SA data API proxy
+│   └── api/
+│       └── getSAData/              # Azure Function — SA data proxy
+│           ├── index.js
+│           └── function.json
 │
-├── js/
-│   ├── firebase-config.js   # Firebase initialisation and exports
-│   ├── auth.js              # Auth helpers
-│   ├── dashboard.js         # Dashboard controller (SA data widget)
-│   ├── login.js             # Sign-in logic
-│   ├── register.js          # Registration logic
-│   ├── meetings.js          # Meeting CRUD + real-time notifications
-│   ├── sa-data.js           # SA financial data fetch/cache layer
-│   └── firebase.js          # Firebase compat SDK bootstrap
+├── frontend/                       # All browser-facing code
+│   ├── index.html                  # Landing page
+│   ├── login.html                  # Sign-in page
+│   ├── register.html               # Registration page
+│   ├── dashboard.html              # Member dashboard
+│   ├── meetings.html               # Meeting management
+│   ├── groupCreate.html            # Group creation form
+│   │
+│   ├── js/
+│   │   ├── firebase-config.js      # Firebase initialisation and exports
+│   │   ├── auth.js                 # Auth helpers (privateRoute, roleGuard)
+│   │   ├── dashboard.js            # Dashboard controller (SA data widget)
+│   │   ├── login.js                # Sign-in logic
+│   │   ├── register.js             # Registration logic
+│   │   ├── meetings.js             # Meeting CRUD + real-time notifications
+│   │   ├── sa-data.js              # SA financial data fetch/cache layer
+│   │   └── firebase.js             # Firebase compat SDK bootstrap
+│   │
+│   ├── css/
+│   │   ├── theme.css               # Design system (colours, fonts, spacing)
+│   │   ├── app.css                 # Authenticated page layout
+│   │   ├── dashboard.css           # Dashboard-specific styles
+│   │   ├── meetings.css            # Meetings page styles
+│   │   ├── landing.css             # Landing page styles
+│   │   └── register.css            # Login/register/group-create styles
+│   │
+│   ├── components/
+│   │   ├── navbar.js               # Shared navbar (auth-aware)
+│   │   └── footer.js               # Shared footer
+│   │
+│   ├── contributions/              # Contribution tracking pages
+│   │   ├── my.html                 # Member's contribution history
+│   │   ├── manage.html             # Treasurer contribution management
+│   │   ├── payout.html             # Payout schedule view
+│   │   ├── contributions.js        # Contribution data logic
+│   │   ├── contributions.css       # Contribution page styles
+│   │   └── mock-data.js            # Mock data for development
+│   │
+│   └── pages/
+│       └── dashboard.html          # Additional dashboard page
 │
-├── css/
-│   ├── app.css
-│   ├── dashboard.css
-│   ├── meetings.css
-│   ├── landing.css
-│   ├── register.css
-│   └── theme.css
+├── services/                       # Firebase service modules (npm-based imports)
+│   ├── firebase.js                 # Firebase app initialisation
+│   ├── auth.js                     # Auth listener + invite checker
+│   ├── dashboardService.js         # Group data queries
+│   └── groupService.js             # Group creation + treasurer assignment
 │
-├── components/
-│   ├── navbar.js
-│   └── footer.js
+├── firebase/                       # Firebase configuration files
+│   ├── firestore.rules             # Firestore security rules
+│   ├── firestore.indexes.json      # Composite index definitions
+│   └── dataconnect/
+│       ├── dataconnect.yaml
+│       ├── seed_data.gql
+│       ├── schema/schema.gql       # Firebase Data Connect GraphQL schema
+│       └── example/
+│           ├── connector.yaml
+│           └── queries.gql
 │
-├── api/
-│   └── getSAData/           # Azure Function — SA data proxy
-│       ├── index.js
-│       └── function.json
+├── docs/                           # Documentation and schema references
+│   ├── Firestore meeting schema
+│   ├── schema_representation.txt
+│   └── data-model.txt
 │
-├── dataconnect/
-│   ├── dataconnect.yaml
-│   ├── seed_data.gql
-│   └── schema/schema.gql    # Firebase Data Connect GraphQL schema
+├── tests/
+│   └── auth.tests.js               # Auth utility unit tests
 │
-└── tests/
-    └── auth.tests.js
+├── package.json
+├── staticwebapp.config.json        # Azure routing and auth config
+└── README.md
 ```
 
 ---
@@ -272,7 +303,7 @@ npm start
 # App is served at http://localhost:8080
 ```
 
-> **Firebase config:** Add your Firebase project credentials to `js/firebase-config.js`. The required fields are `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, and `appId`.
+> **Firebase config:** The Firebase project credentials are configured in `frontend/js/firebase-config.js`. The required fields are `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, and `appId`.
 
 ### Running Tests
 
