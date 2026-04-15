@@ -1,9 +1,9 @@
-import { auth } from '../js/firebase-config.js';
-import { isAuthenticated, getCurrentUserRole, privateRoute, roleGuard } from '../js/auth.js';
+import { auth } from '../frontend/js/firebase-config.js';
+import { isAuthenticated, getCurrentUserRole, privateRoute, roleGuard } from '../frontend/js/auth.js';
 import { getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Mock Firebase modules
-jest.mock('../js/firebase-config.js', () => ({
+jest.mock('../frontend/js/firebase-config.js', () => ({
   auth: {
     currentUser: null
   },

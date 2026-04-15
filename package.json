@@ -2,13 +2,13 @@
   "name": "stockpal-app",
   "version": "1.0.0",
   "description": "> A web-based stokvel management system that enables members to track contributions, monitor payout schedules, communicate, and gain financial insights – designed for South African savings groups.",
-  "main": "server.js",
+  "main": "backend/server.js",
   "directories": {
     "test": "jest"
   },
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
+    "start": "node backend/server.js",
+    "dev": "node backend/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {

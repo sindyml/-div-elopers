@@ -1,5 +1,5 @@
 // server.js — lightweight static file server for Azure Web App
-// Serves all HTML/CSS/JS files from the project root
+// Serves all HTML/CSS/JS files from the frontend/ directory
 // Also provides /api/getSAData proxy for Frankfurter API (CORS fallback)
 
 const http    = require('http');
@@ -7,6 +7,9 @@ const https   = require('https');
 const fs      = require('fs');
 const path    = require('path');
 const PORT    = process.env.PORT || 8080;
+
+// Resolve the frontend directory (one level up from backend/)
+const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -102,12 +105,12 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(urlPath);
   if (!ext) urlPath = urlPath + '.html';
 
-  const filePath = path.join(__dirname, urlPath);
+  const filePath = path.join(FRONTEND_DIR, urlPath);
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
       // File not found — serve index.html (SPA-style fallback)
-      fs.readFile(path.join(__dirname, 'index.html'), (err2, fallback) => {
+      fs.readFile(path.join(FRONTEND_DIR, 'index.html'), (err2, fallback) => {
         if (err2) {
           res.writeHead(404, { 'Content-Type': 'text/plain' });
           res.end('404 Not Found');
