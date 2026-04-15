@@ -1,0 +1,24 @@
+============================================================
+CONTRIBUTIONS COLLECTION 
+============================================================
+
+Field Name      | Type     | Description
+----------------|----------|-----------------------------------------------
+userId          | string   | The user's UID from Firebase Auth
+groupId         | string   | The stokvel group ID (matches Person 3's document ID)
+amount          | number   | Payment amount in Rands
+date            | string   | Payment date (YYYY-MM-DD)
+status          | string   | pending, confirmed, or missed
+
+============================================================
+PAYOUTS COLLECTION 
+============================================================
+
+Field Name         | Type     | Description
+-------------------|----------|-----------------------------------------------
+groupId            | string   | The stokvel group ID (matches Person 3's document ID)
+userId             | string   | Member's UID who gets paid
+userDisplayName    | string   | Member's name for display
+payoutDate         | string   | When they get paid (YYYY-MM-DD)
+order              | number   | Position in payout order (1, 2, 3...)
+amount             | number   | Payout amount in Rands

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StokPal - My Contributions</title>
+    <link rel="stylesheet" href="contributions.css">
+</head>
+<body>
+
+    <header>
+        <h1>StokPal</h1>
+        <nav>
+            <button id="dashboardButton">Dashboard</button>
+            <button id="backButton">Back</button>
+            <button id="logoutButton">Logout</button>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Contribution Tracking</h1>
+        <section id="dynamicContent"></section>
+    </main>
+
+    <script type="module">
+        import { auth } from '../js/firebase-config.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { 
+            getCurrentUserId,
+            getUserGroups,
+            listenToMemberContributions
+        } from './contributions.js';
+
+        let activeGroupId = null;
+        let activeUnsubscribe = null;
+        let activeTableSection = null;
+
+        async function logout() {
+            try {
+                await signOut(auth);
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+
+        function goBack() {
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
+            // Remove active table if exists
+            if (activeTableSection && activeTableSection.parentNode) {
+                activeTableSection.remove();
+            }
+            if (activeUnsubscribe) {
+                activeUnsubscribe();
+                activeUnsubscribe = null;
+            }
+
+            const tableSection = document.createElement('section');
+            tableSection.id = `contributions-table-${groupId}`;
+            
+            const heading = document.createElement('h3');
+            heading.textContent = `Contributions for ${groupName}`;
+            tableSection.appendChild(heading);
+
+            // Only add Collapse button if showCollapseButton is true (for 2+ groups)
+            if (showCollapseButton) {
+                const collapseButton = document.createElement('button');
+                collapseButton.textContent = 'Collapse';
+                collapseButton.style.marginBottom = '1rem';
+                collapseButton.addEventListener('click', () => {
+                    if (activeTableSection && activeTableSection.parentNode) {
+                        activeTableSection.remove();
+                    }
+                    if (activeUnsubscribe) {
+                        activeUnsubscribe();
+                        activeUnsubscribe = null;
+                    }
+                    activeTableSection = null;
+                    activeGroupId = null;
+                });
+                tableSection.appendChild(collapseButton);
+            }
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Amount', 'Date', 'Status'];
+            headers.forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            tbody.id = `contributions-body-${groupId}`;
+            table.appendChild(tbody);
+            tableSection.appendChild(table);
+
+            containerElement.appendChild(tableSection);
+            activeTableSection = tableSection;
+
+            activeUnsubscribe = listenToMemberContributions(getCurrentUserId(), (allContributions) => {
+                const groupContributions = allContributions.filter(c => c.groupId === groupId);
+                const targetTbody = document.getElementById(`contributions-body-${groupId}`);
+                if (!targetTbody) return;
+                
+                targetTbody.innerHTML = '';
+                
+                groupContributions.forEach(contribution => {
+                    const row = targetTbody.insertRow();
+                    const amountCell = row.insertCell(0);
+                    amountCell.setAttribute('data-label', 'Amount');
+                    amountCell.textContent = `R${contribution.amount}`;
+                    const dateCell = row.insertCell(1);
+                    dateCell.setAttribute('data-label', 'Date');
+                    dateCell.textContent = contribution.date;
+                    
+                    const statusCell = row.insertCell(2);
+                    statusCell.setAttribute('data-label', 'Status');
+                    if (contribution.status === 'confirmed') {
+                        statusCell.textContent = '✅ Confirmed';
+                    } else if (contribution.status === 'missed') {
+                        statusCell.textContent = '❌ Missed';
+                    } else {
+                        statusCell.textContent = '⏳ Pending';
+                    }
+                });
+            });
+        }
+
+        function displayGroupList(groups, container) {
+            container.innerHTML = '';
+            
+            const instructions = document.createElement('p');
+            instructions.textContent = 'Your groups:';
+            container.appendChild(instructions);
+            
+            const groupList = document.createElement('ul');
+            groupList.style.listStyle = 'none';
+            groupList.style.padding = '0';
+            
+            groups.forEach(group => {
+                const listItem = document.createElement('li');
+                listItem.style.marginBottom = '1rem';
+                listItem.style.padding = '1rem';
+                listItem.style.border = '1px solid #ddd';
+                listItem.style.borderRadius = '8px';
+                
+                const groupName = document.createElement('strong');
+                groupName.textContent = group.name;
+                listItem.appendChild(groupName);
+                listItem.appendChild(document.createElement('br'));
+                
+                const viewContributionsBtn = document.createElement('button');
+                viewContributionsBtn.textContent = 'View Contributions';
+                viewContributionsBtn.style.marginRight = '0.5rem';
+                viewContributionsBtn.addEventListener('click', () => {
+                    displayContributionsTable(group.id, group.name, container, true);
+                });
+                listItem.appendChild(viewContributionsBtn);
+                
+                const viewPayoutBtn = document.createElement('button');
+                viewPayoutBtn.textContent = 'View Payout Schedule';
+                viewPayoutBtn.addEventListener('click', () => {
+                    window.location.href = `payout.html?groupId=${group.id}&returnTo=my`;
+                });
+                listItem.appendChild(viewPayoutBtn);
+                
+                groupList.appendChild(listItem);
+            });
+            
+            container.appendChild(groupList);
+        }
+
+        function displaySingleGroupTable(groups, container) {
+            const singleGroup = groups[0];
+            const heading = document.createElement('h2');
+            heading.textContent = `Your contributions for group: ${singleGroup.name}`;
+            container.appendChild(heading);
+            
+            // Add View Payout button for single group
+            const payoutBtn = document.createElement('button');
+            payoutBtn.textContent = 'View Payout Schedule';
+            payoutBtn.style.marginBottom = '1rem';
+            payoutBtn.addEventListener('click', () => {
+                window.location.href = `payout.html?groupId=${singleGroup.id}&returnTo=my`;
+            });
+            container.appendChild(payoutBtn);
+            
+            // NO collapse button for single group (showCollapseButton = false)
+            displayContributionsTable(singleGroup.id, singleGroup.name, container, false);
+        }
+
+        function displayNoGroupsMessage(container) {
+            container.innerHTML = `
+                <p>You haven't joined any stokvel group yet.</p>
+                <p>Ask an Admin to add you to a group.</p>
+            `;
+        }
+
+        async function loadMyPage() {
+            const currentUserId = getCurrentUserId();
+            if (!currentUserId) {
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            const groups = await getUserGroups(currentUserId);
+            const container = document.getElementById('dynamicContent');
+            container.innerHTML = '';
+            
+            if (groups.length === 0) {
+                displayNoGroupsMessage(container);
+            } else if (groups.length === 1) {
+                displaySingleGroupTable(groups, container);
+            } else {
+                displayGroupList(groups, container);
+            }
+        }
+
+        document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
+        document.getElementById('backButton').addEventListener('click', goBack);
+        document.getElementById('logoutButton').addEventListener('click', logout);
+
+        loadMyPage();
+    </script>
+</body>
+</html>
