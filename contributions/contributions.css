@@ -1,0 +1,353 @@
+/* contributions/contributions.css */
+/* Evergreen Trust theme for Contribution Tracking screens */
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #F5F0E6;  /* Cloud background */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #1A2E1F;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* ============================================================
+   HEADER & NAVIGATION
+   ============================================================ */
+
+header {
+    background: linear-gradient(135deg, #0F4C3A 0%, #1A5E4A 100%);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+    color: #FFFFFF;
+    font-size: 1.8rem;
+    letter-spacing: 1px;
+    font-weight: 600;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+nav {
+    display: flex;
+    gap: 1rem;
+}
+
+nav button {
+    background-color: transparent;
+    border: 2px solid #FFFFFF;
+    color: #FFFFFF;
+    padding: 0.5rem 1.2rem;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+nav button:hover {
+    background-color: #FFFFFF;
+    color: #0F4C3A;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================================
+   MAIN CONTENT
+   ============================================================ */
+
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+main > h1 {
+    color: #0F4C3A;
+    font-size: 2.2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+/* ============================================================
+   TABLES (Card style with shadow and rounded corners)
+   ============================================================ */
+
+table {
+    width: 100%;
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+thead {
+    background: linear-gradient(135deg, #1A7A5E 0%, #0F5C46 100%);
+}
+
+th {
+    color: #FFFFFF;
+    font-weight: 600;
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+}
+
+td {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #E8F0EA;
+    color: #2C3E2B;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tbody tr:hover {
+    background-color: #F0F7F4;
+    transition: background-color 0.2s ease;
+}
+
+/* ============================================================
+   BUTTONS (Primary, Secondary, Hover effects)
+   ============================================================ */
+
+button {
+    background: linear-gradient(135deg, #1A7A5E 0%, #0F5C46 100%);
+    border: none;
+    color: #FFFFFF;
+    padding: 0.6rem 1.2rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #238F6E 0%, #157050 100%);
+}
+
+button:active {
+    transform: translateY(0px);
+}
+
+/* Confirm button (green success) */
+button.confirm {
+    background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+}
+
+button.confirm:hover {
+    background: linear-gradient(135deg, #388E3C 0%, #2E7D32 100%);
+}
+
+/* Miss button (red warning) */
+button.miss {
+    background: linear-gradient(135deg, #C62828 0%, #B71C1C 100%);
+}
+
+button.miss:hover {
+    background: linear-gradient(135deg, #D32F2F 0%, #C62828 100%);
+}
+
+/* Secondary/Outline button */
+button.secondary {
+    background: transparent;
+    border: 2px solid #1A7A5E;
+    color: #1A7A5E;
+    box-shadow: none;
+}
+
+button.secondary:hover {
+    background: #1A7A5E;
+    color: #FFFFFF;
+    transform: translateY(-2px);
+}
+
+/* Danger button (for delete/cancel) */
+button.danger {
+    background: linear-gradient(135deg, #8B0000 0%, #A00000 100%);
+}
+
+/* ============================================================
+   GROUP LIST CARDS
+   ============================================================ */
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    background-color: #FFFFFF;
+    margin-bottom: 1rem;
+    padding: 1.2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(26, 122, 94, 0.2);
+}
+
+li:hover {
+    transform: translateX(5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    border-color: #1A7A5E;
+}
+
+strong {
+    color: #0F4C3A;
+    font-size: 1.1rem;
+    display: inline-block;
+    margin-bottom: 0.8rem;
+}
+
+/* ============================================================
+   STATUS BADGES
+   ============================================================ */
+
+.status-confirmed {
+    color: #2E7D32;
+    font-weight: 600;
+}
+
+.status-pending {
+    color: #E65100;
+    font-weight: 600;
+}
+
+.status-missed {
+    color: #C62828;
+    font-weight: 600;
+}
+
+/* ============================================================
+   MESSAGES (No groups, access denied, etc.)
+   ============================================================ */
+
+p {
+    background-color: #FFFFFF;
+    padding: 2rem;
+    border-radius: 16px;
+    text-align: center;
+    color: #4A5B4A;
+    font-size: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ============================================================
+   HEADINGS WITHIN CONTENT
+   ============================================================ */
+
+h2, h3 {
+    color: #0F4C3A;
+    margin: 1.5rem 0 1rem 0;
+    font-weight: 600;
+}
+
+h2 {
+    font-size: 1.6rem;
+    border-left: 5px solid #1A7A5E;
+    padding-left: 1rem;
+}
+
+h3 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================================
+   RESPONSIVE DESIGN
+   ============================================================ */
+
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    main {
+        padding: 0 1rem;
+    }
+    
+    main > h1 {
+        font-size: 1.6rem;
+    }
+    
+    table, thead, tbody, th, td, tr {
+        display: block;
+    }
+    
+    thead {
+        display: none;
+    }
+    
+    tr {
+        margin-bottom: 1rem;
+        border: 1px solid #E8F0EA;
+        border-radius: 12px;
+        padding: 0.5rem;
+    }
+    
+    td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid #E8F0EA;
+    }
+    
+    td::before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: #0F4C3A;
+    }
+    
+    button {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+.text-center {
+    text-align: center;
+}
+
+.mt-2 {
+    margin-top: 1rem;
+}
+
+.mb-2 {
+    margin-bottom: 1rem;
+}
