@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StokPal - Manage Contributions</title>
+    <link rel="stylesheet" href="contributions.css">
+</head>
+<body>
+
+    <header>
+        <h1>StokPal</h1>
+        <nav>
+            <button id="dashboardButton">Dashboard</button>
+            <button id="backButton">Back</button>
+            <button id="logoutButton">Logout</button>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Manage Contributions</h1>
+        <section id="manageContent"></section>
+    </main>
+
+    <script type="module">
+        import { auth } from '../js/firebase-config.js';
+        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { 
+            getCurrentUserId,
+            getCurrentUserRole,
+            getTreasurerGroups,
+            getMemberName,
+            updateContributionStatus,
+            listenToGroupContributions
+        } from './contributions.js';
+
+        let activeUnsubscribe = null;
+
+        async function logout() {
+            try {
+                await signOut(auth);
+                window.location.href = 'login.html';
+            } catch (error) {
+                console.error('Logout failed:', error);
+            }
+        }
+
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+
+        function goBack() {
+            if (activeGroupId) {
+                if (activeUnsubscribe) {
+                    activeUnsubscribe();
+                    activeUnsubscribe = null;
+                }
+                activeGroupId = null;
+                window.location.href = 'manage.html';
+                return;
+            }
+
+            if (document.referrer && document.referrer !== '') {
+                window.history.back();
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function displayGroupList(groups, container) {
+            container.innerHTML = '';
+
+            const instruction = document.createElement('p');
+            instruction.textContent = 'Select a group to manage:';
+            container.appendChild(instruction);
+
+            const groupList = document.createElement('ul');
+            groupList.style.listStyle = 'none';
+            groupList.style.padding = '0';
+
+            groups.forEach(group => {
+                const listItem = document.createElement('li');
+                listItem.style.marginBottom = '1rem';
+                listItem.style.padding = '1rem';
+                listItem.style.border = '1px solid #ddd';
+                listItem.style.borderRadius = '8px';
+
+                const groupName = document.createElement('strong');
+                groupName.textContent = group.name;
+                listItem.appendChild(groupName);
+                listItem.appendChild(document.createElement('br'));
+
+                const selectButton = document.createElement('button');
+                selectButton.textContent = 'Select';
+                selectButton.addEventListener('click', () => {
+                    loadContributionsForGroup(group.id, group.name);
+                });
+                listItem.appendChild(selectButton);
+
+                groupList.appendChild(listItem);
+            });
+
+            container.appendChild(groupList);
+        }
+
+        async function displayContributionsTable(groupId, groupName, container) {
+            if (activeUnsubscribe) {
+                activeUnsubscribe();
+                activeUnsubscribe = null;
+            }
+
+            container.innerHTML = '';
+
+            const groupHeading = document.createElement('h2');
+            groupHeading.textContent = `Managing group: ${groupName}`;
+            container.appendChild(groupHeading);
+
+            const backToGroupsButton = document.createElement('button');
+            backToGroupsButton.textContent = 'Back to Groups';
+            backToGroupsButton.style.marginBottom = '1rem';
+            backToGroupsButton.addEventListener('click', () => {
+                if (activeUnsubscribe) {
+                    activeUnsubscribe();
+                    activeUnsubscribe = null;
+                }
+                loadManagePage();
+            });
+            container.appendChild(backToGroupsButton);
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Member', 'Amount', 'Date', 'Status', 'Action'];
+            headers.forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            tbody.id = `contributions-tbody-${groupId}`;
+            table.appendChild(tbody);
+            container.appendChild(table);
+
+            const payoutButton = document.createElement('button');
+            payoutButton.textContent = 'View Payout Schedule';
+            payoutButton.style.marginTop = '1rem';
+            payoutButton.addEventListener('click', () => {
+                window.location.href = `payout.html?groupId=${groupId}&returnTo=manage`;
+            });
+            container.appendChild(payoutButton);
+
+            activeUnsubscribe = listenToGroupContributions(groupId, async (contributions) => {
+                const tbodyElement = document.getElementById(`contributions-tbody-${groupId}`);
+                if (!tbodyElement) return;
+                tbodyElement.innerHTML = '';
+
+                if (contributions.length === 0) {
+                    const emptyRow = tbodyElement.insertRow();
+                    const emptyCell = emptyRow.insertCell(0);
+                    emptyCell.colSpan = 5;
+                    emptyCell.textContent = 'No contributions found for this group.';
+                    return;
+                }
+
+                for (const contribution of contributions) {
+                    const row = tbodyElement.insertRow();
+                    const memberName = await getMemberName(contribution.userId);
+
+                    const memberCell = row.insertCell(0);
+                    memberCell.setAttribute('data-label', 'Member');
+                    memberCell.textContent = memberName;
+                    const amountCell = row.insertCell(1);
+                    amountCell.setAttribute('data-label', 'Amount');
+                    amountCell.textContent = `R${contribution.amount}`;
+                    const dateCell = row.insertCell(2);
+                    dateCell.setAttribute('data-label', 'Date');
+                    dateCell.textContent = contribution.date;
+
+                    const statusCell = row.insertCell(3);
+                    statusCell.setAttribute('data-label', 'Status');
+                    if (contribution.status === 'confirmed') {
+                        statusCell.textContent = '✅ Confirmed';
+                    } else if (contribution.status === 'missed') {
+                        statusCell.textContent = '❌ Missed';
+                    } else {
+                        statusCell.textContent = '⏳ Pending';
+                    }
+
+                    const actionCell = row.insertCell(4);
+                    actionCell.setAttribute('data-label', 'Action');
+                    if (contribution.status === 'pending') {
+                        const confirmButton = document.createElement('button');
+                        confirmButton.textContent = 'Confirm';
+                        confirmButton.className = 'confirm';
+                        confirmButton.style.marginRight = '0.5rem';
+                        confirmButton.addEventListener('click', async () => {
+                            await updateContributionStatus(contribution.id, 'confirmed');
+                        });
+
+                        const missButton = document.createElement('button');
+                        missButton.textContent = 'Miss';
+                        missButton.className = 'miss';
+                        missButton.addEventListener('click', async () => {
+                            await updateContributionStatus(contribution.id, 'missed');
+                        });
+
+                        actionCell.appendChild(confirmButton);
+                        actionCell.appendChild(missButton);
+                    } else {
+                        actionCell.textContent = '-';
+                    }
+                }
+            });
+        }
+
+        async function loadContributionsForGroup(groupId, groupName) {
+            const container = document.getElementById('manageContent');
+            await displayContributionsTable(groupId, groupName, container);
+        }
+
+        function displayNoGroupsMessage(container) {
+            container.innerHTML = `
+                <p>You are not assigned as a treasurer for any group.</p>
+                <p>Ask an Admin to assign you as treasurer.</p>
+                <button id="dashboardBtn">Go to Dashboard</button>
+            `;
+            document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
+        }
+
+        async function loadManagePage() {
+            const currentUserId = getCurrentUserId();
+            if (!currentUserId) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const userRole = await getCurrentUserRole();
+            if (userRole !== 'Treasurer' && userRole !== 'Admin') {
+                document.getElementById('manageContent').innerHTML = `
+                    <p>Access denied. Only Treasurers and Admins can access this page.</p>
+                    <button id="dashboardBtn">Go to Dashboard</button>
+                `;
+                document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
+                return;
+            }
+
+            const groups = await getTreasurerGroups(currentUserId);
+            const container = document.getElementById('manageContent');
+
+            if (activeUnsubscribe) {
+                activeUnsubscribe();
+                activeUnsubscribe = null;
+            }
+
+            if (groups.length === 0) {
+                displayNoGroupsMessage(container);
+            } else {
+                displayGroupList(groups, container);
+            }
+        }
+
+        document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
+        document.getElementById('backButton').addEventListener('click', goBack);
+        document.getElementById('logoutButton').addEventListener('click', logout);
+
+        loadManagePage();
+    </script>
+</body>
+</html>

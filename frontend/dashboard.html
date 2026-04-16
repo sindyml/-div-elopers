@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokPal — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body class="app-layout">
+
+  <!-- Navbar injected by navbar.js -->
+  <div id="navbar-root"></div>
+
+  <main class="app-main">
+
+    <!-- PAGE HEADER -->
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">
+          Good morning, <span id="user-display-name">Member</span> 👋
+        </h1>
+        <p class="page-header__sub">Here's what's happening with your stokvel today.</p>
+      </hgroup>
+      <small id="group-name-badge" class="group-badge">Loading group…</small>
+    </header>
+
+    <!-- STAT CARDS -->
+    <ul class="dashboard-grid" aria-label="Key statistics">
+      <li class="stat-card stat-card--primary">
+        <small class="stat-card__label">Group Balance</small>
+        <p class="stat-card__value" id="stat-balance">R 0</p>
+        <small class="stat-card__sub">Total confirmed contributions</small>
+      </li>
+      <li class="stat-card stat-card--accent">
+        <small class="stat-card__label">Active Members</small>
+        <p class="stat-card__value" id="stat-members">—</p>
+        <small class="stat-card__sub">In your stokvel group</small>
+      </li>
+      <li class="stat-card stat-card--warning">
+        <small class="stat-card__label">Next Payout</small>
+        <p class="stat-card__value" id="stat-payout">—</p>
+        <small class="stat-card__sub" id="stat-payout-name">Waiting for data</small>
+      </li>
+      <li class="stat-card">
+        <small class="stat-card__label">Your Contributions</small>
+        <p class="stat-card__value" id="stat-my-contributions">—</p>
+        <small class="stat-card__sub">This sprint period</small>
+      </li>
+    </ul>
+
+    <!-- MAIN + SIDEBAR LAYOUT -->
+    <div class="dashboard-content">
+
+      <!-- LEFT — main content column -->
+      <div class="dashboard-col dashboard-col--main">
+
+        <!-- SA DATA WIDGET (P6) -->
+        <article class="card widget-section" aria-labelledby="sa-widget-heading">
+          <header class="widget-section__header">
+            <h2 id="sa-widget-heading" class="widget-section__title">📈 SA Financial Snapshot</h2>
+            <button class="widget-refresh-btn"
+                    id="sa-refresh-btn"
+                    aria-label="Refresh financial data"
+                    title="Refresh">↻</button>
+          </header>
+          <div id="sa-widget-container" class="sa-widget-container">
+            <!-- Skeleton shown while fetching, replaced by dashboard.js -->
+            <div class="sa-widget-skeleton" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-row">
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+                <div class="skeleton-block skeleton-block--stat"></div>
+              </div>
+              <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
+            </div>
+          </div>
+        </article>
+
+        <!-- RECENT CONTRIBUTIONS shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="contributions-heading">
+          <header class="widget-section__header">
+            <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
+            <a href="contributions/my.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="contributions-container" aria-live="polite">
+            <div class="contributions-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
+          </section>
+        </article>
+
+      </div><!-- /.dashboard-col--main -->
+
+      <!-- RIGHT — sidebar column -->
+      <aside class="dashboard-col dashboard-col--side">
+
+        <!-- UPCOMING MEETINGS widget (P5) -->
+        <article class="card widget-section" aria-labelledby="meetings-heading">
+          <header class="widget-section__header">
+            <h2 id="meetings-heading" class="widget-section__title">📅 Upcoming Meetings</h2>
+            <a href="meetings.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="meetings-container" aria-live="polite">
+            <div class="meetings-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
+          </section>
+        </article>
+
+        <!-- GROUP MEMBERS & MANAGEMENT (P3 — integrated) -->
+        <article class="card widget-section" aria-labelledby="members-heading">
+          <header class="widget-section__header">
+            <h2 id="members-heading" class="widget-section__title">👥 Group Members</h2>
+            <a href="groupCreate.html" class="widget-section__link">Manage →</a>
+          </header>
+          <section id="members-container" class="members-widget" aria-live="polite">
+
+            <!-- Your Groups list (P3) -->
+            <div class="members-widget__block">
+              <h3 class="members-widget__heading">Your Groups</h3>
+              <ul id="grouplist" class="members-widget__list" aria-label="List of your stokvel groups"></ul>
+            </div>
+
+            <!-- Invite Member form (P3) -->
+            <div class="members-widget__block">
+              <h3 class="members-widget__heading">Invite Member</h3>
+              <form id="invite-form" class="members-widget__invite-form" aria-label="Invite a member by email">
+                <input type="email" id="inviteEmail" class="form-input" placeholder="Enter email address" aria-label="Member email address" required />
+                <button type="submit" id="inviteBtn" class="btn btn--primary btn--sm">Invite</button>
+              </form>
+              <p id="inviteMessage" role="status" aria-live="polite"></p>
+            </div>
+
+            <!-- Create New Group (P3) -->
+            <div class="members-widget__block">
+              <a href="groupCreate.html" class="btn btn--outline btn--sm" aria-label="Create a new stokvel group">+ Create New Group</a>
+            </div>
+
+          </section>
+        </article>
+
+        <!-- PAYOUT SCHEDULE shell (P4 populates this) -->
+        <article class="card widget-section" aria-labelledby="payout-heading">
+          <header class="widget-section__header">
+            <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
+            <a id="payout-view-all" href="contributions/payout.html" class="widget-section__link">View all →</a>
+          </header>
+          <section id="payout-container" aria-live="polite">
+            <div class="payout-widget-loading" aria-hidden="true">
+              <div class="skeleton-block skeleton-block--wide"></div>
+              <div class="skeleton-block skeleton-block--wide"></div>
+            </div>
+          </section>
+        </article>
+
+      </aside><!-- /.dashboard-col--side -->
+
+    </div><!-- /.dashboard-content -->
+
+  </main>
+
+  <!-- Live notification region — P5 injects banners here -->
+  <output id="notification-root" aria-live="polite" aria-atomic="true"></output>
+
+  <!-- Footer injected by footer.js -->
+  <div id="footer-root"></div>
+
+  <!-- Firebase SDKs — must load before firebase-config.js -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Initialize Firebase compat SDK (js/firebase-config.js is ES-module only) -->
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
+      authDomain: "stokvel-database.firebaseapp.com",
+      projectId: "stokvel-database",
+      storageBucket: "stokvel-database.firebasestorage.app",
+      messagingSenderId: "997328421094",
+      appId: "1:997328421094:web:9f88bf8ac720b118d97b27"
+    });
+  </script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
+  <script src="js/sa-data.js"></script>
+  <script src="js/dashboard.js"></script>
+
+  <!-- P3: Group management — lists groups, handles invites, creates groups -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const grouplist     = document.getElementById('grouplist');
+    const inviteForm    = document.getElementById('invite-form');
+    const inviteMessage = document.getElementById('inviteMessage');
+
+    let selectedGroupId = null;
+    let userRole        = null;
+
+    /* ── Fetch the current user's role within a group ────── */
+    const getUserRole = async (groupID) => {
+      const user = auth.currentUser;
+      if (!user) return null;
+      const roleDoc = await db
+        .collection('groups').doc(groupID)
+        .collection('members').doc(user.uid)
+        .get();
+      return roleDoc.exists ? roleDoc.data().role : null;
+    };
+
+    /* ── Load and render the user's groups ────────────────── */
+    const loadGroups = async () => {
+      const user = auth.currentUser;
+      if (!user || !grouplist) return;
+
+      const snapshot = await db
+        .collection('memberships')
+        .where('uid', '==', user.uid)
+        .get();
+
+      grouplist.innerHTML = '';
+
+      for (const membership of snapshot.docs) {
+        const { groupId } = membership.data();
+        const groupDoc = await db.collection('groups').doc(groupId).get();
+
+        if (groupDoc.exists) {
+          const group = { id: groupId, ...groupDoc.data() };
+          const li = document.createElement('li');
+          li.textContent = group.name;
+          li.setAttribute('role', 'button');
+          li.setAttribute('tabindex', '0');
+          li.onclick = async () => {
+            selectedGroupId = group.id;
+            userRole = await getUserRole(group.id);
+            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+          };
+          grouplist.appendChild(li);
+        }
+      }
+    };
+
+    /* ── Handle invite form submission ────────────────────── */
+    if (inviteForm) {
+      inviteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('inviteEmail').value.trim();
+
+        if (!selectedGroupId) {
+          alert('Please select a group first');
+          return;
+        }
+        if (userRole !== 'admin') {
+          alert('Only admins can invite members');
+          return;
+        }
+
+        try {
+          await db.collection('invites').add({
+            email:     email,
+            groupId:   selectedGroupId,
+            invitedBy: auth.currentUser.uid,
+            status:    'pending',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          inviteMessage.textContent = 'Invite Sent!';
+        } catch (err) {
+          inviteMessage.textContent = 'Error sending invite';
+          console.error(err);
+        }
+      });
+    }
+
+    /* ── Accept any pending invites for the signed-in user ── */
+    const checkInvites = async (user) => {
+      const snapshot = await db.collection('invites')
+        .where('email',  '==', user.email)
+        .where('status', '==', 'pending')
+        .get();
+
+      for (const docSnap of snapshot.docs) {
+        const invite = docSnap.data();
+
+        // Add user to the group members sub-collection
+        await db.collection('groups').doc(invite.groupId)
+          .collection('members').doc(user.uid)
+          .set({
+            uid:      user.uid,
+            role:     'member',
+            joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+
+        // Create a membership record for quick dashboard lookups
+        await db.collection('memberships').doc(user.uid + '_' + invite.groupId).set({
+          uid:     user.uid,
+          groupId: invite.groupId
+        });
+
+        // Mark the invite as accepted
+        await docSnap.ref.update({ status: 'invite accepted' });
+      }
+    };
+
+    /* ── Auth listener: check invites then load groups ────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        await checkInvites(user);
+        await loadGroups();
+      }
+    });
+  })();
+  </script>
+
+  <!-- P5: Upcoming Meetings widget — real-time via Firestore onSnapshot() -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const meetingsContainer = document.getElementById('meetings-container');
+    const notificationRoot  = document.getElementById('notification-root');
+    let   unsubMeetings     = null;
+
+    /* ── Resolve which groups this user belongs to ───────── */
+    async function getUserGroupIds(uid) {
+      const snap = await db
+        .collection('memberships')
+        .where('uid', '==', uid)
+        .get();
+      return snap.docs.map(d => d.data().groupId);
+    }
+
+    /* ── Format helpers ──────────────────────────────────── */
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    }
+
+    function fmtTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      const hr = parseInt(h, 10);
+      const ampm = hr >= 12 ? 'PM' : 'AM';
+      return ((hr % 12) || 12) + ':' + m + ' ' + ampm;
+    }
+
+    /* ── Build a compact meeting card for the dashboard ──── */
+    function buildMeetingWidget(meeting) {
+      const d        = new Date(meeting.date);
+      const day      = d.getDate();
+      const monthStr = d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase();
+      const title    = (meeting.title || meeting.agenda?.split('\n')[0] || 'Untitled').substring(0, 50);
+
+      const li = document.createElement('li');
+      li.className = 'meeting-widget-item';
+      li.dataset.meetingId = meeting.id;
+      li.innerHTML = `
+        <time class="meeting-widget-date" datetime="${meeting.date}">
+          <strong>${day}</strong>
+          <span>${monthStr}</span>
+        </time>
+        <div class="meeting-widget-info">
+          <p class="meeting-widget-title">${title}</p>
+          <small class="meeting-widget-meta">
+            ${meeting.time ? fmtTime(meeting.time) : ''}${meeting.location ? ' · ' + meeting.location : ''}
+          </small>
+        </div>
+      `;
+      return li;
+    }
+
+    /* ── Render the empty state ──────────────────────────── */
+    function showEmpty() {
+      meetingsContainer.innerHTML =
+        '<p class="meetings-widget-empty">No upcoming meetings scheduled.</p>';
+    }
+
+    /* ── Show real-time notification banner ───────────────── */
+    function showMeetingNotification(meeting) {
+      if (!notificationRoot) return;
+      notificationRoot.innerHTML = `
+        <div class="notification-banner notification-banner--meeting">
+          <span>📅 New meeting: <strong>${meeting.title || 'Untitled'}</strong> on ${fmtDate(meeting.date)}</span>
+          <button type="button" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
+        </div>
+      `;
+      setTimeout(() => { notificationRoot.innerHTML = ''; }, 6000);
+    }
+
+    /* ── Attach onSnapshot listener for upcoming meetings ── */
+    function startDashboardMeetingListener(groupIds) {
+      if (unsubMeetings) unsubMeetings();
+      if (!groupIds.length) { showEmpty(); return; }
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      /* Firestore 'in' queries support up to 10 values */
+      unsubMeetings = db
+        .collection('meetings')
+        .where('groupId', 'in', groupIds.slice(0, 10))
+        .where('date', '>=', today)
+        .orderBy('date', 'asc')
+        .limit(5)
+        .onSnapshot(
+          (snapshot) => {
+            /* Full re-render on each snapshot for simplicity in the widget */
+            const meetings = [];
+            snapshot.forEach(doc => meetings.push({ id: doc.id, ...doc.data() }));
+
+            if (!meetings.length) { showEmpty(); return; }
+
+            const ul = document.createElement('ul');
+            ul.className = 'meeting-widget-list';
+            ul.setAttribute('aria-label', 'Upcoming meetings');
+            meetings.forEach(m => ul.appendChild(buildMeetingWidget(m)));
+            meetingsContainer.innerHTML = '';
+            meetingsContainer.appendChild(ul);
+
+            /* Notification for newly added docs (not from cache) */
+            snapshot.docChanges().forEach(change => {
+              if (change.type === 'added' && !change.doc.metadata.hasPendingWrites) {
+                showMeetingNotification({ id: change.doc.id, ...change.doc.data() });
+              }
+            });
+          },
+          (err) => {
+            console.error('[Meetings Widget] Listener error:', err);
+            meetingsContainer.innerHTML =
+              '<p class="meetings-widget-empty">Could not load meetings.</p>';
+          }
+        );
+    }
+
+    /* ── Init when auth resolves ─────────────────────────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      try {
+        const groupIds = await getUserGroupIds(user.uid);
+        startDashboardMeetingListener(groupIds);
+      } catch (err) {
+        console.error('[Meetings Widget]', err);
+        showEmpty();
+      }
+    });
+  })();
+  </script>
+
+  <!-- P4: Contributions & Payout widgets — real-time via Firestore onSnapshot() -->
+  <script>
+  (function () {
+    const db   = firebase.firestore();
+    const auth = firebase.auth();
+
+    const contributionsContainer = document.getElementById('contributions-container');
+    const payoutContainer        = document.getElementById('payout-container');
+    const statMyContributions    = document.getElementById('stat-my-contributions');
+    const statBalance            = document.getElementById('stat-balance');
+    const statPayout             = document.getElementById('stat-payout');
+    const statPayoutName         = document.getElementById('stat-payout-name');
+    const payoutViewAll          = document.getElementById('payout-view-all');
+
+    let unsubContributions = null;
+
+    /* ── Resolve which groups this user belongs to ───────── */
+    async function getUserGroupIds(uid) {
+      const snap = await db
+        .collection('memberships')
+        .where('uid', '==', uid)
+        .get();
+      return snap.docs.map(d => d.data().groupId);
+    }
+
+    /* ── Format a date string as "1 Apr" ─────────────────── */
+    function fmtDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    }
+
+    /* ── Format currency ─────────────────────────────────── */
+    function fmtRand(amount) {
+      return 'R ' + Number(amount).toLocaleString('en-ZA');
+    }
+
+    /* ── Status badge helper ──────────────────────────────── */
+    function statusBadge(status) {
+      switch (status) {
+        case 'confirmed': return '<span class="badge badge--success">✅ Confirmed</span>';
+        case 'missed':    return '<span class="badge badge--danger">❌ Missed</span>';
+        default:          return '<span class="badge badge--warning">⏳ Pending</span>';
+      }
+    }
+
+    /* ── Build a contribution row for the widget ──────────── */
+    function buildContributionItem(c, groupName) {
+      const li = document.createElement('li');
+      li.className = 'contribution-widget-item';
+      li.innerHTML = `
+        <div class="contribution-widget-info">
+          <p class="contribution-widget-amount">${fmtRand(c.amount)}</p>
+          <small class="contribution-widget-meta">${groupName} · ${fmtDate(c.date)}</small>
+        </div>
+        <div class="contribution-widget-status">${statusBadge(c.status)}</div>
+      `;
+      return li;
+    }
+
+    /* ── Render contributions widget ──────────────────────── */
+    function renderContributions(contributions, groupMap) {
+      if (!contributions.length) {
+        contributionsContainer.innerHTML =
+          '<p class="widget-empty">No contributions recorded yet.</p>';
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'contribution-widget-list';
+      ul.setAttribute('aria-label', 'Recent contributions');
+
+      /* Show the 5 most recent */
+      contributions.slice(0, 5).forEach(c => {
+        const groupName = groupMap[c.groupId] || 'Unknown group';
+        ul.appendChild(buildContributionItem(c, groupName));
+      });
+
+      contributionsContainer.innerHTML = '';
+      contributionsContainer.appendChild(ul);
+    }
+
+    /* ── Update stat cards from contribution data ─────────── */
+    function updateContributionStats(contributions) {
+      if (!contributions.length) return;
+
+      /* Your Contributions — count confirmed this period */
+      const confirmed = contributions.filter(c => c.status === 'confirmed');
+      const totalAmount = confirmed.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+      if (statMyContributions) {
+        statMyContributions.textContent = fmtRand(totalAmount);
+      }
+    }
+
+    /* ── Start real-time listener for user's contributions ── */
+    function startContributionListener(uid, groupMap) {
+      if (unsubContributions) unsubContributions();
+
+      unsubContributions = db.collection('contributions')
+        .where('userId', '==', uid)
+        .orderBy('date', 'desc')
+        .limit(10)
+        .onSnapshot(
+          (snapshot) => {
+            const contributions = [];
+            snapshot.forEach(doc => contributions.push({ id: doc.id, ...doc.data() }));
+            renderContributions(contributions, groupMap);
+            updateContributionStats(contributions);
+          },
+          (err) => {
+            console.error('[Contributions Widget] Listener error:', err);
+            contributionsContainer.innerHTML =
+              '<p class="widget-empty">Could not load contributions.</p>';
+          }
+        );
+    }
+
+    /* ── Build a payout row for the widget ────────────────── */
+    function buildPayoutItem(p, isCurrentUser) {
+      const li = document.createElement('li');
+      li.className = 'payout-widget-item' + (isCurrentUser ? ' payout-widget-item--you' : '');
+      li.innerHTML = `
+        <div class="payout-widget-order">#${p.order}</div>
+        <div class="payout-widget-info">
+          <p class="payout-widget-name">${p.userDisplayName}${isCurrentUser ? ' (You)' : ''}</p>
+          <small class="payout-widget-date">${fmtDate(p.payoutDate)}</small>
+        </div>
+        <div class="payout-widget-amount">${fmtRand(p.amount)}</div>
+      `;
+      return li;
+    }
+
+    /* ── Load payout schedule for the user's first group ──── */
+    async function loadPayoutWidget(uid, groupIds) {
+      if (!groupIds.length) {
+        payoutContainer.innerHTML =
+          '<p class="widget-empty">Join a group to see payout schedules.</p>';
+        return;
+      }
+
+      try {
+        /* Load payouts for all user groups, pick the first with data */
+        let payouts = [];
+        let activeGroupId = null;
+
+        for (const gid of groupIds.slice(0, 5)) {
+          const snap = await db.collection('payouts')
+            .where('groupId', '==', gid)
+            .orderBy('order', 'asc')
+            .get();
+          if (!snap.empty) {
+            payouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            activeGroupId = gid;
+            break;
+          }
+        }
+
+        if (!payouts.length) {
+          payoutContainer.innerHTML =
+            '<p class="widget-empty">No payout schedule set up yet.</p>';
+          return;
+        }
+
+        /* Update View all link with groupId */
+        if (payoutViewAll && activeGroupId) {
+          payoutViewAll.href = 'contributions/payout.html?groupId=' + activeGroupId;
+        }
+
+        /* Update stat card — next payout */
+        const today = new Date().toISOString().slice(0, 10);
+        const upcoming = payouts.find(p => p.payoutDate >= today);
+        if (upcoming) {
+          if (statPayout) statPayout.textContent = fmtDate(upcoming.payoutDate);
+          if (statPayoutName) statPayoutName.textContent = upcoming.userDisplayName + "'s turn";
+        }
+
+        /* Render list */
+        const ul = document.createElement('ul');
+        ul.className = 'payout-widget-list';
+        ul.setAttribute('aria-label', 'Payout schedule');
+        payouts.forEach(p => ul.appendChild(buildPayoutItem(p, p.userId === uid)));
+        payoutContainer.innerHTML = '';
+        payoutContainer.appendChild(ul);
+
+      } catch (err) {
+        console.error('[Payout Widget] Error:', err);
+        payoutContainer.innerHTML =
+          '<p class="widget-empty">Could not load payout schedule.</p>';
+      }
+    }
+
+    /* ── Init when auth resolves ─────────────────────────── */
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) return;
+      try {
+        const groupIds = await getUserGroupIds(user.uid);
+
+        /* Build a groupId → name map for contribution labels */
+        const groupMap = {};
+        for (const gid of groupIds) {
+          const doc = await db.collection('groups').doc(gid).get();
+          if (doc.exists) groupMap[gid] = doc.data().name;
+        }
+
+        startContributionListener(user.uid, groupMap);
+        await loadPayoutWidget(user.uid, groupIds);
+      } catch (err) {
+        console.error('[P4 Widget Init]', err);
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

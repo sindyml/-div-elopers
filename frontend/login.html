@@ -1,0 +1,65 @@
+<!-- login.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — StokPal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/register.css" />
+</head>
+<body>
+  <main class="register-page">
+    <article class="register-card">
+      <header class="register-card__header">
+        <strong class="register-card__logo">StokPal</strong>
+        <h1 class="register-card__title">Welcome back</h1>
+        <p class="register-card__sub">Sign in to access your stokvel dashboard</p>
+      </header>
+
+      <section class="register-card__body">
+        <aside id="alertMessage" class="alert alert--hidden" aria-live="polite"></aside>
+
+        <!-- OAuth buttons — primary sign-in method -->
+        <section class="oauth-buttons" aria-label="Sign in with social accounts">
+          <button type="button" id="googleLoginBtn" class="btn btn--outline oauth-btn">
+            Google
+          </button>
+          <button type="button" id="githubLoginBtn" class="btn btn--outline oauth-btn">
+            GitHub
+          </button>
+          <button type="button" id="linkedinLoginBtn" class="btn btn--outline oauth-btn">
+            LinkedIn
+          </button>
+        </section>
+
+        <hr class="divider" aria-label="or sign in with email" />
+
+        <!-- Email/password fallback for users who registered with email -->
+        <form id="loginForm">
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" class="form-input" placeholder="you@example.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" class="form-input" placeholder="Enter your password" required>
+          </div>
+
+          <button type="submit" class="btn btn--primary btn--full">Sign in</button>
+        </form>
+      </section>
+
+      <footer class="register-card__footer">
+        <p>Don't have an account? <a href="register.html">Create one</a></p>
+      </footer>
+    </article>
+  </main>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

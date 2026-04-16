@@ -1,221 +1,341 @@
-# 🏦 Stockpal – Stokvel Management Platform
+# Stockpal — Stokvel Management Platform
 
-> A web-based stokvel management system that enables members to track contributions, monitor payout schedules, communicate, and gain financial insights – designed for South African savings groups.
+> A web-based platform for South African savings groups (stokvels) to manage contributions, payout schedules, group meetings, and financial insights — replacing spreadsheets and chat threads with a transparent, role-aware system.
 
-**Project name:** Stockpal (voted team favourite)
-
----
-
-## 👥 Team (6 members)
-
-This project is a group effort. Every member has contributed to the design, development, testing, and deployment. Recognition to all:
-
-| ID | Name | Primary Responsibility | Feature Area | Stack Focus |
-|----|------|------------------------|--------------|--------------|
-| **P1** | Alondwe | Project Lead + Auth (Firebase setup) | Auth | HTML/CSS/JS + Firebase |
-| **P2** | Kwezi | Auth RBAC + CI/CD Lead | Auth / CI | HTML/CSS/JS + Firebase |
-| **P3** | Owen | Group Management | Groups | HTML/CSS/JS + Firebase |
-| **P4** | Athandwa | Contribution Tracking | Contributions | HTML/CSS/JS + Firebase |
-| **P5** | Ziya | Meeting Management | Meetings | HTML/CSS/JS + Firebase |
-| **P6** | Sindiswa | Landing Page + Azure Deployment | Landing / Deploy | HTML/CSS/JS + Firebase |
-
-> *Replace "Person X" with actual names. All members have active commit history and participate in sprint reviews.*
+[![Azure Static Web Apps](https://img.shields.io/badge/hosted-Azure%20Static%20Web%20Apps-0078d4?logo=microsoftazure)](https://azure.microsoft.com/en-us/products/app-service/static)
+[![Firebase](https://img.shields.io/badge/backend-Firebase%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Node.js](https://img.shields.io/badge/server-Node.js%20%3E%3D18-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
 ---
 
-## 📋 Project Brief (Abridged)
+## Table of Contents
 
-**Context:** Stokvels are a cornerstone of South African financial culture. This platform replaces manual spreadsheets/messaging apps with a transparent, automated system.
-
-**Objectives:** Agile methodology, CI/CD, test-driven development, publicly accessible web app.
-
-**Core requirements:**
-
-| Requirement | Description |
-|-------------|-------------|
-| User Verification | 3rd party identity provider; roles: Member, Treasurer, Admin |
-| Group Management | Create/configure stokvel groups, contribution amounts, payout order, meeting frequency |
-| Contribution Tracking | View contributions (members); confirm payments, flag missed contributions, manage payout schedule (treasurers) |
-| Meeting Management | Schedule meetings, post agendas, record minutes; member notifications |
-| Payments | 3rd party payment gateway for contributions & payout disbursements |
-| **SA Data Integration** | Display current SA prime lending rate & repo rate from a live/reliable public dataset. Projected savings growth derived from this data |
-| Analytics | 3 dashboards (contribution compliance, payout history/projections, custom view) + CSV/PDF export |
-| Bonus (ML) | Financial health scoring for members |
-
-**Special constraints (from brief):**
-- **Sprint Review Viva:** Individual members must explain specific code they authored.
-- **Individual Sprint Retrospectives:** 200–400 words per sprint, cross-referenced with git history.
-- **Commit scrutiny:** Incremental commits across sprint; no last-minute spikes.
-- **Mid-sprint requirement change (Sprint 3):** New requirement introduced at planning – team must adapt.
-- **SA Data Integration:** Team researches & documents a real South African dataset (justification in backlog).
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Tech Stack](#tech-stack)
+4. [Database Schema](#database-schema)
+5. [SA Financial Data Integration](#sa-financial-data-integration)
+6. [Project Structure](#project-structure)
+7. [Getting Started](#getting-started)
+8. [User Roles](#user-roles)
+9. [Team](#team)
 
 ---
 
-## 🛠️ Tech Stack
+## Overview
 
-| Layer | Technology | Owner |
-|-------|------------|-------|
-| Frontend | HTML / CSS / JavaScript | Everyone |
-| Auth & DB | Firebase Auth + Cloud Firestore | P1 (setup), P2 (guards) |
-| CI/CD | GitHub Actions | P2 |
-| Hosting | Azure Static Web Apps | P6 (infra), P2 (pipeline) |
-| Testing | Jest (code coverage) | P2 |
-| Project tracking | GitHub Projects | P1 |
+Stokvels are a cornerstone of South African financial culture — informal savings clubs where members pool money and take turns receiving the total. Stockpal digitises this process, providing:
+
+- Role-based access for **Members**, **Treasurers**, and **Admins**
+- Real-time group and contribution tracking backed by Cloud Firestore
+- Meeting scheduling with agenda and minutes management
+- A live SA financial data widget (SARB prime rate, repo rate, USD/ZAR)
+- Deployed as a public web app on Azure Static Web Apps
 
 ---
 
-## 📅 Sprint 1 – Task Breakdown (Stokvel Management Platform)
+## Features
 
-**Team of 6 • HTML/CSS/JS • Firebase + Azure + GitHub**
+| Feature | Description |
+|---|---|
+| **Authentication** | Firebase Auth with email/password; role-based access control (Admin, Treasurer, Member) |
+| **Group Management** | Create stokvel groups with a contribution amount, payout order, and meeting frequency; invite members by email |
+| **Contribution Tracking** | Members view contribution history; Treasurers confirm payments and flag missed contributions |
+| **Meeting Management** | Schedule meetings (08:00–20:00), post agendas, record minutes; real-time notifications via Firestore `onSnapshot` |
+| **SA Data Widget** | Live prime rate, repo rate, inflation rate, and USD/ZAR exchange with a projected savings growth calculator |
+| **Dashboard** | Personalised view of group stats, upcoming meetings, and SA financial indicators |
 
-### 1. User Verification – Split Between P1 and P2
+---
 
-| **P1 – Firebase Auth + Login/Register UI** | **P2 – RBAC, Protected Routes + CI/CD** |
-|---------------------------------------------|------------------------------------------|
-| - Set up Firebase project (Auth + Firestore) | - `checkRole()` utility function (reads Firestore role) |
-| - Enable Email/Password + Google OAuth | - Apply route guards to all pages by role |
-| - Build `login.html` and `register.html` pages | - Logout button + Firebase `signOut()` |
-| - Firebase `signInWithEmailAndPassword()` | - Firestore security rules for `users` collection |
-| - Write user role doc to Firestore on register | - Write UATs for role enforcement |
-| - `onAuthStateChanged()` redirect listener | - GitHub Actions CI/CD deploy to Azure |
-| - Write UATs for login / register / logout | - Jest code coverage setup in pipeline |
-| | - Create Sprint 1 GitHub Release (v0.1.0) |
+## Tech Stack
 
-### 2. Individual Task Assignments
+| Layer | Technology |
+|---|---|
+| Frontend | HTML5 / CSS3 / Vanilla JavaScript (ES Modules) |
+| Authentication | Firebase Authentication (email/password) |
+| Database | Cloud Firestore (NoSQL, real-time) |
+| Data Connect | Firebase Data Connect (GraphQL schema) |
+| Server | Node.js static file server + `/api/getSAData` proxy |
+| SA Data | Frankfurter API (live USD/ZAR); SARB static rates as fallback |
+| Hosting | Azure Static Web Apps |
+| CI/CD | GitHub Actions |
+| Testing | Jest |
 
-#### P1 – Person 1 (User Verification – Auth UI)
+---
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Create Firebase project; enable Email/Password + Google OAuth | To Do | CI/CD |
-| 2 | Build Login page (HTML/CSS/JS) wired to Firebase Auth `signInWithEmailAndPassword()` | To Do | Implementation |
-| 3 | Build Register page – collect email, password, display name, role selection | To Do | Implementation |
-| 4 | On successful registration write user document to Firestore with uid, name, email, role | To Do | Implementation |
-| 5 | Implement `onAuthStateChanged()` listener – redirect unauthenticated users to `/login.html` | To Do | Implementation |
-| 6 | Write UATs for login, register, logout flows in Given-When-Then format | To Do | TDD |
-| 7 | Set up GitHub Projects board with columns: Backlog / In Progress / Testing / Done | To Do | Requirements |
-| 8 | Create full product backlog in GitHub Projects – all requirements as user stories (Who-What-Why) | To Do | Requirements |
-| 9 | Document Sprint Planning meeting minutes (date, attendees, decisions, priorities) | To Do | Scrum |
-| 10 | Implement password reset flow – Firebase `sendPasswordResetEmail()` to Forgot Password link; confirm reset email works | To Do | Implementation |
+## Database Schema
 
-#### P2 – Person 2 (User Verification – RBAC + CI/CD)
+### Cloud Firestore Collections
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Write `checkRole(requiredRole)` JS utility – reads user Firestore doc, blocks/redirects unauthorised access | To Do | Implementation |
-| 2 | Apply route protection to all pages: Admin-only, Treasurer-only, Member-accessible | To Do | Implementation |
-| 3 | Implement logout button + Firebase `signOut()` – clear session, redirect to login | To Do | Implementation |
-| 4 | Write Firestore security rules for `users` collection (own doc readable; Admin can read all) | To Do | Implementation |
-| 5 | Write UATs for role enforcement (e.g. Member cannot navigate to `/admin.html`) | To Do | TDD |
-| 6 | Set up GitHub Actions workflow – auto-build on push to main, deploy to Azure Static Web Apps | To Do | CI/CD |
-| 7 | Configure Jest for code coverage; add Jest run step to GitHub Actions pipeline | To Do | CI/CD |
-| 8 | Create GitHub Sprint 1 Release tag (v0.1.0) once deployment is confirmed working | To Do | CI/CD |
-| 9 | Document CI/CD pipeline steps in repo README.md | To Do | CI/CD |
+#### `groups`
 
-#### P3 – Person 3 (Group Management)
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Display name of the group |
+| `contributionAmount` | `number` | Monthly contribution amount in ZAR |
+| `payoutOrder` | `array<uid>` | Ordered list of member UIDs for payout rotation |
+| `meetingFrequency` | `string` | e.g. `"monthly"`, `"weekly"` |
+| `creatorUid` | `string` | UID of the user who created the group |
+| `createdAt` | `timestamp` | Server-side creation time |
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Build Create Stokvel Group form – group name, contribution amount, payout order, meeting frequency | To Do | Implementation |
-| 2 | Save new group document to Firestore `groups` collection, linked to Admin user uid as creator | To Do | Implementation |
-| 3 | Build Member Invite flow – Admin enters email; write invite document to `invites` collection | To Do | Implementation |
-| 4 | On first login after invite, auto-add user to group members sub-collection if invite exists for their email | To Do | Implementation |
-| 5 | Build Group Dashboard page – list all groups the logged-in user belongs to (query by uid) | To Do | Implementation |
-| 6 | Write Firestore data model for groups and members sub-collection (fields, paths) | To Do | Requirements |
-| 7 | Write UATs for: create group, invite member, member sees their groups | To Do | TDD |
-| 8 | Assign all Group Management user stories to Sprint 1 track in GitHub Projects with task statuses | To Do | Requirements |
+##### `groups/{groupId}/members` (subcollection)
 
-#### P4 – Person 4 (Contribution Tracking)
+| Field | Type | Description |
+|---|---|---|
+| `uid` | `string` | Firebase Auth UID |
+| `role` | `"admin" \| "treasurer" \| "member"` | Permission level within the group |
+| `joinedAt` | `timestamp` | When the member joined |
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Build Member Contribution View page – list own contributions (amount, date, status) from Firestore `contributions` | To Do | Implementation |
-| 2 | Build Treasurer Confirmation Panel – table of all member contributions; Treasurer can mark Confirmed or Missed | To Do | Implementation |
-| 3 | Build Payout Schedule View – ordered list of members and their payout date from `payouts` collection | To Do | Implementation |
-| 4 | Write Firestore data model for `contributions` and `payouts` collections | To Do | Requirements |
-| 5 | Seed sample contribution and payout data into Firestore for demo/testing | To Do | Implementation |
-| 6 | Write UATs for: member views contributions, Treasurer confirms payment, flags missed, views payout schedule | To Do | TDD |
-| 7 | Assign all Contribution Tracking user stories in GitHub Projects with statuses | To Do | Requirements |
+---
 
-#### P5 – Person 5 (Meeting Management)
+#### `meetings`
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Build Schedule Meeting form (Treasurer/Admin only) – date, time, location, agenda, linked group | To Do | Implementation |
-| 2 | Save meeting document to Firestore `meetings` collection; link to group id | To Do | Implementation |
-| 3 | Build Meeting List view for all roles – upcoming meetings with date, time, agenda preview | To Do | Implementation |
-| 4 | Implement real-time in-app notification banner using Firestore `onSnapshot()` – alerts member when new meeting scheduled for their group | To Do | Implementation |
-| 5 | Build Record Minutes feature – Treasurer can add text minutes to a past meeting document | To Do | Implementation |
-| 6 | Write UATs for: schedule meeting, view meeting list, member receives notification, record minutes | To Do | TDD |
-| 7 | Assign all Meeting Management user stories in GitHub Projects with statuses | To Do | Requirements |
+| Field | Type | Description |
+|---|---|---|
+| `groupID` | `string` | Reference to the parent group |
+| `title` | `string` | Meeting title |
+| `date` | `string` | Date of the meeting (`YYYY-MM-DD`) |
+| `time` | `string` | Time of the meeting (`HH:MM`), constrained to 08:00–20:00 |
+| `location` | `string` | Physical or virtual location |
+| `agenda` | `string` | Meeting agenda (free text) |
+| `minutes` | `string` | Recorded minutes (added post-meeting) |
+| `createdAt` | `timestamp` | Server-side creation time |
 
-#### P6 – Person 6 (Landing Page + Shared Components + Azure Deployment + SA Data Integration)
+---
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Build landing/home page (index.html) – branding, feature overview, CTA buttons to `/login.html` and `/register.html` | To Do | Polish |
-| 2 | Build shared navbar component (navbar.js) included across all pages – shows user name and logout when logged in | To Do | Polish |
-| 3 | Build shared footer component across all pages | To Do | Polish |
-| 4 | Configure Azure Static Web Apps resource in Azure portal; link to GitHub repo for auto-deploy via GitHub Actions | To Do | CI/CD |
-| 5 | Configure `staticwebapp.config.json` – route fallbacks, CORS headers, env vars for Firebase config | To Do | CI/CD |
-| 6 | Verify deployed public URL is accessible without login – confirm app not running from localhost | To Do | CI/CD |
-| 7 | Apply consistent CSS design system across all pages (colours, fonts, spacing, responsive layout) | To Do | Polish |
-| 8 | Write UATs for: landing page loads publicly, nav links work, login CTA redirects correctly | To Do | TDD |
+#### `invites`
 
-**SA Data Integration – P6 Additional Tasks**
+| Field | Type | Description |
+|---|---|---|
+| `email` | `string` | Invitee's email address |
+| `groupId` | `string` | Target group ID |
+| `invitedBy` | `string` | UID of the inviting user |
+| `status` | `"pending" \| "accepted"` | Current invite state |
+| `createdAt` | `timestamp` | Server-side creation time |
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Research available SA financial data sources (SARB, JSE, public APIs) – document accessible endpoints, rate limits | To Do | Requirements |
-| 2 | Document SA Data Integration as a user story in GitHub Projects backlog (Who-What-Why) and link to relevant tasks | To Do | Requirements |
-| 3 | Write `fetchSAData()` JS function that calls chosen SA data API; implement Azure Function fallback proxy if CORS blocked | To Do | Implementation |
-| 4 | Build savings projection widget on dashboard – display live or cached SA data (prime rate, repo rate) with each member's stokvel balance to show projected savings growth | To Do | Implementation |
-| 5 | Write UATs for SA Data Integration: widget renders with real/fallback data, Azure Function responds within 3s, widget does not break if API unreachable | To Do | TDD |
+---
 
-### 3. Shared Responsibilities – All 6 Members
+#### `memberships`
 
-| # | Task Description | Status | Rubric Area |
-|---|------------------|--------|--------------|
-| 1 | Attend and contribute to all 4 required Scrum meetings (Sprint Planning, Daily Standups x3+, Backlog Refinement, Sprint Retrospective) | Ongoing | Scrum /15 |
-| 2 | Log GitHub Issues as you encounter problems – open AND close with comments explaining fix | Ongoing | CI/CD /15 |
-| 3 | Make regular incremental commits throughout the sprint – NOT a large spike night before deadline | Ongoing | CI/CD /15 |
-| 4 | Submit individual written Sprint Retrospective (200-400 words) via LMS before assessment | Before assess. | Retro /10 |
-| 5 | Prepare to explain your own code and justify technical decisions during Sprint Review Viva | Before assess. | Viva /15 |
-| 6 | Cross-review each other's pull requests – each PR should have at least one reviewer comment | Ongoing | Polish |
+Flat lookup table mapping users to groups (used for efficient membership queries).
 
-### 4. User Acceptance Tests (Given-When-Then)
+| Field | Type | Description |
+|---|---|---|
+| `uid` | `string` | Firebase Auth UID |
+| `groupId` | `string` | Associated group ID |
 
-Every user story must have at least one UAT in this format. Markers will verify these were used to confirm story completion.
+---
 
-| User Story | Given | When | Then |
-|------------|-------|------|------|
-| User Login | User has a registered account | They enter correct email and password on login page and click Login | They are redirected to their role-appropriate dashboard |
-| User Register | User navigates to register page | They fill in all required fields and submit the form | Account created in Firebase Auth, user doc with role written to Firestore, redirected to dashboard |
-| Role protection | A logged-in Member user | They attempt to navigate directly to `/admin.html` | They are redirected to `/login.html` or a 403 page |
-| Create Group | An Admin user is logged in | They fill in the Create Group form and submit | A new group document appears in Firestore and the group appears on their dashboard |
-| Invite Member | An Admin user is on the group management page | They enter a valid email and click Invite | An invite document is created in Firestore for that email address |
-| View Contributions | A Member user is logged in | They navigate to the Contributions page | They see a list of their own past contributions with amounts and dates |
-| Confirm Payment | A Treasurer is on the Contribution panel | They click Confirm on a member's contribution | The contribution status updates to Confirmed in Firestore in real time |
-| Schedule Meeting | A Treasurer is logged in | They fill in the Schedule Meeting form and submit | A meeting document is saved to Firestore and visible in Meeting List for all group members |
-| Meeting Notification | A Member is logged in with the app open | A Treasurer schedules a new meeting for their group | A notification banner appears on the Member's screen without a page refresh |
-| Public Landing | An unauthenticated user visits the deployed Azure URL | The page loads | The landing page renders fully with working Login and Register CTA buttons |
-| SA Data Widget | A logged-in Member navigates to the dashboard | The savings projection widget loads (live data or Azure Function fallback) | SA financial data (e.g. prime rate) is displayed in the widget within 3s and no error is shown |
-| Password Reset | A registered user has forgotten their password and clicks Forgot Password link on login.html | They enter their email and click Send Reset Email | Firebase sends a reset email; user resets password and can log in with new credentials |
+#### `users`
 
-## 🚀 Getting Started
+User profile documents created on registration.
+
+| Field | Type | Description |
+|---|---|---|
+| `role` | `"Admin" \| "Treasurer" \| "Member"` | Application-level role |
+
+---
+
+### Firebase Data Connect Schema
+
+A secondary typed schema used with Firebase Data Connect for strongly-typed queries:
+
+```graphql
+type User @table {
+  email: String!
+  displayName: String!
+  createdAt: Timestamp!
+  photoUrl: String
+}
+
+type Group @table {
+  name: String!
+  createdAt: Timestamp!
+  description: String
+}
+
+type Membership @table(key: ["user", "group"]) {
+  user: User!
+  group: Group!
+  role: String!
+  createdAt: Timestamp!
+}
+
+type Meeting @table {
+  group: Group!
+  title: String!
+  scheduledAt: Timestamp!
+  createdAt: Timestamp!
+  caller: User!
+  description: String
+  location: String
+}
+```
+
+---
+
+## SA Financial Data Integration
+
+The dashboard includes a live SA financial data widget. Data is sourced in the following priority order:
+
+1. **Frankfurter API** (`api.frankfurter.dev`) — live USD/ZAR exchange rate; no API key required, CORS-friendly
+2. **Azure Function proxy** (`/api/getSAData`) — server-side fallback to avoid browser CORS restrictions
+3. **Static fallback** — hardcoded SARB values updated at the start of each sprint
+
+**Current values (SARB MPC decision, March 2026):**
+
+| Indicator | Value |
+|---|---|
+| Repo Rate | 6.75% |
+| Prime Lending Rate | 10.25% |
+| Inflation Rate (SARB Q2 forecast) | 4.0% |
+| USD/ZAR | Fetched live at runtime |
+
+Exchange rate data is cached in `localStorage` for 4 hours to minimise API requests.
+
+---
+
+## Project Structure
+
+```
+stockpal/
+├── backend/                        # Server-side code
+│   ├── server.js                   # Node.js static server + SA data API proxy
+│   └── api/
+│       └── getSAData/              # Azure Function — SA data proxy
+│           ├── index.js
+│           └── function.json
+│
+├── frontend/                       # All browser-facing code
+│   ├── index.html                  # Landing page
+│   ├── login.html                  # Sign-in page
+│   ├── register.html               # Registration page
+│   ├── dashboard.html              # Member dashboard
+│   ├── meetings.html               # Meeting management
+│   ├── groupCreate.html            # Group creation form
+│   │
+│   ├── js/
+│   │   ├── firebase-config.js      # Firebase initialisation and exports
+│   │   ├── auth.js                 # Auth helpers (privateRoute, roleGuard)
+│   │   ├── dashboard.js            # Dashboard controller (SA data widget)
+│   │   ├── login.js                # Sign-in logic
+│   │   ├── register.js             # Registration logic
+│   │   ├── meetings.js             # Meeting CRUD + real-time notifications
+│   │   ├── sa-data.js              # SA financial data fetch/cache layer
+│   │   └── firebase.js             # Firebase compat SDK bootstrap
+│   │
+│   ├── css/
+│   │   ├── theme.css               # Design system (colours, fonts, spacing)
+│   │   ├── app.css                 # Authenticated page layout
+│   │   ├── dashboard.css           # Dashboard-specific styles
+│   │   ├── meetings.css            # Meetings page styles
+│   │   ├── landing.css             # Landing page styles
+│   │   └── register.css            # Login/register/group-create styles
+│   │
+│   ├── components/
+│   │   ├── navbar.js               # Shared navbar (auth-aware)
+│   │   └── footer.js               # Shared footer
+│   │
+│   ├── contributions/              # Contribution tracking pages
+│   │   ├── my.html                 # Member's contribution history
+│   │   ├── manage.html             # Treasurer contribution management
+│   │   ├── payout.html             # Payout schedule view
+│   │   ├── contributions.js        # Contribution data logic
+│   │   ├── contributions.css       # Contribution page styles
+│   │   └── mock-data.js            # Mock data for development
+│   │
+│   └── pages/
+│       └── dashboard.html          # Additional dashboard page
+│
+├── services/                       # Firebase service modules (npm-based imports)
+│   ├── firebase.js                 # Firebase app initialisation
+│   ├── auth.js                     # Auth listener + invite checker
+│   ├── dashboardService.js         # Group data queries
+│   └── groupService.js             # Group creation + treasurer assignment
+│
+├── firebase/                       # Firebase configuration files
+│   ├── firestore.rules             # Firestore security rules
+│   ├── firestore.indexes.json      # Composite index definitions
+│   └── dataconnect/
+│       ├── dataconnect.yaml
+│       ├── seed_data.gql
+│       ├── schema/schema.gql       # Firebase Data Connect GraphQL schema
+│       └── example/
+│           ├── connector.yaml
+│           └── queries.gql
+│
+├── docs/                           # Documentation and schema references
+│   ├── Firestore meeting schema
+│   ├── schema_representation.txt
+│   └── data-model.txt
+│
+├── tests/
+│   └── auth.tests.js               # Auth utility unit tests
+│
+├── package.json
+├── staticwebapp.config.json        # Azure routing and auth config
+└── README.md
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- Node.js (v18+) / Python (3.10+) – *only if you add backend later; Sprint 1 is pure static HTML/CSS/JS + Firebase*
-- Git
-- Firebase account (free tier)
-- Azure account (free tier for Static Web Apps)
 
-### Installation (Sprint 1)
+- Node.js v18 or later
+- Git
+- A Firebase project (free Spark tier is sufficient)
+- An Azure account (free tier for Static Web Apps)
+
+### Local Setup
 
 ```bash
-# Clone the repo
-git clone https://github.com/your-org/stockpal.git
-cd stockpal
+# 1. Clone the repository
+git clone https://github.com/SindyMl/-div-elopers.git
+cd -div-elopers
 
-# No build step – open index.html locally or serve with live server
-# For Firebase: create a project, copy your config into a firebase-config.js file
+# 2. Install dependencies
+npm install
+
+# 3. Start the local server
+npm start
+# App is served at http://localhost:8080
+```
+
+> **Firebase config:** The Firebase project credentials are configured in `frontend/js/firebase-config.js`. The required fields are `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, and `appId`.
+
+### Running Tests
+
+```bash
+npm test
+```
+
+---
+
+## User Roles
+
+| Role | Permissions |
+|---|---|
+| **Member** | View group info, contribution history, meetings, and the SA data widget |
+| **Treasurer** | All Member permissions + confirm/flag contributions, manage payout schedule, schedule meetings, record minutes |
+| **Admin** | All Treasurer permissions + manage group settings, invite/remove members, assign the Treasurer role |
+
+Route protection is enforced via `staticwebapp.config.json` (Azure) and Firestore security rules. All routes except `/`, `/login.html`, `/register.html`, and static assets require an authenticated session.
+
+---
+
+## Team
+
+| # | Name | Responsibility |
+|---|---|---|
+| P1 | Alondwe | Project Lead · Firebase Auth setup |
+| P2 | Kwezi | RBAC · CI/CD pipeline |
+| P3 | Owen | Group Management |
+| P4 | Athandwa | Contribution Tracking |
+| P5 | Ziya | Meeting Management |
+| P6 | Sindiswa | Landing Page · Azure Deployment · SA Data Integration |
+
+---
+
+*Built with Firebase and Azure as part of an Agile software engineering module.*

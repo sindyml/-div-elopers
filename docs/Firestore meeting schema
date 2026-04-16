@@ -1,0 +1,10 @@
+meetings (collection)
+    meetingID (document)
+      groupID: string
+      title: string
+      date: string 
+      time: string
+      location: string
+      agenda: string
+      minutes: string
+      createdAt: timestamp
