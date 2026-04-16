@@ -4,7 +4,7 @@ import { auth, db } from '../js/firebase-config.js';
 // ============================================================
 // MOCK MODE SWITCH
 // ============================================================
-const USE_MOCK = false;
+const USE_MOCK = true;
 
 import { mockData } from './mock-data.js';
 
@@ -139,7 +139,7 @@ async function getMemberName(userId) {
 }
 
 // ============================================================
-// CONTRIBUTIONS FUNCTIONS (Query from my TABLE)
+// CONTRIBUTIONS FUNCTIONS (Query from my table TABLE)
 // ============================================================
 
 async function getContributionsByMember(userId) {
