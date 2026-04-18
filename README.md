@@ -298,12 +298,16 @@ cd -div-elopers
 # 2. Install dependencies
 npm install
 
-# 3. Start the local server
+# 3. Copy the environment template and fill in your Firebase values
+cp .env.example .env
+# Edit .env with values from Firebase Console → Project Settings → General
+
+# 4. Start the local server
 npm start
 # App is served at http://localhost:8080
 ```
 
-> **Firebase config:** The Firebase project credentials are configured in `frontend/js/firebase-config.js`. The required fields are `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, and `appId`.
+> **Firebase config:** Firebase credentials are **not** stored in source code. They are loaded at runtime from environment variables via the `/api/getFirebaseConfig` Azure Function. See `.env.example` for the required variables and the [Secrets & Key Vault](#secrets--azure-key-vault) section below for production setup.
 
 ### Running Tests
 
@@ -322,6 +326,75 @@ npm test
 | **Admin** | All Treasurer permissions + manage group settings, invite/remove members, assign the Treasurer role |
 
 Route protection is enforced via `staticwebapp.config.json` (Azure) and Firestore security rules. All routes except `/`, `/login.html`, `/register.html`, and static assets require an authenticated session.
+
+---
+
+## Secrets & Azure Key Vault
+
+### Environment Variables
+
+All Firebase configuration is supplied through **environment variables** — never committed to source code.
+
+| Variable | Description |
+|---|---|
+| `FIREBASE_API_KEY` | Firebase Web API key |
+| `FIREBASE_AUTH_DOMAIN` | e.g. `your-project.firebaseapp.com` |
+| `FIREBASE_DATABASE_URL` | Realtime Database URL |
+| `FIREBASE_PROJECT_ID` | Firebase project ID |
+| `FIREBASE_STORAGE_BUCKET` | Cloud Storage bucket |
+| `FIREBASE_MESSAGING_SENDER_ID` | FCM sender ID |
+| `FIREBASE_APP_ID` | Firebase Web app ID |
+| `FIREBASE_MEASUREMENT_ID` | Google Analytics measurement ID |
+
+**Local development:** copy `.env.example` → `.env` and fill in values from the Firebase Console.
+
+**Azure Static Web Apps:** add the same variables as **Application Settings** in the Azure portal (Settings → Configuration → Application settings).
+
+### Azure Key Vault (server-side secrets)
+
+For any server-side secrets that must not be exposed to the browser (e.g. Firebase Admin SDK service account keys, third-party API tokens), use **Azure Key Vault**.
+
+| Item | Value |
+|---|---|
+| **Key Vault resource name** | `stockpal-kv` (create in the same resource group as the Static Web App) |
+| **Access policy** | Grant the Static Web App's managed identity **Get** and **List** permissions on secrets |
+
+#### Setup steps
+
+1. Create the Key Vault in the Azure portal (or via CLI):
+   ```bash
+   az keyvault create --name stockpal-kv --resource-group <your-rg> --location <region>
+   ```
+2. Store secrets:
+   ```bash
+   az keyvault secret set --vault-name stockpal-kv --name "FirebaseServiceAccountKey" --file service-account.json
+   ```
+3. Enable the Static Web App's system-assigned managed identity and grant it access:
+   ```bash
+   az keyvault set-policy --name stockpal-kv \
+     --object-id <managed-identity-object-id> \
+     --secret-permissions get list
+   ```
+4. In Azure Functions (API), retrieve secrets at runtime using the `@azure/identity` and `@azure/keyvault-secrets` packages instead of reading from environment variables or files.
+
+### Cleaning Git History
+
+If secrets were previously committed, remove them from the entire Git history using [BFG Repo Cleaner](https://rtyley.github.io/bfg-repo-cleaner/):
+
+```bash
+# 1. Install BFG (requires Java)
+# 2. Create a file listing the secret strings to remove
+echo "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" > /tmp/secrets.txt
+
+# 3. Run BFG to replace secrets in history
+bfg --replace-text /tmp/secrets.txt
+
+# 4. Clean up and force-push
+git reflog expire --expire=now --all && git gc --prune=now --aggressive
+git push --force
+```
+
+> ⚠️ **After force-pushing, all team members must re-clone or run `git pull --rebase` to sync with the cleaned history.**
 
 ---
 
