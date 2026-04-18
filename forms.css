@@ -1,0 +1,160 @@
+/* ============================================================
+   forms.css — Forms + basic pages (create, edit, settings)
+   Matches dashboard.css style system
+   ============================================================ */
+
+/* ── Page layout ── */
+main {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Headings ── */
+h2 {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* ── Card-style container ── */
+form,
+section {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Inputs ── */
+input,
+select {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+/* ── Buttons ── */
+button {
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-sm);
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+/* Primary button */
+button[type="submit"],
+button.primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+button[type="submit"]:hover,
+button.primary:hover {
+  opacity: 0.9;
+}
+
+/* Danger button (delete) */
+button.danger {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+button.danger:hover {
+  background: #f1b0b7;
+}
+
+/* Secondary button */
+button.secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Messages ── */
+#message,
+#inviteMessage {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* Success / error states */
+.success {
+  color: #155724;
+}
+
+.error {
+  color: #721c24;
+}
+
+/* ── Links ── */
+a {
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  opacity: 0.7;
+}
+
+/* ── Lists (members, groups, etc.) ── */
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+li {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+li:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-2);
+}
+
+/* ── Section titles ── */
+section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  main {
+    padding: var(--space-4);
+  }
+}
