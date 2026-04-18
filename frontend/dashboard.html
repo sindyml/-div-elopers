@@ -179,17 +179,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <!-- Initialize Firebase compat SDK (js/firebase-config.js is ES-module only) -->
-  <script>
-    firebase.initializeApp({
-      apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
-      authDomain: "stokvel-database.firebaseapp.com",
-      projectId: "stokvel-database",
-      storageBucket: "stokvel-database.firebasestorage.app",
-      messagingSenderId: "997328421094",
-      appId: "1:997328421094:web:9f88bf8ac720b118d97b27"
-    });
-  </script>
+  <!-- Initialize Firebase compat SDK from server config -->
+  <script src="js/firebase-compat-init.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
   <script src="js/sa-data.js"></script>

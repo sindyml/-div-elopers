@@ -166,14 +166,14 @@
   <!--
     SCRIPT LOAD ORDER — this matters:
     1. Firebase SDKs first
-    2. firebase-config.js (initialises Firebase using the SDKs)
+    2. firebase-compat-init.js (fetches config from API, initialises Firebase)
     3. navbar.js (renders immediately, then updates on auth state)
     4. footer.js
   -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-config.js"></script>
+  <script src="js/firebase-compat-init.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
 </body>
