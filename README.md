@@ -384,7 +384,7 @@ If secrets were previously committed, remove them from the entire Git history us
 ```bash
 # 1. Install BFG (requires Java)
 # 2. Create a file listing the secret strings to remove
-echo "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw" > /tmp/secrets.txt
+echo "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" > /tmp/secrets.txt
 
 # 3. Run BFG to replace secrets in history
 bfg --replace-text /tmp/secrets.txt
