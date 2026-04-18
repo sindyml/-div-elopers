@@ -199,3 +199,21 @@
 .divider span {
   margin: 0 1rem;
 }
+/* Forgot password section */
+.forgot-password-section {
+  text-align: right;
+  margin: -0.5rem 0 1.5rem 0;
+}
+
+.forgot-password-link {
+  font-size: 0.8rem;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.forgot-password-link:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}

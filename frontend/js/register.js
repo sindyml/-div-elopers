@@ -63,10 +63,15 @@ async function handleOAuthSignIn(provider, providerName) {
     }
     
   } catch (error) {
-    // Something went wrong - log it and show user the error message
-    console.error(`${providerName} error:`, error);
+  console.error(`${providerName} error:`, error);
+  //When a user is trying to register with a github account that already exists
+  if (error.code === 'auth/account-exists-with-different-credential') {
+    alert('An account already exists with this email.Redirecting you to login....');
+    window.location.href = "login.html";
+  } else {
     alert(error.message);
   }
+}
 }
 
 // STEP 5: EMAIL/PASSWORD REGISTRATION (traditional signup)
