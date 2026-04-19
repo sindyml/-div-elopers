@@ -236,3 +236,9 @@
     font-size: 1.4rem;
   }
 }
+.spam-warning {
+  font-size: 0.75rem;
+  color: var(--color-warning);
+  text-align: center;
+  margin-top: 1rem;
+}

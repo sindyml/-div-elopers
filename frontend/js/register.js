@@ -10,8 +10,10 @@ import { auth, db } from "./firebase-config.js";
 // signInWithPopup = opens popup window for OAuth login
 import { 
   createUserWithEmailAndPassword, 
+  sendEmailVerification,
   GoogleAuthProvider, 
   GithubAuthProvider,
+  OAuthProvider,
   signInWithPopup 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -64,11 +66,23 @@ async function handleOAuthSignIn(provider, providerName) {
     
   } catch (error) {
   console.error(`${providerName} error:`, error);
-  //When a user is trying to register with a github account that already exists
+  
+  // Case 1: Account already exists with different provider
   if (error.code === 'auth/account-exists-with-different-credential') {
-    alert('An account already exists with this email.Redirecting you to login....');
+    alert('An account already exists with this email. Redirecting you to login...');
     window.location.href = "login.html";
-  } else {
+  } 
+  // Case 2: Firebase config not found (Azure endpoint missing)
+  else if (error.code === 'auth/configuration-not-found' || error.message.includes('config')) {
+    alert('Firebase configuration error. Please contact support.');
+    console.error('Firebase config issue - check /api/getFirebaseConfig endpoint');
+  }
+  // Case 3: Popup closed by user
+  else if (error.code === 'auth/popup-closed-by-user') {
+    alert('Sign in cancelled. Please try again.');
+  }
+  // Case 4: Everything else
+  else {
     alert(error.message);
   }
 }
@@ -79,31 +93,32 @@ const form = document.getElementById("registerForm");
 
 if (form) {
   form.addEventListener("submit", async (e) => {
-    e.preventDefault();  // Stop the page from refreshing
+    e.preventDefault();
 
-    // Grab the values the user typed into the form
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
-    const role = document.getElementById("role").value;  // From dropdown
+    const role = document.getElementById("role").value;
 
     try {
-      // Create the account in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Store their role in Firestore (same as OAuth users)
+      // Send verification email
+      await sendEmailVerification(user);
+
       await setDoc(doc(db, "users", user.uid), {
         email: email,
         role: role,
-        provider: "email",  // Mark that they used email/password, not OAuth
+        provider: "email",
+        emailVerified: false,
         createdAt: new Date().toISOString()
       });
 
-      alert("User registered successfully!");
-      window.location.href = "login.html";  // Send them to login page (not dashboard because they need to sign in)
+      alert("Registration successful! Please check your email to verify your account.");
+      window.location.href = "login.html";
 
     } catch (error) {
-      alert(error.message);  // Show error like "email already exists" or "weak password"
+      alert(error.message);
     }
   });
 }
@@ -124,13 +139,5 @@ if (githubBtn) {
   });
 }
 
-// STEP 8: LINKEDIN OAUTH BUTTON
-// NOTE: LinkedIn requires extra setup in Firebase Console (OpenID Connect)
-// The code is ready but won't work until a teammate adds the credentials
-const linkedinBtn = document.getElementById("linkedinRegisterBtn");
-if (linkedinBtn) {
-  linkedinBtn.addEventListener("click", () => {
-    const provider = new OAuthProvider("linkedin.com");
-    handleOAuthSignIn(provider, "linkedin");
-  });
+// STEP 8: 
 }
