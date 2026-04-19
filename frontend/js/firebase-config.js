@@ -1,4 +1,4 @@
-// js/firebase-config.js
+/// js/firebase-config.js
 
 // STEP 1: Import Firebase SDK modules from Google's CDN
 // initializeApp = starts Firebase in our app

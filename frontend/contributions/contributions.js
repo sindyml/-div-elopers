@@ -16,7 +16,7 @@ import {
 // ============================================================
 // MOCK MODE SWITCH
 // ============================================================
-const USE_MOCK = true;
+const USE_MOCK = false;
 
 import { mockData } from './mock-data.js';
 
@@ -29,10 +29,12 @@ let mockGroupCallbacks = [];
 // ============================================================
 
 function getCurrentUserId() {
+
     if (USE_MOCK) {
         return mockData.currentUserId;
     }
     const currentUser = auth.currentUser;
+    alert('Real mode - auth.currentUser = ' + (currentUser ? currentUser.uid : 'null'));
     return currentUser ? currentUser.uid : null;
 }
 
