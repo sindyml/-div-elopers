@@ -100,10 +100,11 @@ if (githubBtn) {
   });
 }
 
-// LINKEDIN OAUTH (requires OIDC setup in Firebase Console)
-const linkedinBtn = document.getElementById("linkedinLoginBtn");
-if (linkedinBtn) {
-  linkedinBtn.addEventListener("click", () => {
-    handleOAuthSignIn(new OAuthProvider("linkedin.com"), "linkedin");
+// MICROSOFT OAUTH
+const microsoftBtn = document.getElementById("microsoftRegisterBtn");
+if (microsoftBtn) {
+  microsoftBtn.addEventListener("click", () => {
+    const provider = new OAuthProvider("microsoft.com");
+    handleOAuthSignIn(provider, "microsoft");
   });
 }

@@ -13,6 +13,7 @@ import {
   sendEmailVerification,
   GoogleAuthProvider, 
   GithubAuthProvider,
+  OAuthProvider,
   signInWithPopup 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -138,13 +139,5 @@ if (githubBtn) {
   });
 }
 
-// STEP 8: LINKEDIN OAUTH BUTTON
-// NOTE: LinkedIn requires extra setup in Firebase Console (OpenID Connect)
-// The code is ready but won't work until a teammate adds the credentials
-const linkedinBtn = document.getElementById("linkedinRegisterBtn");
-if (linkedinBtn) {
-  linkedinBtn.addEventListener("click", () => {
-    const provider = new OAuthProvider("linkedin.com");
-    handleOAuthSignIn(provider, "linkedin");
-  });
+// STEP 8: 
 }
