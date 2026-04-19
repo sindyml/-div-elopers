@@ -58,22 +58,31 @@ async function handleOAuthSignIn(provider, providerName) {
 
 // EMAIL/PASSWORD LOGIN
 const form = document.getElementById("loginForm");
-if (form) {
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      window.location.href = "dashboard.html";
-    } catch (error) {
-      console.error("Email login error:", error);
-      showAlert(error.message);
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+
+    // Check if email is verified
+    if (!user.emailVerified) {
+      alert("Please verify your email before logging in. Check your inbox for the verification link.");
+      await auth.signOut();
+      return;
     }
-  });
-}
+
+    // If verified, proceed
+    window.location.href = "dashboard.html";
+
+  } catch (error) {
+    alert(error.message);
+  }
+});
+
 
 // GOOGLE OAUTH
 const googleBtn = document.getElementById("googleLoginBtn");
