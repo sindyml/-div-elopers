@@ -28,7 +28,7 @@ export const createGroup = async ({
    
 
     //adding the membership record
-    await setDoc(doc(db, "memberships", `${user.uid}_${groupRef.id}`), {
+    await setDoc(doc(db, "memberships", `${user.uid}_${groupReference.id}`), {
     uid: user.uid,
     groupId: groupRef.id
   });

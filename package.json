@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "description": "> A web-based stokvel management system that enables members to track contributions, monitor payout schedules, communicate, and gain financial insights – designed for South African savings groups.",
   "main": "backend/server.js",
-  "directories": {
-    "test": "jest"
-  },
+  "type": "module",
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test:backend": "jest", 
+     "test:frontend": "vitest run --config vitest.config.js",
+  "test:integration": "firebase emulators:exec --only auth,firestore \"vitest run --config vitest.integration.config.js\"",
+  "test:all": "npm run test:frontend && npm run test:integration"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -18,7 +19,11 @@
     "type": "git",
     "url": "git+https://github.com/SindyMl/-div-elopers.git"
   },
-  "keywords": ["stokvel", "firebase", "azure"],
+  "keywords": [
+    "stokvel",
+    "firebase",
+    "azure"
+  ],
   "author": "Sindiswa, Alondwe, Ziya, Owen, Athandwa & Kwezi",
   "license": "ISC",
   "bugs": {
@@ -29,6 +34,10 @@
     "firebase": "^12.11.0"
   },
   "devDependencies": {
-    "jest": "^30.3.0"
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase-admin": "^13.8.0",
+    "jest": "^30.3.0",
+    "jsdom": "^29.0.2",
+    "vitest": "^4.1.4"
   }
 }
