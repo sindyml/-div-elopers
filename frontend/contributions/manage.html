@@ -23,8 +23,9 @@
     </main>
 
     <script type="module">
-        import { auth } from '../js/firebase-config.js';
+        import { auth, db } from '../js/firebase-config.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { 
             getCurrentUserId,
             getCurrentUserRole,
@@ -34,19 +35,20 @@
             listenToGroupContributions
         } from './contributions.js';
 
+        let activeGroupId = null;
         let activeUnsubscribe = null;
 
         async function logout() {
             try {
                 await signOut(auth);
-                window.location.href = 'login.html';
+                window.location.href = '../login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
             }
         }
 
         function goToDashboard() {
-            window.location.href = 'dashboard.html';
+            window.location.href = '../dashboard.html';
         }
 
         function goBack() {
@@ -56,14 +58,14 @@
                     activeUnsubscribe = null;
                 }
                 activeGroupId = null;
-                window.location.href = 'manage.html';
+                loadManagePage();
                 return;
             }
 
             if (document.referrer && document.referrer !== '') {
                 window.history.back();
             } else {
-                window.location.href = 'dashboard.html';
+                window.location.href = '../dashboard.html';
             }
         }
 
@@ -123,6 +125,7 @@
                     activeUnsubscribe();
                     activeUnsubscribe = null;
                 }
+                activeGroupId = null;
                 loadManagePage();
             });
             container.appendChild(backToGroupsButton);
@@ -205,6 +208,20 @@
                         missButton.className = 'miss';
                         missButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'missed');
+                            
+                            // NEW: Create notification for the affected member
+                            try {
+                                await addDoc(collection(db, 'notifications'), {
+                                    userId: contribution.userId,
+                                    message: `You missed a payment of R${contribution.amount} for ${groupName}`,
+                                    read: false,
+                                    createdAt: new Date(),
+                                    contributionId: contribution.id
+                                });
+                                console.log('Notification sent to member');
+                            } catch (notifError) {
+                                console.error('Failed to send notification:', notifError);
+                            }
                         });
 
                         actionCell.appendChild(confirmButton);
@@ -217,6 +234,7 @@
         }
 
         async function loadContributionsForGroup(groupId, groupName) {
+            activeGroupId = groupId;
             const container = document.getElementById('manageContent');
             await displayContributionsTable(groupId, groupName, container);
         }
@@ -233,7 +251,7 @@
         async function loadManagePage() {
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
-                window.location.href = 'login.html';
+                window.location.href = '../login.html';
                 return;
             }
 

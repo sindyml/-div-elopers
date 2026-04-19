@@ -23,8 +23,17 @@
     </main>
 
     <script type="module">
-        import { auth } from '../js/firebase-config.js';
+        import { auth, db } from '../js/firebase-config.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { 
+            collection, 
+            query, 
+            where, 
+            orderBy, 
+            onSnapshot, 
+            updateDoc, 
+            doc 
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { 
             getCurrentUserId,
             getUserGroups,
@@ -34,29 +43,90 @@
         let activeGroupId = null;
         let activeUnsubscribe = null;
         let activeTableSection = null;
+        let notificationsUnsubscribe = null;
 
         async function logout() {
             try {
                 await signOut(auth);
-                window.location.href = 'login.html';
+                window.location.href = '../login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
             }
         }
 
         function goToDashboard() {
-            window.location.href = 'dashboard.html';
+            window.location.href = '../dashboard.html';
         }
 
         function goBack() {
             if (document.referrer && document.referrer !== '') {
                 window.history.back();
             } else {
-                window.location.href = 'dashboard.html';
+                window.location.href = '../dashboard.html';
             }
         }
 
+        // NEW: Show notification banner
+        function showNotificationBanner(message, notificationId) {
+            // Check if banner already exists for this notification
+            if (document.getElementById(`notif-${notificationId}`)) return;
+            
+            const banner = document.createElement('div');
+            banner.id = `notif-${notificationId}`;
+            banner.style.backgroundColor = '#ff9800';
+            banner.style.color = 'white';
+            banner.style.padding = '12px 20px';
+            banner.style.margin = '10px';
+            banner.style.borderRadius = '8px';
+            banner.style.display = 'flex';
+            banner.style.justifyContent = 'space-between';
+            banner.style.alignItems = 'center';
+            banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            
+            banner.innerHTML = `
+                <span>🔔 ${message}</span>
+                <button class="dismiss-notif" data-id="${notificationId}" style="background:white; color:#ff9800; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">Dismiss</button>
+            `;
+            
+            // Insert at top of main content
+            const main = document.querySelector('main');
+            const firstChild = main.firstChild;
+            main.insertBefore(banner, firstChild);
+            
+            // Add dismiss event listener
+            const dismissBtn = banner.querySelector('.dismiss-notif');
+            dismissBtn.addEventListener('click', async () => {
+                await updateDoc(doc(db, 'notifications', notificationId), {
+                    read: true
+                });
+                banner.remove();
+            });
+        }
+
+        // NEW: Listen for notifications
+        function listenToNotifications(userId) {
+            const q = query(
+                collection(db, 'notifications'),
+                where('userId', '==', userId),
+                where('read', '==', false),
+                orderBy('createdAt', 'desc')
+            );
+            
+            return onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added') {
+                        const notification = change.doc.data();
+                        const notificationId = change.doc.id;
+                        showNotificationBanner(notification.message, notificationId);
+                    }
+                });
+            });
+        }
+
         function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
+            console.log('=== displayContributionsTable ===');
+            console.log('Looking for groupId:', groupId);
+            console.log('Group name:', groupName);
             // Remove active table if exists
             if (activeTableSection && activeTableSection.parentNode) {
                 activeTableSection.remove();
@@ -113,7 +183,11 @@
             activeTableSection = tableSection;
 
             activeUnsubscribe = listenToMemberContributions(getCurrentUserId(), (allContributions) => {
+                console.log('=== LISTENER CALLBACK ===');
+    console.log('All contributions received:', allContributions);
+    console.log('Looking for groupId:', groupId);
                 const groupContributions = allContributions.filter(c => c.groupId === groupId);
+                console.log('Filtered contributions:', groupContributions);
                 const targetTbody = document.getElementById(`contributions-body-${groupId}`);
                 if (!targetTbody) return;
                 
@@ -214,9 +288,15 @@
         async function loadMyPage() {
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
-                window.location.href = 'login.html';
+                window.location.href = '../login.html';
                 return;
             }
+            
+            // NEW: Start listening for notifications
+            if (notificationsUnsubscribe) {
+                notificationsUnsubscribe();
+            }
+            notificationsUnsubscribe = listenToNotifications(currentUserId);
             
             const groups = await getUserGroups(currentUserId);
             const container = document.getElementById('dynamicContent');
