@@ -1,0 +1,199 @@
+// js/dashboard-widgets.js
+import { auth, db } from "./firebase-config.js";
+import {
+  getUserGroups,
+  getUserRoleInGroup,
+  checkAndAcceptInvites,
+  sendInvite,
+  getGroupDetails
+} from "./groupService.js";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { COLLECTIONS, ROLES } from "./constants.js";
+
+(function () {
+    const grouplist     = document.getElementById('grouplist');
+    const inviteForm    = document.getElementById('invite-form');
+    const inviteMessage = document.getElementById('inviteMessage');
+    const meetingsContainer = document.getElementById('meetings-container');
+    const contributionsContainer = document.getElementById('contributions-container');
+    const payoutContainer        = document.getElementById('payout-container');
+    const notificationRoot  = document.getElementById('notification-root');
+    const statMyContributions    = document.getElementById('stat-my-contributions');
+    const statBalance            = document.getElementById('stat-balance');
+    const statPayout             = document.getElementById('stat-payout');
+    const statPayoutName         = document.getElementById('stat-payout-name');
+    const payoutViewAll          = document.getElementById('payout-view-all');
+
+    let selectedGroupId = null;
+    let userRole        = null;
+    let unsubMeetings     = null;
+    let unsubContributions = null;
+
+    const loadGroups = async (uid) => {
+      if (!grouplist) return;
+      const groups = await getUserGroups(uid);
+      grouplist.innerHTML = '';
+      groups.forEach(group => {
+          const li = document.createElement('li');
+          li.textContent = group.name;
+          li.setAttribute('role', 'button');
+          li.setAttribute('tabindex', '0');
+          li.onclick = async () => {
+            selectedGroupId = group.id;
+            userRole = await getUserRoleInGroup(group.id, uid);
+            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+          };
+          grouplist.appendChild(li);
+      });
+      return groups.map(g => g.id);
+    };
+
+    if (inviteForm) {
+      inviteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('inviteEmail').value.trim();
+        if (!selectedGroupId) { alert('Please select a group first'); return; }
+        if (userRole !== ROLES.ADMIN) { alert('Only admins can invite members'); return; }
+        try {
+          await sendInvite(selectedGroupId, email, auth.currentUser.uid);
+          inviteMessage.textContent = 'Invite Sent!';
+        } catch (err) {
+          inviteMessage.textContent = 'Error sending invite';
+          console.error(err);
+        }
+      });
+    }
+
+    function fmtDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+    }
+
+    function fmtRand(amount) {
+      return 'R ' + Number(amount).toLocaleString('en-ZA');
+    }
+
+    function fmtTime(t) {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      const hr = parseInt(h, 10);
+      const ampm = hr >= 12 ? 'PM' : 'AM';
+      return ((hr % 12) || 12) + ':' + m + ' ' + ampm;
+    }
+
+    function buildMeetingWidget(meeting) {
+      const d = new Date(meeting.date);
+      const day = d.getDate();
+      const monthStr = d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase();
+      const title = (meeting.title || meeting.agenda?.split('\n')[0] || 'Untitled').substring(0, 50);
+      const li = document.createElement('li');
+      li.className = 'meeting-widget-item';
+      li.innerHTML = `
+        <time class="meeting-widget-date"><strong>${day}</strong><span>${monthStr}</span></time>
+        <div class="meeting-widget-info">
+          <p class="meeting-widget-title">${title}</p>
+          <small class="meeting-widget-meta">${meeting.time ? fmtTime(meeting.time) : ''}${meeting.location ? ' · ' + meeting.location : ''}</small>
+        </div>`;
+      return li;
+    }
+
+    function startMeetingListener(groupIds) {
+      if (unsubMeetings) unsubMeetings();
+      if (!meetingsContainer) return;
+      if (!groupIds.length) { meetingsContainer.innerHTML = '<p class="meetings-widget-empty">No upcoming meetings.</p>'; return; }
+      const today = new Date().toISOString().slice(0, 10);
+      const q = query(collection(db, COLLECTIONS.MEETINGS), where('groupId', 'in', groupIds.slice(0, 10)), where('date', '>=', today), orderBy('date', 'asc'), limit(5));
+      unsubMeetings = onSnapshot(q, (snapshot) => {
+          const meetings = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (!meetings.length) { meetingsContainer.innerHTML = '<p class="meetings-widget-empty">No upcoming meetings.</p>'; return; }
+          const ul = document.createElement('ul');
+          ul.className = 'meeting-widget-list';
+          meetings.forEach(m => ul.appendChild(buildMeetingWidget(m)));
+          meetingsContainer.innerHTML = '';
+          meetingsContainer.appendChild(ul);
+      });
+    }
+
+    function startContributionListener(uid, groupMap) {
+        if (unsubContributions) unsubContributions();
+        if (!contributionsContainer) return;
+        const q = query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('userId', '==', uid), orderBy('date', 'desc'), limit(10));
+        unsubContributions = onSnapshot(q, (snapshot) => {
+            const contributions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (!contributions.length) { contributionsContainer.innerHTML = '<p class="widget-empty">No contributions.</p>'; return; }
+            const ul = document.createElement('ul');
+            ul.className = 'contribution-widget-list';
+            contributions.slice(0, 5).forEach(c => {
+                const li = document.createElement('li');
+                li.className = 'contribution-widget-item';
+                li.innerHTML = `<div class="contribution-widget-info"><p class="contribution-widget-amount">R ${c.amount}</p><small>${groupMap[c.groupId] || 'Group'} · ${fmtDate(c.date)}</small></div>`;
+                ul.appendChild(li);
+            });
+            contributionsContainer.innerHTML = '';
+            contributionsContainer.appendChild(ul);
+
+            const confirmed = contributions.filter(c => c.status === 'confirmed');
+            const totalAmount = confirmed.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+            if (statMyContributions) statMyContributions.textContent = fmtRand(totalAmount);
+        });
+    }
+
+    async function loadPayoutWidget(uid, groupIds) {
+      if (!payoutContainer) return;
+      if (!groupIds.length) { payoutContainer.innerHTML = '<p class="widget-empty">Join a group to see payout schedules.</p>'; return; }
+      try {
+        let payouts = [];
+        let activeGroupId = null;
+        for (const gid of groupIds.slice(0, 5)) {
+          const snap = await getDocs(query(collection(db, COLLECTIONS.PAYOUTS), where('groupId', '==', gid), orderBy('order', 'asc')));
+          if (!snap.empty) {
+            payouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            activeGroupId = gid;
+            break;
+          }
+        }
+        if (!payouts.length) { payoutContainer.innerHTML = '<p class="widget-empty">No payout schedule set up yet.</p>'; return; }
+        if (payoutViewAll && activeGroupId) payoutViewAll.href = 'contributions-payout.html?groupId=' + activeGroupId;
+        const today = new Date().toISOString().slice(0, 10);
+        const upcoming = payouts.find(p => p.payoutDate >= today);
+        if (upcoming) {
+          if (statPayout) statPayout.textContent = fmtDate(upcoming.payoutDate);
+          if (statPayoutName) statPayoutName.textContent = upcoming.userDisplayName + "'s turn";
+        }
+        const ul = document.createElement('ul');
+        ul.className = 'payout-widget-list';
+        payouts.forEach(p => {
+            const isCurrentUser = p.userId === uid;
+            const li = document.createElement('li');
+            li.className = 'payout-widget-item' + (isCurrentUser ? ' payout-widget-item--you' : '');
+            li.innerHTML = `<div class="payout-widget-order">#${p.order}</div><div class="payout-widget-info"><p class="payout-widget-name">${p.userDisplayName}${isCurrentUser ? ' (You)' : ''}</p><small class="payout-widget-date">${fmtDate(p.payoutDate)}</small></div><div class="payout-widget-amount">${fmtRand(p.amount)}</div>`;
+            ul.appendChild(li);
+        });
+        payoutContainer.innerHTML = '';
+        payoutContainer.appendChild(ul);
+      } catch (err) { console.error('[Payout Widget] Error:', err); }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        await checkAndAcceptInvites(user);
+        const groupIds = await loadGroups(user.uid);
+        const groupMap = {};
+        for(const id of groupIds) {
+            const details = await getGroupDetails(id);
+            if(details) groupMap[id] = details.name;
+        }
+        startMeetingListener(groupIds);
+        startContributionListener(user.uid, groupMap);
+        await loadPayoutWidget(user.uid, groupIds);
+      }
+    });
+})();
