@@ -45,9 +45,40 @@ function sendFallbackSAData(res, saStatic) {
 }
 
 const server = http.createServer((req, res) => {
+  const urlPath = req.url.split('?')[0];
+
+  // ── API: /api/getFirebaseConfig ────────────────────────────
+  // Returns Firebase client config from environment variables.
+  // Mirrors the Azure Function in backend/api/getFirebaseConfig/.
+  if (urlPath === '/api/getFirebaseConfig' && req.method === 'GET') {
+    const config = {
+      apiKey:            process.env.FIREBASE_API_KEY            || '',
+      authDomain:        process.env.FIREBASE_AUTH_DOMAIN        || '',
+      databaseURL:       process.env.FIREBASE_DATABASE_URL       || '',
+      projectId:         process.env.FIREBASE_PROJECT_ID         || '',
+      storageBucket:     process.env.FIREBASE_STORAGE_BUCKET     || '',
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+      appId:             process.env.FIREBASE_APP_ID             || '',
+      measurementId:     process.env.FIREBASE_MEASUREMENT_ID     || '',
+    };
+
+    if (!config.apiKey) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Firebase configuration is not set. Add FIREBASE_* environment variables.' }));
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=3600',
+    });
+    res.end(JSON.stringify(config));
+    return;
+  }
+
   // ── API proxy: /api/getSAData ──────────────────────────────
   // Proxies Frankfurter API server-side to avoid browser CORS issues.
-  if (req.url.split('?')[0] === '/api/getSAData' && req.method === 'GET') {
+  if (urlPath === '/api/getSAData' && req.method === 'GET') {
     const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
 
     // SA rates (updated each sprint — SARB MPC decision)
@@ -95,17 +126,16 @@ const server = http.createServer((req, res) => {
 
   // ── Static file serving ────────────────────────────────────
   // Sanitise URL — strip query strings and prevent directory traversal
-  let urlPath = req.url.split('?')[0];
-  urlPath = decodeURIComponent(urlPath).replace(/\.\./g, '');
+  let staticPath = decodeURIComponent(urlPath).replace(/\.\./g, '');
 
   // Default to index.html for root
-  if (urlPath === '/') urlPath = '/index.html';
+  if (staticPath === '/') staticPath = '/index.html';
 
   // If URL has no extension, try adding .html (clean URLs)
-  const ext = path.extname(urlPath);
-  if (!ext) urlPath = urlPath + '.html';
+  const ext = path.extname(staticPath);
+  if (!ext) staticPath = staticPath + '.html';
 
-  const filePath = path.join(FRONTEND_DIR, urlPath);
+  const filePath = path.join(FRONTEND_DIR, staticPath);
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
