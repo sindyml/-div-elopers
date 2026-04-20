@@ -52,6 +52,64 @@ jobs:
           FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080'
           FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099'
 
+      # ── Debug: list coverage files so we can see what was generated ───────
+      - name: List coverage files
+        if: always()
+        run: |
+          echo "=== Coverage directory contents ==="
+          find . -name "coverage-summary.json" 2>/dev/null || echo "No coverage-summary.json found anywhere"
+          find . -name "*.json" -path "*/coverage/*" 2>/dev/null || echo "No coverage JSON files found"
+
+      # ── Merge coverage summaries into one file ────────────────────────────
+      - name: Merge coverage summaries
+        if: always()
+        run: |
+          node - << 'JS'
+            const fs = require('fs');
+
+            // Find all coverage-summary.json files
+            const { execSync } = require('child_process');
+            const files = execSync('find . -name "coverage-summary.json" 2>/dev/null')
+              .toString().trim().split('\n').filter(Boolean);
+
+            console.log('Found coverage files:', files);
+
+            if (files.length === 0) {
+              console.log('No coverage files found, creating empty summary');
+              fs.mkdirSync('./coverage', { recursive: true });
+              fs.writeFileSync('./coverage/coverage-summary.json', JSON.stringify({
+                total: {
+                  statements: { pct: 0 },
+                  branches:   { pct: 0 },
+                  functions:  { pct: 0 },
+                  lines:      { pct: 0 },
+                }
+              }));
+              process.exit(0);
+            }
+
+            // Merge all summaries by averaging percentages
+            const summaries = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
+            const merged = { total: {
+              statements: { pct: 0 },
+              branches:   { pct: 0 },
+              functions:  { pct: 0 },
+              lines:      { pct: 0 },
+            }};
+
+            const metrics = ['statements', 'branches', 'functions', 'lines'];
+            for (const m of metrics) {
+              const valid = summaries.filter(s => s.total && s.total[m]);
+              merged.total[m].pct = valid.length > 0
+                ? Math.round(valid.reduce((a, s) => a + s.total[m].pct, 0) / valid.length)
+                : 0;
+            }
+
+            fs.mkdirSync('./coverage', { recursive: true });
+            fs.writeFileSync('./coverage/coverage-summary.json', JSON.stringify(merged, null, 2));
+            console.log('Merged summary:', JSON.stringify(merged.total, null, 2));
+          JS
+
       # ── Generate coverage charts in job summary ───────────────────────────
       - name: Display coverage charts
         if: always()
@@ -64,7 +122,7 @@ jobs:
             try {
               summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
             } catch (e) {
-              core.summary.addRaw('⚠️ Coverage summary not found.').write();
+              core.summary.addRaw('⚠️ Coverage summary not found. Make sure `@vitest/coverage-v8` is installed and coverage is configured in your vitest config files.').write();
               return;
             }
 
@@ -80,7 +138,7 @@ jobs:
             const avg     = Math.round(values.reduce((a, v) => a + v, 0) / values.length);
             const badge   = avg >= 80 ? '✅' : avg >= 50 ? '⚠️' : '❌';
 
-            // ── Bar chart (quickchart.io) ───────────────────────────────────
+            // ── Bar chart ─────────────────────────────────────────────────
             const barChart = {
               type: 'bar',
               data: {
@@ -111,16 +169,12 @@ jobs:
                   legend: { display: false },
                 },
                 scales: {
-                  y: {
-                    min: 0,
-                    max: 100,
-                    ticks: { callback: (v) => v + '%' },
-                  },
+                  y: { min: 0, max: 100, ticks: { callback: (v) => v + '%' } },
                 },
               },
             };
 
-            // ── Pie chart (quickchart.io) ──────────────────────────────────
+            // ── Pie chart ─────────────────────────────────────────────────
             const pieChart = {
               type: 'pie',
               data: {
@@ -150,10 +204,6 @@ jobs:
               'https://quickchart.io/chart?w=500&h=300&c=' +
               encodeURIComponent(JSON.stringify(chart));
 
-            const barUrl = encode(barChart);
-            const pieUrl = encode(pieChart);
-
-            // ── Bar table ─────────────────────────────────────────────────
             function bar(pct) {
               const filled = Math.round(pct / 5);
               const empty  = 20 - filled;
@@ -163,20 +213,16 @@ jobs:
 
             let md = `## ${badge} Code Coverage Report\n\n`;
             md += `> Average coverage: **${avg}%**\n\n`;
-
-            // Table
             md += `| Metric | Coverage |\n`;
             md += `|--------|----------|\n`;
             for (const [label, pct] of Object.entries(metrics)) {
               md += `| **${label}** | ${bar(pct)} |\n`;
             }
             md += `\n> 🟩 = 80%+  &nbsp; 🟨 = 50–79%  &nbsp; 🟥 = below 50%\n\n`;
-
-            // Charts
             md += `### 📊 Bar Chart\n`;
-            md += `![Coverage Bar Chart](${barUrl})\n\n`;
+            md += `![Coverage Bar Chart](${encode(barChart)})\n\n`;
             md += `### 🥧 Pie Chart\n`;
-            md += `![Coverage Pie Chart](${pieUrl})\n`;
+            md += `![Coverage Pie Chart](${encode(pieChart)})\n`;
 
             await core.summary.addRaw(md).write();
 
