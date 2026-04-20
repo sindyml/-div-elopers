@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - My Contributions</title>
-    <link rel="stylesheet" href="contributions.css">
+    <link rel="stylesheet" href="../css/contributions.css">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
             getCurrentUserId,
             getUserGroups,
             listenToMemberContributions
-        } from './contributions.js';
+        } from '../js/contributions.js';
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -249,7 +249,7 @@
                 const viewPayoutBtn = document.createElement('button');
                 viewPayoutBtn.textContent = 'View Payout Schedule';
                 viewPayoutBtn.addEventListener('click', () => {
-                    window.location.href = `payout.html?groupId=${group.id}&returnTo=my`;
+                    window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=my`;
                 });
                 listItem.appendChild(viewPayoutBtn);
                 
@@ -270,7 +270,7 @@
             payoutBtn.textContent = 'View Payout Schedule';
             payoutBtn.style.marginBottom = '1rem';
             payoutBtn.addEventListener('click', () => {
-                window.location.href = `payout.html?groupId=${singleGroup.id}&returnTo=my`;
+                window.location.href = `contributions-payout.html?groupId=${singleGroup.id}&returnTo=my`;
             });
             container.appendChild(payoutBtn);
             
