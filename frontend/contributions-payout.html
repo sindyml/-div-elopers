@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Payout Schedule</title>
-    <link rel="stylesheet" href="contributions.css">
+    <link rel="stylesheet" href="css/contributions.css">
 </head>
 <body>
 
@@ -23,14 +23,14 @@
     </main>
 
     <script type="module">
-        import { auth } from '../js/firebase-config.js';
+        import { auth } from 'js/firebase-config.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getPayoutSchedule,
             getGroupById,
             getCurrentUserId,
             getUserGroups
-        } from './contributions.js';
+        } from 'js/contributions.js';
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -40,21 +40,21 @@
         async function logout() {
             try {
                 await signOut(auth);
-                window.location.href = '../login.html';
+                window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
             }
         }
 
         function goToDashboard() {
-            window.location.href = '../dashboard.html';
+            window.location.href = 'dashboard.html';
         }
 
         function goBack() {
             if (document.referrer && document.referrer !== '') {
                 window.history.back();
             } else {
-                window.location.href = '../dashboard.html';
+                window.location.href = 'dashboard.html';
             }
         }
 
@@ -137,7 +137,7 @@
         const viewButton = document.createElement('button');
         viewButton.textContent = 'View Payout Schedule';
         viewButton.addEventListener('click', () => {
-            window.location.href = `payout.html?groupId=${group.id}&returnTo=dashboard`;
+            window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=dashboard`;
         });
         listItem.appendChild(viewButton);
         

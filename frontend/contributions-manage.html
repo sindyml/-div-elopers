@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Manage Contributions</title>
-    <link rel="stylesheet" href="contributions.css">
+    <link rel="stylesheet" href="css/contributions.css">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
     </main>
 
     <script type="module">
-        import { auth, db } from '../js/firebase-config.js';
+        import { auth, db } from 'js/firebase-config.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { 
@@ -33,7 +33,7 @@
             getMemberName,
             updateContributionStatus,
             listenToGroupContributions
-        } from './contributions.js';
+        } from 'js/contributions.js';
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -41,14 +41,14 @@
         async function logout() {
             try {
                 await signOut(auth);
-                window.location.href = '../login.html';
+                window.location.href = 'login.html';
             } catch (error) {
                 console.error('Logout failed:', error);
             }
         }
 
         function goToDashboard() {
-            window.location.href = '../dashboard.html';
+            window.location.href = 'dashboard.html';
         }
 
         function goBack() {
@@ -65,7 +65,7 @@
             if (document.referrer && document.referrer !== '') {
                 window.history.back();
             } else {
-                window.location.href = '../dashboard.html';
+                window.location.href = 'dashboard.html';
             }
         }
 
@@ -151,7 +151,7 @@
             payoutButton.textContent = 'View Payout Schedule';
             payoutButton.style.marginTop = '1rem';
             payoutButton.addEventListener('click', () => {
-                window.location.href = `payout.html?groupId=${groupId}&returnTo=manage`;
+                window.location.href = `contributions-payout.html?groupId=${groupId}&returnTo=manage`;
             });
             container.appendChild(payoutButton);
 
@@ -251,7 +251,7 @@
         async function loadManagePage() {
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
-                window.location.href = '../login.html';
+                window.location.href = 'login.html';
                 return;
             }
 
