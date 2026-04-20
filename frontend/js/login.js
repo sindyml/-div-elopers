@@ -101,7 +101,7 @@ if (githubBtn) {
 }
 
 // MICROSOFT OAUTH
-const microsoftBtn = document.getElementById("microsoftRegisterBtn");
+const microsoftBtn = document.getElementById("microsoftLoginBtn");
 if (microsoftBtn) {
   microsoftBtn.addEventListener("click", () => {
     const provider = new OAuthProvider("microsoft.com");

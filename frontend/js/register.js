@@ -139,5 +139,11 @@ if (githubBtn) {
   });
 }
 
-// STEP 8: 
+// STEP 8: MICROSOFT OAUTH BUTTON
+const microsoftBtn = document.getElementById("microsoftRegisterBtn");
+if (microsoftBtn) {
+  microsoftBtn.addEventListener("click", () => {
+    const provider = new OAuthProvider("microsoft.com");
+    handleOAuthSignIn(provider, "microsoft");
+  });
 }
