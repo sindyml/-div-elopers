@@ -52,24 +52,135 @@ jobs:
           FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080'
           FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099'
 
-      # ── Display coverage summary in GitHub Actions job summary ────────────
-      - name: Display coverage summary
+      # ── Generate coverage charts in job summary ───────────────────────────
+      - name: Display coverage charts
         if: always()
-        run: |
-          echo "## 🧪 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Frontend Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          cat coverage/coverage-summary.json 2>/dev/null | npx --yes json -e '
-            const s = this.total;
-            console.log("Statements : " + s.statements.pct + "%");
-            console.log("Branches   : " + s.branches.pct + "%");
-            console.log("Functions  : " + s.functions.pct + "%");
-            console.log("Lines      : " + s.lines.pct + "%");
-          ' >> $GITHUB_STEP_SUMMARY || echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
 
-      # ── Upload coverage artifact so you can download the full HTML report ─
+            let summary;
+            try {
+              summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+            } catch (e) {
+              core.summary.addRaw('⚠️ Coverage summary not found.').write();
+              return;
+            }
+
+            const total = summary.total;
+            const metrics = {
+              Statements: total.statements.pct,
+              Branches:   total.branches.pct,
+              Functions:  total.functions.pct,
+              Lines:      total.lines.pct,
+            };
+            const labels  = Object.keys(metrics);
+            const values  = Object.values(metrics);
+            const avg     = Math.round(values.reduce((a, v) => a + v, 0) / values.length);
+            const badge   = avg >= 80 ? '✅' : avg >= 50 ? '⚠️' : '❌';
+
+            // ── Bar chart (quickchart.io) ───────────────────────────────────
+            const barChart = {
+              type: 'bar',
+              data: {
+                labels,
+                datasets: [{
+                  label: 'Coverage %',
+                  data: values,
+                  backgroundColor: values.map(v =>
+                    v >= 80 ? 'rgba(34,197,94,0.8)' :
+                    v >= 50 ? 'rgba(234,179,8,0.8)' :
+                              'rgba(239,68,68,0.8)'
+                  ),
+                  borderColor: values.map(v =>
+                    v >= 80 ? 'rgba(22,163,74,1)' :
+                    v >= 50 ? 'rgba(202,138,4,1)' :
+                              'rgba(220,38,38,1)'
+                  ),
+                  borderWidth: 2,
+                }],
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: `Code Coverage — Average: ${avg}%`,
+                    font: { size: 16 },
+                  },
+                  legend: { display: false },
+                },
+                scales: {
+                  y: {
+                    min: 0,
+                    max: 100,
+                    ticks: { callback: (v) => v + '%' },
+                  },
+                },
+              },
+            };
+
+            // ── Pie chart (quickchart.io) ──────────────────────────────────
+            const pieChart = {
+              type: 'pie',
+              data: {
+                labels,
+                datasets: [{
+                  data: values,
+                  backgroundColor: [
+                    'rgba(34,197,94,0.8)',
+                    'rgba(59,130,246,0.8)',
+                    'rgba(168,85,247,0.8)',
+                    'rgba(249,115,22,0.8)',
+                  ],
+                }],
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Coverage Distribution',
+                    font: { size: 16 },
+                  },
+                },
+              },
+            };
+
+            const encode = (chart) =>
+              'https://quickchart.io/chart?w=500&h=300&c=' +
+              encodeURIComponent(JSON.stringify(chart));
+
+            const barUrl = encode(barChart);
+            const pieUrl = encode(pieChart);
+
+            // ── Bar table ─────────────────────────────────────────────────
+            function bar(pct) {
+              const filled = Math.round(pct / 5);
+              const empty  = 20 - filled;
+              const color  = pct >= 80 ? '🟩' : pct >= 50 ? '🟨' : '🟥';
+              return color.repeat(filled) + '⬜'.repeat(empty) + `  **${pct}%**`;
+            }
+
+            let md = `## ${badge} Code Coverage Report\n\n`;
+            md += `> Average coverage: **${avg}%**\n\n`;
+
+            // Table
+            md += `| Metric | Coverage |\n`;
+            md += `|--------|----------|\n`;
+            for (const [label, pct] of Object.entries(metrics)) {
+              md += `| **${label}** | ${bar(pct)} |\n`;
+            }
+            md += `\n> 🟩 = 80%+  &nbsp; 🟨 = 50–79%  &nbsp; 🟥 = below 50%\n\n`;
+
+            // Charts
+            md += `### 📊 Bar Chart\n`;
+            md += `![Coverage Bar Chart](${barUrl})\n\n`;
+            md += `### 🥧 Pie Chart\n`;
+            md += `![Coverage Pie Chart](${pieUrl})\n`;
+
+            await core.summary.addRaw(md).write();
+
+      # ── Upload full HTML coverage report as artifact ──────────────────────
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
