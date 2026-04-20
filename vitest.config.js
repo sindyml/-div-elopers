@@ -8,11 +8,10 @@ export default defineConfig({
     include: ['tests/frontend/**/*.test.js'],
     exclude: ['tests/integration/**'],
     setupFiles: ['./tests/frontend/setup.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary', 'html'],
+      reportsDirectory: './coverage/frontend',
+    },
   },
-// add to both vitest.config.js and vitest.integration.config.js
-coverage: {
-  provider: 'v8',
-  reporter: ['text', 'lcov', 'json-summary', 'html'],
-  reportsDirectory: './coverage/frontend',
-},
 });

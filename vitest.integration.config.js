@@ -6,11 +6,10 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['tests/integration/**/*.test.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'json-summary', 'html'],
+      reportsDirectory: './coverage/integration',
+    },
   },
-// add to both vitest.config.js and vitest.integration.config.js
-coverage: {
-  provider: 'v8',
-  reporter: ['text', 'lcov', 'json-summary', 'html'],
-  reportsDirectory: './coverage/integration',
-},
 });
