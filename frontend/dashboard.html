@@ -130,6 +130,12 @@
               <ul id="grouplist" class="members-widget__list" aria-label="List of your stokvel groups"></ul>
             </div>
 
+            <!-- Current Group Members list -->
+            <div id="members-list-block" class="members-widget__block" style="display: none;">
+              <h3 class="members-widget__heading">Members in <span id="current-group-name"></span></h3>
+              <ul id="memberlist" class="members-widget__list" aria-label="List of members in selected group"></ul>
+            </div>
+
             <!-- Invite Member form (P3) -->
             <div class="members-widget__block">
               <h3 class="members-widget__heading">Invite Member</h3>
@@ -193,6 +199,9 @@
     const auth = firebase.auth();
 
     const grouplist     = document.getElementById('grouplist');
+    const memberlist    = document.getElementById('memberlist');
+    const membersBlock  = document.getElementById('members-list-block');
+    const currentGroupNameEl = document.getElementById('current-group-name');
     const inviteForm    = document.getElementById('invite-form');
     const inviteMessage = document.getElementById('inviteMessage');
 
@@ -211,6 +220,52 @@
     };
 
     /* ── Load and render the user's groups ────────────────── */
+    const loadMembers = async (groupId, groupName) => {
+      if (!memberlist) return;
+      memberlist.innerHTML = '<li>Loading members...</li>';
+      membersBlock.style.display = 'block';
+      currentGroupNameEl.textContent = groupName;
+
+      try {
+        const membersSnap = await db.collection('groups').doc(groupId).collection('members').get();
+        memberlist.innerHTML = '';
+
+        const memberPromises = membersSnap.docs.map(async (docSnap) => {
+          const memberData = docSnap.data();
+          let displayName = 'User ' + docSnap.id.substring(0, 5);
+
+          try {
+            const userDoc = await db.collection('users').doc(docSnap.id).get();
+            if (userDoc.exists) {
+              displayName = userDoc.data().displayName || userDoc.data().name || userDoc.data().email || displayName;
+            }
+          } catch (e) { console.error(e); }
+
+          return { displayName, role: memberData.role };
+        });
+
+        const members = await Promise.all(memberPromises);
+
+        members.forEach(member => {
+          const li = document.createElement('li');
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = member.displayName;
+
+          const roleSmall = document.createElement('small');
+          roleSmall.className = 'badge';
+          roleSmall.textContent = member.role;
+
+          li.appendChild(nameSpan);
+          li.appendChild(document.createTextNode(' '));
+          li.appendChild(roleSmall);
+          memberlist.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+        memberlist.innerHTML = '<li>Error loading members</li>';
+      }
+    };
+
     const loadGroups = async () => {
       const user = auth.currentUser;
       if (!user || !grouplist) return;
@@ -233,9 +288,13 @@
           li.setAttribute('role', 'button');
           li.setAttribute('tabindex', '0');
           li.onclick = async () => {
-            selectedGroupId = group.id;
-            userRole = await getUserRole(group.id);
-            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+            if (window.switchGroup) {
+              await window.switchGroup(group.id, group.name);
+            } else {
+              selectedGroupId = group.id;
+              userRole = await getUserRole(group.id);
+              await loadMembers(group.id, group.name);
+            }
           };
           grouplist.appendChild(li);
         }
@@ -303,6 +362,34 @@
       }
     };
 
+    window.switchGroup = async (groupId, groupName) => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      selectedGroupId = groupId;
+      userRole = await getUserRole(groupId);
+      await loadMembers(groupId, groupName);
+
+      // Update main dashboard stats and SA widget
+      if (window.loadDashboardData) {
+        const balance = await window.loadDashboardData(user, groupId);
+        if (window.renderSAWidget) {
+          await window.renderSAWidget(balance);
+          window.wireRefreshButton(balance);
+        }
+      }
+
+      // Update Meetings widget for this group specifically
+      if (window.startDashboardMeetingListener) {
+        window.startDashboardMeetingListener([groupId]);
+      }
+
+      // Update P4 widgets
+      if (window.updateP4Widgets) {
+        await window.updateP4Widgets(groupId);
+      }
+    };
+
     /* ── Auth listener: check invites then load groups ────── */
     auth.onAuthStateChanged(async (user) => {
       if (user) {
@@ -331,6 +418,10 @@
         .get();
       return snap.docs.map(d => d.data().groupId);
     }
+
+    window.startDashboardMeetingListener = (groupIds) => {
+      startDashboardMeetingListener(groupIds);
+    };
 
     /* ── Format helpers ──────────────────────────────────── */
     function fmtDate(iso) {
@@ -462,6 +553,22 @@
     const payoutViewAll          = document.getElementById('payout-view-all');
 
     let unsubContributions = null;
+    let currentGroupMap = {};
+
+    window.updateP4Widgets = async (groupId) => {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      // Update Payout widget
+      await loadPayoutWidget(user.uid, [groupId]);
+
+      // Contribution listener already filters by userId,
+      // but we might want to refresh the groupMap if names changed
+      const doc = await db.collection('groups').doc(groupId).get();
+      if (doc.exists) {
+        currentGroupMap[groupId] = doc.data().name;
+      }
+    };
 
     /* ── Resolve which groups this user belongs to ───────── */
     async function getUserGroupIds(uid) {
@@ -520,7 +627,7 @@
 
       /* Show the 5 most recent */
       contributions.slice(0, 5).forEach(c => {
-        const groupName = groupMap[c.groupId] || 'Unknown group';
+        const groupName = groupMap[c.groupId] || currentGroupMap[c.groupId] || 'Unknown group';
         ul.appendChild(buildContributionItem(c, groupName));
       });
 

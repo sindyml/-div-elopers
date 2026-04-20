@@ -212,7 +212,7 @@
   }
 
   // ── Load user & group data from Firestore ────────────────
-  async function loadDashboardData(user) {
+  async function loadDashboardData(user, groupId = null) {
     // Set display name
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) {
@@ -225,24 +225,38 @@
 
     // Try to load group data (P3 will flesh this out)
     try {
-      const groupsSnap = await db
-        .collection('groups')
-        .where('members', 'array-contains', user.uid)
-        .limit(1)
-        .get();
+      let targetGroupId = groupId;
 
-      if (!groupsSnap.empty) {
-        const group = groupsSnap.docs[0].data();
-        groupBalance = group.totalBalance || 0;
+      if (!targetGroupId) {
+        const membershipSnap = await db
+          .collection('memberships')
+          .where('uid', '==', user.uid)
+          .limit(1)
+          .get();
+        if (!membershipSnap.empty) {
+          targetGroupId = membershipSnap.docs[0].data().groupId;
+        }
+      }
 
-        const badgeEl = document.getElementById('group-name-badge');
-        if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
+      if (targetGroupId) {
+        const groupDoc = await db.collection('groups').doc(targetGroupId).get();
 
-        const balanceEl = document.getElementById('stat-balance');
-        if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupBalance = group.totalBalance || 0;
 
-        const membersEl = document.getElementById('stat-members');
-        if (membersEl) membersEl.textContent = group.members?.length || '—';
+          const badgeEl = document.getElementById('group-name-badge');
+          if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
+
+          const balanceEl = document.getElementById('stat-balance');
+          if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
+
+          const membersEl = document.getElementById('stat-members');
+          if (membersEl) {
+            const membersSnap = await db.collection('groups').doc(groupDoc.id).collection('members').get();
+            membersEl.textContent = membersSnap.size || '—';
+          }
+        }
       } else {
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) badgeEl.textContent = '🌿 No group yet';
@@ -255,6 +269,11 @@
 
     return groupBalance;
   }
+
+  // Expose to window so other scripts can trigger a refresh
+  window.loadDashboardData = loadDashboardData;
+  window.renderSAWidget     = renderSAWidget;
+  window.wireRefreshButton = wireRefreshButton;
 
   // ── Auth guard + init ─────────────────────────────────────
   function init() {
