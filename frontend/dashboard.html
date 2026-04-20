@@ -86,7 +86,7 @@
         <article class="card widget-section" aria-labelledby="contributions-heading">
           <header class="widget-section__header">
             <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
-            <a href="pages/contributions-my.html" class="widget-section__link">View all →</a>
+            <a href="contributions-my.html" class="widget-section__link">View all →</a>
           </header>
           <section id="contributions-container" aria-live="polite">
             <div class="contributions-widget-loading" aria-hidden="true">
@@ -152,7 +152,7 @@
         <article class="card widget-section" aria-labelledby="payout-heading">
           <header class="widget-section__header">
             <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
-            <a id="payout-view-all" href="pages/contributions-payout.html" class="widget-section__link">View all →</a>
+            <a id="payout-view-all" href="contributions-payout.html" class="widget-section__link">View all →</a>
           </header>
           <section id="payout-container" aria-live="polite">
             <div class="payout-widget-loading" aria-hidden="true">
@@ -611,7 +611,7 @@
 
         /* Update View all link with groupId */
         if (payoutViewAll && activeGroupId) {
-          payoutViewAll.href = 'pages/contributions-payout.html?groupId=' + activeGroupId;
+          payoutViewAll.href = 'contributions-payout.html?groupId=' + activeGroupId;
         }
 
         /* Update stat card — next payout */
