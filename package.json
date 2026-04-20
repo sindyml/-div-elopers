@@ -7,10 +7,10 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
-    "test:backend": "jest", 
-     "test:frontend": "vitest run --config vitest.config.js",
-  "test:integration": "firebase emulators:exec --only auth,firestore \"vitest run --config vitest.integration.config.js\"",
-  "test:all": "npm run test:frontend && npm run test:integration"
+    "test:backend": "jest",
+    "test:frontend": "vitest run --config vitest.config.js",
+    "test:integration": "firebase emulators:exec --only auth,firestore \"vitest run --config vitest.integration.config.js\"",
+    "test:all": "npm run test:frontend && npm run test:integration"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -30,11 +30,10 @@
     "url": "https://github.com/SindyMl/-div-elopers/issues"
   },
   "homepage": "https://github.com/SindyMl/-div-elopers#readme",
-  "dependencies": {
-    "firebase": "^12.11.0"
-  },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
+    "firebase": "^12.12.0",
     "firebase-admin": "^13.8.0",
     "jest": "^30.3.0",
     "jsdom": "^29.0.2",

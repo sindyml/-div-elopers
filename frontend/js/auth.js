@@ -48,7 +48,7 @@ export async function roleGuard(requiredRole) {
 
   // If their role doesn't match what's required
   if (role !== requiredRole) {
-    alert("403: Access denied");  // Tell them they can't access
+    window.alert("403: Access denied");  // Tell them they can't access
     window.location.href = "dashboard.html";  // Send them back to dashboard
   }
 }

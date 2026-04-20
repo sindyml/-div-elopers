@@ -1,0 +1,79 @@
+name: Tests & Coverage
+
+on:
+  push:
+    branches: [main, MainWithTesting]
+  pull_request:
+    branches: [main, MainWithTesting]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout & Node setup ─────────────────────────────────────────────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Java (required by Firebase Emulator) ─────────────────────────────
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ── Firebase CLI ──────────────────────────────────────────────────────
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Cache Firebase Emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      # ── Frontend tests with coverage ──────────────────────────────────────
+      - name: Run frontend tests
+        run: npx vitest run --config vitest.config.js --coverage
+
+      # ── Integration tests with coverage ───────────────────────────────────
+      - name: Run integration tests
+        run: firebase emulators:exec --only auth,firestore "npx vitest run --config vitest.integration.config.js --coverage"
+        env:
+          FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080'
+          FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099'
+
+      # ── Display coverage summary in GitHub Actions job summary ────────────
+      - name: Display coverage summary
+        if: always()
+        run: |
+          echo "## 🧪 Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Frontend Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat coverage/coverage-summary.json 2>/dev/null | npx --yes json -e '
+            const s = this.total;
+            console.log("Statements : " + s.statements.pct + "%");
+            console.log("Branches   : " + s.branches.pct + "%");
+            console.log("Functions  : " + s.functions.pct + "%");
+            console.log("Lines      : " + s.lines.pct + "%");
+          ' >> $GITHUB_STEP_SUMMARY || echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      # ── Upload coverage artifact so you can download the full HTML report ─
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
