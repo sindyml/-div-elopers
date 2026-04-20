@@ -3,8 +3,8 @@
 
 export const mockData = {
     // Current logged-in user (change these to test different scenarios)
-    currentUserId: "treasurer_001",
-    currentUserRole: "Treasurer",  // Change to "Member" or "Admin" to test different roles
+    currentUserId: "user_123",
+    currentUserRole: "Member",  // Change to "Member" or "Admin" to test different roles
     
     // Mapping from userId to display name
     memberNames: {

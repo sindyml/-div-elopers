@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Users can create their own document on registration
+      allow create: if request.auth != null && request.auth.uid == userId;
+       
+      // Users can update their own data (but NOT their role)
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !(request.resource.data.role != resource.data.role);
+      
+      // No deleting user accounts
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // GROUPS COLLECTION
+    // ============================================
+    match /groups/{groupId} {
+      // All authenticated users can read groups
+      allow read: if request.auth != null;
+      
+      // Only Admins can create groups
+      allow create: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      
+      // Only the creator can update the group
+      allow update: if request.auth != null 
+        && resource.data.createdBy == /databases/$(database)/documents/users/$(request.auth.uid);
+      
+      // Only Admins can delete groups
+      allow delete: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+    
+    // ============================================
+    // CONTRIBUTIONS COLLECTION
+    // ============================================
+    match /contributions/{contributionId} {
+      // Members can read their own contributions
+      // Treasurers and Admins can read ALL contributions
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+      
+      // Members can create their own contributions
+      allow create: if request.auth != null 
+        && request.resource.data.userId == request.auth.uid;
+      
+      // Only Treasurers and Admins can update status (confirm/pending/missed)
+      allow update: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+      
+      // No deleting contributions
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // MEETINGS COLLECTION
+    // ============================================
+    match /meetings/{meetingId} {
+      // All authenticated users can read meetings
+      allow read: if request.auth != null;
+      
+      // Only Treasurers and Admins can create meetings
+      allow create: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+      
+      // Only the creator can update meetings
+      allow update: if request.auth != null 
+        && resource.data.createdBy == /databases/$(database)/documents/users/$(request.auth.uid);
+      
+      // Only Admins can delete meetings
+      allow delete: if request.auth != null 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+    
+    // ============================================
+    // PAYOUTS COLLECTION
+    // ============================================
+    match /payouts/{payoutId} {
+      // All authenticated users can read payouts
+      allow read: if request.auth != null;
+      
+      // Only Admins and Treasurers can create/update payouts
+      allow write: if request.auth != null && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer'
+      );
+    }
+  }
+}

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Payout Schedule</title>
-    <link rel="stylesheet" href="contributions.css">
+    <link rel="stylesheet" href="css/contributions.css">
 </head>
 <body>
 
@@ -23,13 +23,14 @@
     </main>
 
     <script type="module">
-        import { auth } from '../js/firebase-config.js';
+        import { auth } from 'js/firebase-config.js';
         import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getPayoutSchedule,
             getGroupById,
-            getCurrentUserId
-        } from './contributions.js';
+            getCurrentUserId,
+            getUserGroups
+        } from 'js/contributions.js';
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -113,28 +114,76 @@
             container.appendChild(p);
         }
 
+        function displayGroupSelector(groups) {
+    const container = document.getElementById('payoutContent');
+    container.innerHTML = '<h2>Select a group to view payout schedule</h2>';
+    
+    const groupList = document.createElement('ul');
+    groupList.style.listStyle = 'none';
+    groupList.style.padding = '0';
+    
+    groups.forEach(group => {
+        const listItem = document.createElement('li');
+        listItem.style.margin = '1rem';
+        listItem.style.padding = '1rem';
+        listItem.style.border = '1px solid #ddd';
+        listItem.style.borderRadius = '8px';
+        
+        const groupName = document.createElement('strong');
+        groupName.textContent = group.name;
+        listItem.appendChild(groupName);
+        listItem.appendChild(document.createElement('br'));
+        
+        const viewButton = document.createElement('button');
+        viewButton.textContent = 'View Payout Schedule';
+        viewButton.addEventListener('click', () => {
+            window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=dashboard`;
+        });
+        listItem.appendChild(viewButton);
+        
+        groupList.appendChild(listItem);
+    });
+    
+    container.appendChild(groupList);
+}
+
         async function loadPayoutPage() {
-            const currentUserId = getCurrentUserId();
-            if (!currentUserId) {
-                window.location.href = 'login.html';
-                return;
-            }
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) {
+        window.location.href = 'login.html';
+        return;
+    }
 
-            const groupId = getUrlParameter('groupId');
+    let groupId = getUrlParameter('groupId');
+    const returnTo = getUrlParameter('returnTo');
 
-            if (!groupId) {
-                displayError('No group selected. Please go back and choose a group.');
-                return;
-            }
-
-            const group = await getGroupById(groupId);
-            if (!group) {
-                displayError('Group not found. Please go back and try again.');
-                return;
-            }
-
-            await displayPayoutSchedule(groupId, group.name);
+    // If no groupId in URL, let user pick a group
+    if (!groupId) {
+        const groups = await getUserGroups(currentUserId);
+        
+        if (groups.length === 0) {
+            displayError('You are not a member of any group.');
+            return;
         }
+        
+        if (groups.length === 1) {
+            // Auto-select the only group
+            groupId = groups[0].id;
+        } else {
+            // Show group selector
+            displayGroupSelector(groups);
+            return;
+        }
+    }
+
+    const group = await getGroupById(groupId);
+    if (!group) {
+        displayError('Group not found. Please go back and try again.');
+        return;
+    }
+
+    await displayPayoutSchedule(groupId, group.name, returnTo);
+}
 
         document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
         document.getElementById('backButton').addEventListener('click', goBack);

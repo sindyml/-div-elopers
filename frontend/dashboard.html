@@ -86,7 +86,7 @@
         <article class="card widget-section" aria-labelledby="contributions-heading">
           <header class="widget-section__header">
             <h2 id="contributions-heading" class="widget-section__title">💰 Recent Contributions</h2>
-            <a href="contributions/my.html" class="widget-section__link">View all →</a>
+            <a href="contributions-my.html" class="widget-section__link">View all →</a>
           </header>
           <section id="contributions-container" aria-live="polite">
             <div class="contributions-widget-loading" aria-hidden="true">
@@ -152,7 +152,7 @@
         <article class="card widget-section" aria-labelledby="payout-heading">
           <header class="widget-section__header">
             <h2 id="payout-heading" class="widget-section__title">📊 Payout Schedule</h2>
-            <a id="payout-view-all" href="contributions/payout.html" class="widget-section__link">View all →</a>
+            <a id="payout-view-all" href="contributions-payout.html" class="widget-section__link">View all →</a>
           </header>
           <section id="payout-container" aria-live="polite">
             <div class="payout-widget-loading" aria-hidden="true">
@@ -179,17 +179,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-  <!-- Initialize Firebase compat SDK (js/firebase-config.js is ES-module only) -->
-  <script>
-    firebase.initializeApp({
-      apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
-      authDomain: "stokvel-database.firebaseapp.com",
-      projectId: "stokvel-database",
-      storageBucket: "stokvel-database.firebasestorage.app",
-      messagingSenderId: "997328421094",
-      appId: "1:997328421094:web:9f88bf8ac720b118d97b27"
-    });
-  </script>
+  <!-- Initialize Firebase compat SDK from server config -->
+  <script src="js/firebase-compat-init.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
   <script src="js/sa-data.js"></script>
@@ -620,7 +611,7 @@
 
         /* Update View all link with groupId */
         if (payoutViewAll && activeGroupId) {
-          payoutViewAll.href = 'contributions/payout.html?groupId=' + activeGroupId;
+          payoutViewAll.href = 'contributions-payout.html?groupId=' + activeGroupId;
         }
 
         /* Update stat card — next payout */
