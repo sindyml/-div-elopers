@@ -1,43 +1,16 @@
-/* ============================================================
-   dashboard.js — Dashboard Page Controller
-   
-   Responsibilities (P6):
-   - Auth guard: redirect to login if not signed in
-   - Load user display name and group info from Firestore
-   - Render the SA Data savings projection widget
-   - Wire up the refresh button
-   
-   Other teams wire in their own sections:
-   - P3 → #members-container, #group-name-badge
-   - P4 → #contributions-container, #payout-container, stat cards
-   - P5 → #meetings-container, #notification-root
-   ============================================================ */
+// js/dashboard.js
+import { auth } from "./firebase-config.js";
+import { getUserGroups } from "./groupService.js";
+import { SA_DATA_DEFAULTS } from "./constants.js";
 
 (function () {
+  // SA Data config
+  const SA_STATIC = SA_DATA_DEFAULTS;
 
-  // ── Firestore reference (compat SDK) ─────────────────────
-  const db = typeof firebase !== 'undefined' && firebase.firestore
-    ? firebase.firestore()
-    : null;
-
-  // ── SA Data config (updated each sprint) ─────────────────
-  // Current as of Sprint 1 (April 2026)
-  // Source: SARB MPC decision March 26 2026 — rate held at 6.75% repo
-  const SA_STATIC = {
-    primeRate:     10.25,   // Prime = repo (6.75%) + 3.5%
-    inflationRate:  4.0,    // SARB Q2 2026 forecast
-    repoRate:       6.75,
-    lastUpdated:   'March 2026',
-  };
-
-  // ── Frankfurter API — no key, no CORS issues ─────────────
-  // Returns ZAR per 1 USD
   const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
   const AZURE_FALLBACK  = '/api/getSAData';
   const CACHE_KEY        = 'stokpal_usd_zar';
   const CACHE_DURATION   = 4 * 60 * 60 * 1000; // 4 hours
-
-  // ── Helpers ───────────────────────────────────────────────
 
   function fmt(num, decimals = 2) {
     return 'R ' + Number(num).toLocaleString('en-ZA', {
@@ -62,12 +35,10 @@
     } catch { /* ignore */ }
   }
 
-  // ── Fetch live USD/ZAR from Frankfurter ──────────────────
   async function fetchUSDZAR() {
     const cached = readCache();
     if (cached) return { zarPerUsd: cached.value, fromCache: true, live: false };
 
-    // 1. Try Frankfurter API directly
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
@@ -75,7 +46,6 @@
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      // Frankfurter v1 response: { amount:1, base:"USD", date:"...", rates:{ ZAR:18.xx } }
       const zarPerUsd = data.rates?.ZAR ?? 18.5;
       writeCache(zarPerUsd);
       return { zarPerUsd, fromCache: false, live: true };
@@ -83,7 +53,6 @@
       console.warn('[SA Data] Frankfurter API failed:', err.message);
     }
 
-    // 2. Fallback: Azure Function proxy (avoids CORS)
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
@@ -98,11 +67,9 @@
       console.warn('[SA Data] Azure proxy failed:', err.message);
     }
 
-    // 3. Static fallback
     return { zarPerUsd: 18.50, fromCache: false, live: false };
   }
 
-  // ── Render the SA Widget ──────────────────────────────────
   async function renderSAWidget(groupBalance = 0, forceRefresh = false) {
     const container = document.getElementById('sa-widget-container');
     if (!container) return;
@@ -111,7 +78,6 @@
       try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
     }
 
-    // Show skeleton while loading
     container.innerHTML = `
       <div class="sa-widget-skeleton">
         <div class="skeleton-block skeleton-block--wide"></div>
@@ -127,12 +93,10 @@
     const { zarPerUsd, fromCache, live } = await fetchUSDZAR();
     const elapsed = Date.now() - start;
 
-    // Savings projection
     const monthlyInterest = groupBalance * (SA_STATIC.primeRate / 100) / 12;
     const annualGrowth    = groupBalance * (SA_STATIC.primeRate / 100);
     const projectedYear   = groupBalance + annualGrowth;
 
-    // Source label
     let sourceLabel;
     if (live)           sourceLabel = `Live · Frankfurter API · ${elapsed}ms`;
     else if (fromCache) sourceLabel = `Cached · Frankfurter API`;
@@ -142,8 +106,7 @@
 
     container.innerHTML = `
       <div class="sa-widget">
-        ${isFallback ? `<div class="sa-widget--fallback">⚠️ Could not reach exchange rate API — showing static values. Check your internet connection.</div>` : ''}
-        
+        ${isFallback ? `<div class="sa-widget--fallback">⚠️ Could not reach exchange rate API — showing static values.</div>` : ''}
         <div class="sa-widget__stats">
           <div class="sa-widget__stat">
             <div class="sa-widget__stat-value">${SA_STATIC.primeRate}%</div>
@@ -158,9 +121,7 @@
             <div class="sa-widget__stat-label">USD / ZAR</div>
           </div>
         </div>
-
         <div class="sa-widget__divider"></div>
-
         ${groupBalance > 0 ? `
         <div class="sa-widget__projection">
           <p class="sa-widget__proj-title">💡 Savings Projection — ${SA_STATIC.primeRate}% Prime Rate</p>
@@ -191,14 +152,12 @@
           </p>
         </div>
         `}
-
         <p class="sa-widget__updated">
           SARB data: ${SA_STATIC.lastUpdated} &nbsp;·&nbsp; ${sourceLabel}
         </p>
       </div>`;
   }
 
-  // ── Wire refresh button ───────────────────────────────────
   function wireRefreshButton(groupBalance) {
     const btn = document.getElementById('sa-refresh-btn');
     if (!btn) return;
@@ -211,77 +170,49 @@
     });
   }
 
-  // ── Load user & group data from Firestore ────────────────
   async function loadDashboardData(user) {
-    // Set display name
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) {
-      nameEl.textContent = user.displayName
-        ? user.displayName.split(' ')[0]   // first name only
-        : user.email;
+      nameEl.textContent = user.displayName ? user.displayName.split(' ')[0] : user.email;
     }
 
     let groupBalance = 0;
-
-    // Try to load group data (P3 will flesh this out)
     try {
-      const groupsSnap = await db
-        .collection('groups')
-        .where('members', 'array-contains', user.uid)
-        .limit(1)
-        .get();
-
-      if (!groupsSnap.empty) {
-        const group = groupsSnap.docs[0].data();
+      const groups = await getUserGroups(user.uid);
+      if (groups.length > 0) {
+        const group = groups[0];
         groupBalance = group.totalBalance || 0;
-
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
-
         const balanceEl = document.getElementById('stat-balance');
         if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
-
         const membersEl = document.getElementById('stat-members');
-        if (membersEl) membersEl.textContent = group.members?.length || '—';
+        if (membersEl) membersEl.textContent = group.membersCount || '—';
       } else {
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) badgeEl.textContent = '🌿 No group yet';
       }
     } catch (err) {
       console.warn('[Dashboard] Could not load group data:', err.message);
-      const badgeEl = document.getElementById('group-name-badge');
-      if (badgeEl) badgeEl.textContent = '🌿 My Stokvel';
     }
-
     return groupBalance;
   }
 
-  // ── Auth guard + init ─────────────────────────────────────
   function init() {
-    if (typeof firebase === 'undefined' || !firebase.auth) {
-      console.error('[Dashboard] Firebase not loaded');
-      return;
-    }
-
-    firebase.auth().onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged(async (user) => {
       if (!user) {
-        // Not logged in — redirect to login
         window.location.href = 'login.html';
         return;
       }
-
-      // Logged in — load data then render widget
       const groupBalance = await loadDashboardData(user);
       await renderSAWidget(groupBalance);
       wireRefreshButton(groupBalance);
     });
   }
 
-  // Run after DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-
 })();
