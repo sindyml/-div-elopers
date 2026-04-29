@@ -324,11 +324,11 @@ import { COLLECTIONS, ROLES } from "./constants.js";
       if (user) {
         await checkAndAcceptInvites(user);
         const groupIds = await loadGroups(user.uid);
+        const groupDetails = await Promise.all(groupIds.map(id => getGroupDetails(id)));
         const groupMap = {};
-        for(const id of groupIds) {
-            const details = await getGroupDetails(id);
-            if(details) groupMap[id] = details.name;
-        }
+        groupIds.forEach((id, i) => {
+            if (groupDetails[i]) groupMap[id] = groupDetails[i].name;
+        });
         startMeetingListener(groupIds);
         startContributionListener(user.uid, groupMap);
         await loadPayoutWidget(user.uid, groupIds);

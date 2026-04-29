@@ -33,7 +33,7 @@ service cloud.firestore {
       
       // Only the creator can update the group
       allow update: if request.auth != null 
-        && resource.data.createdBy == /databases/$(database)/documents/users/$(request.auth.uid);
+        && resource.data.createdBy == request.auth.uid;
       
       // Only Admins can delete groups
       allow delete: if request.auth != null 
@@ -81,7 +81,7 @@ service cloud.firestore {
       
       // Only the creator can update meetings
       allow update: if request.auth != null 
-        && resource.data.createdBy == /databases/$(database)/documents/users/$(request.auth.uid);
+        && resource.data.createdBy == request.auth.uid;
       
       // Only Admins can delete meetings
       allow delete: if request.auth != null 
