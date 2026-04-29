@@ -81,7 +81,19 @@
       const amount    = document.getElementById('amount').value;
       const payout    = document.getElementById('payout').value;
       const frequency = document.getElementById('frequency').value;
-      const payoutOrder = payout ? payout.split(',').map(p => p.trim()) : [];
+
+      // Parse and normalize payout order: filter empty entries and de-duplicate
+      let payoutOrder = [];
+      if (payout) {
+        const rawOrder = payout.split(',').map(p => p.trim()).filter(p => p.length > 0);
+        payoutOrder = [...new Set(rawOrder)]; // Remove duplicates
+
+        // Validate that UIDs are non-empty and look reasonable
+        if (payoutOrder.length > 0 && payoutOrder.some(uid => uid.length < 3)) {
+          showMsg('Invalid payout order: UIDs must be at least 3 characters', 'error');
+          return;
+        }
+      }
 
       if (!auth.currentUser) {
         showMsg('You must be logged in.', 'error');
@@ -95,15 +107,61 @@
           name,
           contributionAmount: Number(amount),
           payoutOrder,
+          totalBalance: 0,
           meetingFrequency: frequency,
           createdBy: auth.currentUser.uid,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         await groupRef.collection('members').doc(auth.currentUser.uid).set({
+          uid: auth.currentUser.uid,
           role: 'admin',
           joinedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        // Create a membership record for quick dashboard lookups
+        await db.collection('memberships').doc(auth.currentUser.uid + '_' + groupRef.id).set({
+          uid: auth.currentUser.uid,
+          groupId: groupRef.id
+        });
+
+        // Initialize payouts if order provided
+        if (payoutOrder.length > 0) {
+          const batch = db.batch();
+
+          const payoutDetailsPromises = payoutOrder.map(async (uid, i) => {
+            let displayName = 'Member ' + (i + 1);
+            try {
+              const userDoc = await db.collection('users').doc(uid).get();
+              if (userDoc.exists) {
+                displayName = userDoc.data().displayName || userDoc.data().name || userDoc.data().email || displayName;
+              }
+            } catch (e) {
+              console.warn('Could not fetch user name for payout:', uid);
+            }
+            return { uid, displayName, order: i + 1 };
+          });
+
+          const payoutDetails = await Promise.all(payoutDetailsPromises);
+
+          for (const detail of payoutDetails) {
+            // Calculate payout date using calendar months instead of hard-coded 30 days
+            const payoutDate = new Date();
+            payoutDate.setMonth(payoutDate.getMonth() + (detail.order - 1));
+
+            const payoutRef = db.collection('payouts').doc();
+            batch.set(payoutRef, {
+              groupId: groupRef.id,
+              userId: detail.uid,
+              userDisplayName: detail.displayName,
+              order: detail.order,
+              amount: Number(amount),
+              payoutDate: firebase.firestore.Timestamp.fromDate(payoutDate),
+              status: 'pending'
+            });
+          }
+          await batch.commit();
+        }
 
         showMsg('Group created successfully!', 'success');
         form.reset();

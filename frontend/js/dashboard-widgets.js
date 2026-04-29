@@ -20,6 +20,9 @@ import { COLLECTIONS, ROLES } from "./constants.js";
 
 (function () {
     const grouplist     = document.getElementById('grouplist');
+    const memberlist    = document.getElementById('memberlist');
+    const membersBlock  = document.getElementById('members-list-block');
+    const currentGroupNameEl = document.getElementById('current-group-name');
     const inviteForm    = document.getElementById('invite-form');
     const inviteMessage = document.getElementById('inviteMessage');
     const meetingsContainer = document.getElementById('meetings-container');
@@ -37,6 +40,54 @@ import { COLLECTIONS, ROLES } from "./constants.js";
     let unsubMeetings     = null;
     let unsubContributions = null;
 
+    /* ── Load and render the user's group members ────────────── */
+    const loadMembers = async (groupId, groupName) => {
+      if (!memberlist) return;
+      memberlist.innerHTML = '<li>Loading members...</li>';
+      membersBlock.style.display = 'block';
+      currentGroupNameEl.textContent = groupName;
+
+      try {
+        const membersSnap = await getDocs(collection(db, `groups/${groupId}/members`));
+        memberlist.innerHTML = '';
+
+        const memberPromises = membersSnap.docs.map(async (docSnap) => {
+          const memberData = docSnap.data();
+          let displayName = 'User ' + docSnap.id.substring(0, 5);
+
+          try {
+            const userDoc = await getDocs(query(collection(db, COLLECTIONS.USERS), where('__name__', '==', docSnap.id), limit(1)));
+            if (!userDoc.empty) {
+              const userData = userDoc.docs[0].data();
+              displayName = userData.displayName || userData.name || userData.email || displayName;
+            }
+          } catch (e) { console.error(e); }
+
+          return { displayName, role: memberData.role };
+        });
+
+        const members = await Promise.all(memberPromises);
+
+        members.forEach(member => {
+          const li = document.createElement('li');
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = member.displayName;
+
+          const roleSmall = document.createElement('small');
+          roleSmall.className = 'badge';
+          roleSmall.textContent = member.role;
+
+          li.appendChild(nameSpan);
+          li.appendChild(document.createTextNode(' '));
+          li.appendChild(roleSmall);
+          memberlist.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+        memberlist.innerHTML = '<li>Error loading members</li>';
+      }
+    };
+
     const loadGroups = async (uid) => {
       if (!grouplist) return [];
       const groups = await getUserGroups(uid);
@@ -49,7 +100,22 @@ import { COLLECTIONS, ROLES } from "./constants.js";
           button.onclick = async () => {
             selectedGroupId = group.id;
             userRole = await getUserRoleInGroup(group.id, uid);
-            alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
+            await loadMembers(group.id, group.name);
+
+            // Update main dashboard stats and SA widget
+            if (window.loadDashboardData) {
+              const balance = await window.loadDashboardData(auth.currentUser, group.id);
+              if (window.renderSAWidget) {
+                await window.renderSAWidget(balance);
+                window.wireRefreshButton(balance);
+              }
+            }
+
+            // Update meetings widget for this group specifically
+            startMeetingListener([group.id]);
+
+            // Update payout widget for this group
+            await loadPayoutWidget(uid, [group.id]);
           };
           li.appendChild(button);
           grouplist.appendChild(li);
@@ -195,7 +261,14 @@ import { COLLECTIONS, ROLES } from "./constants.js";
         for (const gid of groupIds.slice(0, 5)) {
           const snap = await getDocs(query(collection(db, COLLECTIONS.PAYOUTS), where('groupId', '==', gid), orderBy('order', 'asc')));
           if (!snap.empty) {
-            payouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            payouts = snap.docs.map(d => {
+              const data = d.data();
+              // Convert Firestore Timestamp to ISO string for comparison
+              if (data.payoutDate && data.payoutDate.toDate) {
+                data.payoutDate = data.payoutDate.toDate().toISOString().slice(0, 10);
+              }
+              return { id: d.id, ...data };
+            });
             activeGroupId = gid;
             break;
           }

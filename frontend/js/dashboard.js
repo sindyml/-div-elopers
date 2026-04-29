@@ -1,5 +1,5 @@
 // js/dashboard.js
-import { auth } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import { getUserGroups } from "./groupService.js";
 import { SA_DATA_DEFAULTS } from "./constants.js";
 
@@ -158,19 +158,24 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
       </div>`;
   }
 
+  let refreshButtonWired = false;
   function wireRefreshButton(groupBalance) {
     const btn = document.getElementById('sa-refresh-btn');
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
+    if (!btn || refreshButtonWired) return;
+
+    btn.onclick = async () => {
       btn.classList.add('spinning');
       btn.disabled = true;
       await renderSAWidget(groupBalance, true);
       btn.classList.remove('spinning');
       btn.disabled = false;
-    });
+    };
+    refreshButtonWired = true;
   }
 
-  async function loadDashboardData(user) {
+  // ── Load user & group data from Firestore ────────────────
+  async function loadDashboardData(user, groupId = null) {
+    // Set display name
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) {
       nameEl.textContent = user.displayName ? user.displayName.split(' ')[0] : user.email;
@@ -178,16 +183,48 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
 
     let groupBalance = 0;
     try {
-      const groups = await getUserGroups(user.uid);
-      if (groups.length > 0) {
-        const group = groups[0];
-        groupBalance = group.totalBalance || 0;
-        const badgeEl = document.getElementById('group-name-badge');
-        if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
-        const balanceEl = document.getElementById('stat-balance');
-        if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
-        const membersEl = document.getElementById('stat-members');
-        if (membersEl) membersEl.textContent = group.membersCount || '—';
+      let targetGroupId = groupId;
+
+      if (!targetGroupId) {
+        const membershipSnap = await db
+          .collection('memberships')
+          .where('uid', '==', user.uid)
+          .limit(1)
+          .get();
+        if (!membershipSnap.empty) {
+          targetGroupId = membershipSnap.docs[0].data().groupId;
+        }
+      }
+
+      if (targetGroupId) {
+        const groupDoc = await db.collection('groups').doc(targetGroupId).get();
+
+        if (groupDoc.exists) {
+          const group = groupDoc.data();
+          groupBalance = group.totalBalance || 0;
+
+          const badgeEl = document.getElementById('group-name-badge');
+          if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
+
+          const balanceEl = document.getElementById('stat-balance');
+          if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
+
+          const membersEl = document.getElementById('stat-members');
+          if (membersEl) {
+            const membersSnap = await db.collection('groups').doc(groupDoc.id).collection('members').get();
+            membersEl.textContent = membersSnap.size ?? '—';
+          }
+        } else {
+          // Handle non-existent group (stale membership)
+          const badgeEl = document.getElementById('group-name-badge');
+          if (badgeEl) badgeEl.textContent = '🌿 No group yet';
+
+          const balanceEl = document.getElementById('stat-balance');
+          if (balanceEl) balanceEl.textContent = 'R 0';
+
+          const membersEl = document.getElementById('stat-members');
+          if (membersEl) membersEl.textContent = '—';
+        }
       } else {
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) badgeEl.textContent = '🌿 No group yet';
@@ -198,6 +235,12 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     return groupBalance;
   }
 
+  // Expose to window so other scripts can trigger a refresh
+  window.loadDashboardData = loadDashboardData;
+  window.renderSAWidget     = renderSAWidget;
+  window.wireRefreshButton = wireRefreshButton;
+
+  // ── Auth guard + init ─────────────────────────────────────
   function init() {
     auth.onAuthStateChanged(async (user) => {
       if (!user) {
