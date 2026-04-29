@@ -13,7 +13,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getUserGroups as fetchUserGroups } from '../js/groupService.js';
 import { getUserProfile } from '../js/userService.js';
-import { COLLECTIONS, ROLES } from '../js/constants.js';
+import { COLLECTIONS } from '../js/constants.js';
 
 function getCurrentUserId() {
     return auth.currentUser ? auth.currentUser.uid : null;

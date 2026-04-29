@@ -38,19 +38,20 @@ import { COLLECTIONS, ROLES } from "./constants.js";
     let unsubContributions = null;
 
     const loadGroups = async (uid) => {
-      if (!grouplist) return;
+      if (!grouplist) return [];
       const groups = await getUserGroups(uid);
       grouplist.innerHTML = '';
       groups.forEach(group => {
           const li = document.createElement('li');
-          li.textContent = group.name;
-          li.setAttribute('role', 'button');
-          li.setAttribute('tabindex', '0');
-          li.onclick = async () => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = group.name;
+          button.onclick = async () => {
             selectedGroupId = group.id;
             userRole = await getUserRoleInGroup(group.id, uid);
             alert('Selected: ' + group.name + ' (Role: ' + userRole + ')');
           };
+          li.appendChild(button);
           grouplist.appendChild(li);
       });
       return groups.map(g => g.id);
@@ -61,7 +62,7 @@ import { COLLECTIONS, ROLES } from "./constants.js";
         e.preventDefault();
         const email = document.getElementById('inviteEmail').value.trim();
         if (!selectedGroupId) { alert('Please select a group first'); return; }
-        if (userRole !== ROLES.ADMIN) { alert('Only admins can invite members'); return; }
+        if (userRole?.toLowerCase() !== ROLES.ADMIN.toLowerCase()) { alert('Only admins can invite members'); return; }
         try {
           await sendInvite(selectedGroupId, email, auth.currentUser.uid);
           inviteMessage.textContent = 'Invite Sent!';
@@ -94,14 +95,40 @@ import { COLLECTIONS, ROLES } from "./constants.js";
       const day = d.getDate();
       const monthStr = d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase();
       const title = (meeting.title || meeting.agenda?.split('\n')[0] || 'Untitled').substring(0, 50);
+
       const li = document.createElement('li');
       li.className = 'meeting-widget-item';
-      li.innerHTML = `
-        <time class="meeting-widget-date"><strong>${day}</strong><span>${monthStr}</span></time>
-        <div class="meeting-widget-info">
-          <p class="meeting-widget-title">${title}</p>
-          <small class="meeting-widget-meta">${meeting.time ? fmtTime(meeting.time) : ''}${meeting.location ? ' · ' + meeting.location : ''}</small>
-        </div>`;
+
+      const timeEl = document.createElement('time');
+      timeEl.className = 'meeting-widget-date';
+
+      const strongEl = document.createElement('strong');
+      strongEl.textContent = String(day);
+
+      const spanEl = document.createElement('span');
+      spanEl.textContent = monthStr;
+
+      timeEl.appendChild(strongEl);
+      timeEl.appendChild(spanEl);
+
+      const infoEl = document.createElement('div');
+      infoEl.className = 'meeting-widget-info';
+
+      const titleEl = document.createElement('p');
+      titleEl.className = 'meeting-widget-title';
+      titleEl.textContent = title;
+
+      const metaEl = document.createElement('small');
+      metaEl.className = 'meeting-widget-meta';
+      const metaText = `${meeting.time ? fmtTime(meeting.time) : ''}${meeting.location ? ' · ' + meeting.location : ''}`;
+      metaEl.textContent = metaText;
+
+      infoEl.appendChild(titleEl);
+      infoEl.appendChild(metaEl);
+
+      li.appendChild(timeEl);
+      li.appendChild(infoEl);
+
       return li;
     }
 
@@ -134,7 +161,20 @@ import { COLLECTIONS, ROLES } from "./constants.js";
             contributions.slice(0, 5).forEach(c => {
                 const li = document.createElement('li');
                 li.className = 'contribution-widget-item';
-                li.innerHTML = `<div class="contribution-widget-info"><p class="contribution-widget-amount">R ${c.amount}</p><small>${groupMap[c.groupId] || 'Group'} · ${fmtDate(c.date)}</small></div>`;
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'contribution-widget-info';
+
+                const amountP = document.createElement('p');
+                amountP.className = 'contribution-widget-amount';
+                amountP.textContent = `R ${c.amount}`;
+
+                const metaSmall = document.createElement('small');
+                metaSmall.textContent = `${groupMap[c.groupId] || 'Group'} · ${fmtDate(c.date)}`;
+
+                infoDiv.appendChild(amountP);
+                infoDiv.appendChild(metaSmall);
+                li.appendChild(infoDiv);
                 ul.appendChild(li);
             });
             contributionsContainer.innerHTML = '';
@@ -174,7 +214,32 @@ import { COLLECTIONS, ROLES } from "./constants.js";
             const isCurrentUser = p.userId === uid;
             const li = document.createElement('li');
             li.className = 'payout-widget-item' + (isCurrentUser ? ' payout-widget-item--you' : '');
-            li.innerHTML = `<div class="payout-widget-order">#${p.order}</div><div class="payout-widget-info"><p class="payout-widget-name">${p.userDisplayName}${isCurrentUser ? ' (You)' : ''}</p><small class="payout-widget-date">${fmtDate(p.payoutDate)}</small></div><div class="payout-widget-amount">${fmtRand(p.amount)}</div>`;
+
+            const orderDiv = document.createElement('div');
+            orderDiv.className = 'payout-widget-order';
+            orderDiv.textContent = `#${p.order}`;
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'payout-widget-info';
+
+            const nameP = document.createElement('p');
+            nameP.className = 'payout-widget-name';
+            nameP.textContent = p.userDisplayName + (isCurrentUser ? ' (You)' : '');
+
+            const dateSmall = document.createElement('small');
+            dateSmall.className = 'payout-widget-date';
+            dateSmall.textContent = fmtDate(p.payoutDate);
+
+            infoDiv.appendChild(nameP);
+            infoDiv.appendChild(dateSmall);
+
+            const amountDiv = document.createElement('div');
+            amountDiv.className = 'payout-widget-amount';
+            amountDiv.textContent = fmtRand(p.amount);
+
+            li.appendChild(orderDiv);
+            li.appendChild(infoDiv);
+            li.appendChild(amountDiv);
             ul.appendChild(li);
         });
         payoutContainer.innerHTML = '';

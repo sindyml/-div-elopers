@@ -1,5 +1,5 @@
 // js/firebase-compat-init.js
-(function () {
+(async function () {
   /* global firebase */
   if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
     console.error('[firebase-compat-init] Firebase compat SDK not loaded.');
@@ -10,19 +10,20 @@
     return;
   }
 
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '/api/getFirebaseConfig', false);
-  xhr.setRequestHeader('Accept', 'application/json');
-  xhr.send();
+  try {
+    const response = await fetch('/api/getFirebaseConfig', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
 
-  if (xhr.status === 200) {
-    try {
-      var config = JSON.parse(xhr.responseText);
-      firebase.initializeApp(config);
-    } catch (e) {
-      console.error('[firebase-compat-init] Failed to parse Firebase config:', e);
+    if (!response.ok) {
+      console.error('[firebase-compat-init] Could not fetch /api/getFirebaseConfig — status', response.status);
+      return;
     }
-  } else {
-    console.error('[firebase-compat-init] Could not fetch /api/getFirebaseConfig — status', xhr.status);
+
+    const config = await response.json();
+    firebase.initializeApp(config);
+  } catch (e) {
+    console.error('[firebase-compat-init] Failed to initialize Firebase:', e);
   }
 })();

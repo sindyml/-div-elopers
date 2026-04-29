@@ -1,6 +1,6 @@
 // js/dashboard.js
-import { auth, db } from "./firebase-config.js";
-import { getUserGroups, getGroupDetails } from "./groupService.js";
+import { auth } from "./firebase-config.js";
+import { getUserGroups } from "./groupService.js";
 import { SA_DATA_DEFAULTS } from "./constants.js";
 
 (function () {

@@ -14,8 +14,7 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  serverTimestamp,
-  getDocs,
+  serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getUserProfile } from './userService.js';
 import { getUserGroups } from './groupService.js';
@@ -193,7 +192,7 @@ export function buildMeetingItem(meeting, role) {
         ${hasMinutes ? '<li><mark class="badge badge-past">Minutes recorded</mark></li>' : ''}
       </ul>
     </article>
-    <button class="ghost" type="button" onclick="openMinutes('${meeting.id}', '${safeTitle}', ${canEditMinutes})">
+    <button class="ghost" type="button" aria-label="${minutesBtnLabel} minutes for ${title}" onclick="openMinutes('${meeting.id}', '${safeTitle}', ${canEditMinutes})">
       ${minutesBtnLabel}
     </button>
   `;

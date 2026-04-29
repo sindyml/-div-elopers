@@ -10,23 +10,26 @@ import {
   setDoc,
   addDoc,
   updateDoc,
-  serverTimestamp,
-  collectionGroup
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { COLLECTIONS } from './constants.js';
 
 export async function getUserGroups(uid) {
   const q = query(collection(db, COLLECTIONS.MEMBERSHIPS), where('uid', '==', uid));
   const snapshot = await getDocs(q);
-  const groups = [];
-  for (const membershipDoc of snapshot.docs) {
-    const { groupId } = membershipDoc.data();
-    const groupDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, groupId));
-    if (groupDoc.exists()) {
-      groups.push({ id: groupId, ...groupDoc.data() });
-    }
-  }
-  return groups;
+
+  const groups = await Promise.all(
+    snapshot.docs.map(async (membershipDoc) => {
+      const { groupId } = membershipDoc.data();
+      const groupDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, groupId));
+      if (!groupDoc.exists()) {
+        return null;
+      }
+      return { id: groupId, ...groupDoc.data() };
+    })
+  );
+
+  return groups.filter((group) => group !== null);
 }
 
 export async function getGroupDetails(groupId) {
