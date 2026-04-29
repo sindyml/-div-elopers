@@ -261,7 +261,14 @@ import { COLLECTIONS, ROLES } from "./constants.js";
         for (const gid of groupIds.slice(0, 5)) {
           const snap = await getDocs(query(collection(db, COLLECTIONS.PAYOUTS), where('groupId', '==', gid), orderBy('order', 'asc')));
           if (!snap.empty) {
-            payouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            payouts = snap.docs.map(d => {
+              const data = d.data();
+              // Convert Firestore Timestamp to ISO string for comparison
+              if (data.payoutDate && data.payoutDate.toDate) {
+                data.payoutDate = data.payoutDate.toDate().toISOString().slice(0, 10);
+              }
+              return { id: d.id, ...data };
+            });
             activeGroupId = gid;
             break;
           }

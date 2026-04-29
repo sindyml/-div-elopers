@@ -81,7 +81,19 @@
       const amount    = document.getElementById('amount').value;
       const payout    = document.getElementById('payout').value;
       const frequency = document.getElementById('frequency').value;
-      const payoutOrder = payout ? payout.split(',').map(p => p.trim()) : [];
+
+      // Parse and normalize payout order: filter empty entries and de-duplicate
+      let payoutOrder = [];
+      if (payout) {
+        const rawOrder = payout.split(',').map(p => p.trim()).filter(p => p.length > 0);
+        payoutOrder = [...new Set(rawOrder)]; // Remove duplicates
+
+        // Validate that UIDs are non-empty and look reasonable
+        if (payoutOrder.length > 0 && payoutOrder.some(uid => uid.length < 3)) {
+          showMsg('Invalid payout order: UIDs must be at least 3 characters', 'error');
+          return;
+        }
+      }
 
       if (!auth.currentUser) {
         showMsg('You must be logged in.', 'error');
@@ -133,6 +145,10 @@
           const payoutDetails = await Promise.all(payoutDetailsPromises);
 
           for (const detail of payoutDetails) {
+            // Calculate payout date using calendar months instead of hard-coded 30 days
+            const payoutDate = new Date();
+            payoutDate.setMonth(payoutDate.getMonth() + (detail.order - 1));
+
             const payoutRef = db.collection('payouts').doc();
             batch.set(payoutRef, {
               groupId: groupRef.id,
@@ -140,7 +156,7 @@
               userDisplayName: detail.displayName,
               order: detail.order,
               amount: Number(amount),
-              payoutDate: new Date(Date.now() + ((detail.order - 1) * 30 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10),
+              payoutDate: firebase.firestore.Timestamp.fromDate(payoutDate),
               status: 'pending'
             });
           }
