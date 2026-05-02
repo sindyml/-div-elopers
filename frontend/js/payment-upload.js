@@ -85,10 +85,11 @@ export async function uploadPaymentProof(file, txId, userId, { onProgress } = {}
 
   const storage = getStorage();
 
-  // Sanitise filename to prevent storage path traversal
+  // Sanitise txId and filename to prevent storage path traversal
+  const safeTxId    = txId.replace(/[^a-zA-Z0-9._-]/g, '_');
   const safeName    = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const uniqueName  = `proof_${Date.now()}_${safeName}`;
-  const storagePath = `payment-proofs/${userId}/${txId}/${uniqueName}`;
+  const storagePath = `payment-proofs/${userId}/${safeTxId}/${uniqueName}`;
   const storageRef  = ref(storage, storagePath);
 
   const uploadTask = uploadBytesResumable(storageRef, file);

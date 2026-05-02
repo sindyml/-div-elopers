@@ -206,7 +206,7 @@
                         statusCell.textContent = '⏳ Pending';
                     }
 
-                    // Add Pay button for pending / missed contributions
+                    // Add Pay button for pending / missed contributions; empty cell otherwise (keeps 4-column alignment)
                     if (contribution.status === 'pending' || contribution.status === 'missed') {
                         const actionCell = row.insertCell(3);
                         actionCell.setAttribute('data-label', 'Payment');
@@ -221,10 +221,12 @@
                                 groupId: contribution.groupId,
                                 contributionId: contribution.id,
                                 amount: parseFloat(contribution.amount) || 0,
-                                groupName: groupId,
+                                groupName: groupName,
                             });
                         });
                         actionCell.appendChild(payBtn);
+                    } else {
+                        row.insertCell(3);
                     }
                 });
             });
