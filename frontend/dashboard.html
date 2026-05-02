@@ -141,6 +141,20 @@
             </div>
           </section>
         </article>
+
+        <article class="card widget-section" aria-labelledby="health-heading" id="health-score-widget">
+          <header class="widget-section__header">
+            <h2 id="health-heading" class="widget-section__title">🏥 Financial Health</h2>
+            <button id="health-refresh-btn" class="widget-refresh-btn"
+                    aria-label="Recalculate financial health score" title="Recalculate">↻</button>
+          </header>
+          <div id="health-score-container" aria-live="polite">
+            <div class="health-loading">
+              <div class="health-spinner" aria-hidden="true"></div>
+              <span>Calculating score…</span>
+            </div>
+          </div>
+        </article>
       </aside>
     </div>
   </main>
@@ -159,5 +173,34 @@
   <script type="module" src="js/dashboard-widgets.js"></script>
   <script type="module" src="js/dashboard.js"></script>
 
-</body>
+  <script type="module">
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { computeAndStoreHealthScore, buildHealthScoreHTML } from './js/financial-health.js';
+    import { initPaymentReminders } from './js/payment-reminders.js';
+
+    const auth = getAuth(getApp());
+    const container = document.getElementById('health-score-container');
+    const refreshBtn = document.getElementById('health-refresh-btn');
+
+    async function renderHealthScore(uid) {
+      container.innerHTML = '<div class="health-loading"><div class="health-spinner" aria-hidden="true"></div><span>Calculating…</span></div>';
+      try {
+        // Use the first active group stored on the page (populated by dashboard.js)
+        const groupId = document.getElementById('grouplist')?.querySelector('[data-group-id]')?.dataset.groupId || 'default';
+        const result = await computeAndStoreHealthScore(uid, groupId);
+        container.innerHTML = buildHealthScoreHTML(result);
+      } catch (err) {
+        container.innerHTML = `<p style="padding:var(--space-4);color:var(--color-text-muted);font-size:0.85rem;">Unable to calculate score — check back after your next contribution.</p>`;
+      }
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (!user) return;
+      initPaymentReminders(user.uid);
+      // slight delay so dashboard.js can populate group list first
+      setTimeout(() => renderHealthScore(user.uid), 1200);
+      refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
+    });
+  </script>
 </html>

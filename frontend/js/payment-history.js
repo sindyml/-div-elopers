@@ -20,7 +20,9 @@ import {
   orderBy,
   getDocs,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getUserGroups } from './groupService.js';
+import { getUserGroups }     from './groupService.js';
+import { showReceiptModal }  from './payment-receipt.js';
+import { initPaymentReminders } from './payment-reminders.js';
 
 /* ── Module state ──────────────────────────────────────────── */
 
@@ -31,6 +33,7 @@ let _allTransactions = [];
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
+  initPaymentReminders(user.uid);
   loadTransactions(user.uid);
 });
 
@@ -103,7 +106,12 @@ function renderTable(transactions, filter) {
   filtered.forEach(tx => {
     const tr     = document.createElement('tr');
     const date   = formatTimestamp(tx.createdAt);
-    const amount = `R ${(parseFloat(tx.amount) || 0).toFixed(2)}`;
+    const baseAmount = parseFloat(tx.amount) || 0;
+    const fee        = tx.paymentMethod === 'card' ? baseAmount * 0.015 : 0;
+    const totalAmt   = baseAmount + fee;
+    const amountHtml = fee > 0
+      ? `R ${baseAmount.toFixed(2)} <small style="color:var(--color-text-muted);font-size:0.74rem;display:block;">+R ${fee.toFixed(2)} fee</small>`
+      : `R ${baseAmount.toFixed(2)}`;
     const method = tx.paymentMethod === 'card'
       ? '💳 Card'
       : tx.paymentMethod === 'eft'
@@ -114,28 +122,29 @@ function renderTable(transactions, filter) {
       : '<span style="color:var(--color-text-muted)">—</span>';
     const badge = statusBadge(tx.status);
 
-    const canUploadProof = ['pending', 'processing', 'completed'].includes(tx.status);
+    const canUploadProof = ['pending', 'processing'].includes(tx.status);
+    const canViewReceipt = tx.status === 'completed';
     const canRetry       = tx.status === 'failed' || tx.status === 'cancelled';
 
     tr.innerHTML = `
       <td>${escHtml(date)}</td>
       <td class="td--name">${escHtml(tx._groupName)}</td>
-      <td>${escHtml(amount)}</td>
+      <td>${amountHtml}</td>
       <td>${method}</td>
       <td style="font-size:0.78rem;font-family:monospace;color:var(--color-text-muted);">${txId}</td>
       <td>${badge}</td>
       <td>
-        <div style="display:flex;gap:var(--space-2);">
+        <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;">
           ${canUploadProof ? `
             <a href="payment-proof.html?txId=${escAttr(tx.id)}"
-               class="btn btn--outline btn--sm">
-              📎 Proof
-            </a>` : ''}
+               class="btn btn--outline btn--sm">📎 Proof</a>` : ''}
+          ${canViewReceipt ? `
+            <button class="btn btn--outline btn--sm js-receipt-btn"
+                    data-txid="${escAttr(tx.id)}"
+                    aria-label="View receipt">🧾 Receipt</button>` : ''}
           ${canRetry ? `
-            <a href="payment.html"
-               class="btn btn--primary btn--sm">
-              Retry
-            </a>` : ''}
+            <a href="payment.html?retry=${escAttr(tx.id)}"
+               class="btn btn--primary btn--sm">↩ Retry</a>` : ''}
         </div>
       </td>
     `;
@@ -171,6 +180,14 @@ document.getElementById('filter-bar').addEventListener('click', (e) => {
   });
 
   renderTable(_allTransactions, _activeFilter);
+});
+
+/* ── Receipt modal delegation ──────────────────────────────── */
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.js-receipt-btn');
+  if (!btn) return;
+  showReceiptModal(btn.dataset.txid);
 });
 
 /* ── Mock data (fallback until Developer A's backend is live) ── */
