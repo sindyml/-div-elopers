@@ -45,10 +45,18 @@
             listenToMemberContributions
         } from 'js/contributions.js';
         import { PaymentModal } from 'components/payment-modal.js';
+        import { uploadPaymentProof, validateProofFile } from 'js/payment-upload.js';
 
         // ── Payment modal ────────────────────────────────────────
         const paymentModal = new PaymentModal();
         paymentModal.onPaymentSuccess = () => loadMyPage();
+        paymentModal.onProofUploaded = async (file, paymentId) => {
+            const user = auth.currentUser;
+            if (!user) throw new Error('Not authenticated.');
+            const err = validateProofFile(file);
+            if (err) throw new Error(err);
+            await uploadPaymentProof(file, paymentId, user.uid);
+        };
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
