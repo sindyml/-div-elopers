@@ -1196,3 +1196,56 @@
     max-width: calc(100vw - var(--space-8));
   }
 }
+
+/* ── Offline Banner ─────────────────────────────────────────── */
+
+.payment-offline-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-bottom: 1px solid #fde68a;
+}
+
+.payment-offline-banner[hidden] { display: none; }
+
+.payment-offline-banner__icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.payment-offline-banner__text {
+  line-height: 1.4;
+}
+
+/* ── Failed Screen — Recovery Steps ────────────────────────── */
+
+.payment-failed__steps {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2, #f3f4f6);
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+
+.payment-failed__steps li {
+  padding: var(--space-1) 0;
+  padding-left: var(--space-5);
+  position: relative;
+}
+
+.payment-failed__steps li::before {
+  content: "›";
+  position: absolute;
+  left: var(--space-2);
+  color: var(--color-primary, #6366f1);
+  font-weight: 700;
+}
+

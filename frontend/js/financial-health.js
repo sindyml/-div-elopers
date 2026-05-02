@@ -53,6 +53,8 @@ import { COLLECTIONS }       from './constants.js';
  */
 const MODEL_WEIGHTS = {
   paymentConsistency: 0.30,   // most important: pays on time?
+  
+  
   amountCompliance:   0.20,   // pays correct amounts?
   paymentStreak:      0.20,   // consecutive good months?
   recoverySpeed:      0.15,   // recovers from late payments quickly?
