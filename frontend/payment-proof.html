@@ -277,16 +277,32 @@
         { label: 'Amount',         value: `R ${(parseFloat(tx.amount) || 0).toFixed(2)}` },
         { label: 'Method',         value: tx.paymentMethod === 'card' ? '💳 Card' : tx.paymentMethod === 'eft' ? '🏦 EFT' : '—' },
         { label: 'Date',           value: formatTimestamp(tx.createdAt) },
-        { label: 'Status',         value: statusBadge(tx.status) },
+        { label: 'Status',         value: statusBadge(tx.status), isBadge: true },
       ];
 
-      list.innerHTML = rows
-        .map(r => `
-          <li class="payment-receipt__row">
-            <span class="payment-receipt__row-label">${escHtml(r.label)}</span>
-            <span class="payment-receipt__row-value">${r.value}</span>
-          </li>`)
-        .join('');
+      list.replaceChildren();
+
+      rows.forEach(r => {
+        const li = document.createElement('li');
+        li.className = 'payment-receipt__row';
+
+        const label = document.createElement('span');
+        label.className = 'payment-receipt__row-label';
+        label.textContent = r.label;
+
+        const value = document.createElement('span');
+        value.className = 'payment-receipt__row-value';
+
+        if (r.isBadge) {
+          value.innerHTML = r.value;
+        } else {
+          value.textContent = r.value == null ? '' : String(r.value);
+        }
+
+        li.appendChild(label);
+        li.appendChild(value);
+        list.appendChild(li);
+      });
     }
 
     /* ── Load existing proofs ───────────────────────── */
