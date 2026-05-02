@@ -1,6 +1,6 @@
 /* ============================================================
    footer.js — Shared Footer Component
-   Included on every page via <div id="footer-root"></div>
+   Included on every page via <footer id="footer-root"></footer>
    ============================================================ */
 
 (function () {
@@ -8,7 +8,6 @@
     const year = new Date().getFullYear();
 
     const html = `
-      <footer class="footer">
         <div class="footer__inner">
           <div class="footer__brand">
             <span class="footer__logo">🌿</span>
@@ -34,7 +33,6 @@
         <div class="footer__bottom">
           <p>© ${year} Stokvel Management Platform — Software Design 2026</p>
         </div>
-      </footer>
       <style>
         .footer {
           background: var(--color-text-primary);
@@ -109,7 +107,10 @@
     `;
 
     const root = document.getElementById('footer-root');
-    if (root) root.innerHTML = html;
+    if (root) {
+      root.classList.add('footer');
+      root.innerHTML = html;
+    }
   }
 
   if (document.readyState === 'loading') {
