@@ -35,10 +35,19 @@ import {
   getPaymentStatus,
   simulatePaymentSuccess,
 } from '../js/payment-api-mock.js';
+import {
+  validatePaymentContext,
+  validatePaymentMethod,
+  isNetworkAvailable,
+  categorizePaymentError,
+} from '../js/payment-validator.js';
 
 /* ── Constants ─────────────────────────────────────────────── */
-const POLL_INTERVAL_MS  = 2000;
-const POLL_MAX_ATTEMPTS = 15;
+const POLL_INTERVAL_MS      = 2000;
+const POLL_SLOW_INTERVAL_MS = 5000;  // used after POLL_SLOW_AFTER attempts
+const POLL_SLOW_AFTER       = 5;     // switch to slow interval after this many polls
+const POLL_MAX_ATTEMPTS     = 20;    // total polls before timeout
+const POLL_MAX_NET_ERRORS   = 3;     // consecutive network errors → abort
 const CARD_FEE_RATE     = 0.015; // 1.5% for card payments
 const MAX_PROOF_SIZE    = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_PROOF_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -96,7 +105,15 @@ export class PaymentModal {
      */
     this.onClose = null;
 
+    /** @type {boolean} Whether the device currently has a network connection. */
+    this._isOnline = navigator.onLine !== false;
+    /** @type {number} Consecutive network errors during polling. */
+    this._consecutiveNetErrors = 0;
+    /** @type {boolean} True while polling is paused due to being offline. */
+    this._pollPaused = false;
+
     this._inject();
+    this._wireNetworkEvents();
   }
 
   /* ── Public API ────────────────────────────────────────────── */
@@ -160,6 +177,18 @@ export class PaymentModal {
      aria-labelledby="payment-modal-title">
 
   <div class="payment-modal">
+
+    <!-- ── Offline Banner ── -->
+    <div id="pm-offline-banner"
+         class="payment-offline-banner"
+         role="alert"
+         aria-live="assertive"
+         hidden>
+      <span class="payment-offline-banner__icon" aria-hidden="true">📡</span>
+      <span class="payment-offline-banner__text">
+        No internet connection. Your payment is paused until you're back online.
+      </span>
+    </div>
 
     <!-- ── Header ── -->
     <header class="payment-modal__header">
@@ -363,15 +392,18 @@ export class PaymentModal {
 
       <div class="payment-failed">
         <div class="payment-failed__badge" aria-label="Payment failed">❌</div>
-        <h3 class="payment-failed__title">Payment Failed</h3>
+        <h3 class="payment-failed__title" id="pm-failed-title">Payment Failed</h3>
         <p class="payment-failed__reason" id="pm-failed-reason">
           Something went wrong. Please try again.
         </p>
+        <ul class="payment-failed__steps" id="pm-failed-steps" hidden></ul>
       </div>
 
       <div class="payment-modal__actions">
         <button class="btn btn--outline" data-action="close">Cancel</button>
-        <button class="btn btn--primary" data-action="retry">Retry Payment</button>
+        <button class="btn btn--primary"
+                id="pm-failed-action-btn"
+                data-action="retry">Retry Payment</button>
       </div>
 
     </section>
@@ -482,14 +514,16 @@ export class PaymentModal {
       const action = target.dataset.action;
 
       switch (action) {
-        case 'close':           this.close();                    break;
-        case 'proceed':         this._handleProceed();           break;
-        case 'back-to-form':    this._showScreen('form');        break;
-        case 'pay':             this._handlePay();               break;
-        case 'retry':           this._handleRetry();             break;
-        case 'go-to-proof':     this._showScreen('proof');       break;
-        case 'back-to-receipt': this._showScreen('receipt');     break;
-        case 'submit-proof':    this._handleProofSubmit();       break;
+        case 'close':           this.close();                                break;
+        case 'proceed':         this._handleProceed();                       break;
+        case 'back-to-form':    this._showScreen('form');                    break;
+        case 'pay':             this._handlePay();                           break;
+        case 'retry':           this._handleRetry();                         break;
+        case 'go-to-proof':     this._showScreen('proof');                   break;
+        case 'back-to-receipt': this._showScreen('receipt');                 break;
+        case 'submit-proof':    this._handleProofSubmit();                   break;
+        case 'nav-history':     window.location.href = 'payment-history.html'; break;
+        case 'nav-login':       window.location.href = 'login.html';         break;
       }
     });
 
@@ -608,10 +642,30 @@ export class PaymentModal {
     if (feeRow) feeRow.style.display = feeRate > 0 ? '' : 'none';
   }
 
-  /** Step 1 → Step 2: validate form and build confirmation screen. */
+  /** Step 1 → Step 2: validate form then build the confirmation screen. */
   _handleProceed() {
     this._hideAlert('pm-form-error');
     if (!this._context) return;
+
+    // Network pre-flight check
+    if (!isNetworkAvailable()) {
+      this._showAlert('pm-form-error', 'No internet connection. Please check your network and try again.');
+      return;
+    }
+
+    // Context / amount validation
+    const ctxResult = validatePaymentContext(this._context);
+    if (!ctxResult.valid) {
+      this._showAlert('pm-form-error', ctxResult.error);
+      return;
+    }
+
+    // Payment method validation
+    const methodResult = validatePaymentMethod(this._selectedMethod);
+    if (!methodResult.valid) {
+      this._showAlert('pm-form-error', methodResult.error);
+      return;
+    }
 
     const base    = parseFloat(this._context.amount) || 0;
     const feeRate = this._selectedMethod === 'card' ? CARD_FEE_RATE : 0;
@@ -652,7 +706,16 @@ export class PaymentModal {
     payBtn.textContent = 'Authorising…';
     this._hideAlert('pm-confirm-error');
 
+    // Network pre-flight: fast-fail before showing processing screen
+    if (!isNetworkAvailable()) {
+      this._showAlert('pm-confirm-error', 'No internet connection. Please check your network and try again.');
+      payBtn.disabled = false;
+      payBtn.textContent = 'Pay Now';
+      return;
+    }
+
     this._showScreen('processing');
+    this._updateProcessingStatus('Initiating payment…', 'Please wait. Do not close this window.');
 
     try {
       const { userId, groupId, contributionId, amount } = this._context;
@@ -676,9 +739,10 @@ export class PaymentModal {
       this._startPolling();
 
     } catch (err) {
-      // Revert to confirm screen and show error
+      // Categorise the error and revert to confirm screen
+      const info = categorizePaymentError(err, 'initiate');
       this._showScreen('confirm');
-      this._showAlert('pm-confirm-error', err.message || 'Failed to initiate payment. Please try again.');
+      this._showAlert('pm-confirm-error', info.message);
       payBtn.disabled = false;
       payBtn.textContent = 'Pay Now';
     }
@@ -699,50 +763,77 @@ export class PaymentModal {
   /* ── Status Polling ────────────────────────────────────────── */
 
   _startPolling() {
-    this._pollCount = 0;
-    this._pollTimer = setInterval(() => this._pollStatus(), POLL_INTERVAL_MS);
+    this._pollCount            = 0;
+    this._consecutiveNetErrors = 0;
+    this._pollPaused           = false;
+    this._schedulePoll(POLL_INTERVAL_MS);
+  }
+
+  _schedulePoll(delayMs) {
+    this._pollTimer = setTimeout(() => this._pollStatus(), delayMs);
   }
 
   _clearPoll() {
     if (this._pollTimer !== null) {
-      clearInterval(this._pollTimer);
+      clearTimeout(this._pollTimer);
       this._pollTimer = null;
     }
   }
 
   async _pollStatus() {
+    // Do not poll when paused (device offline) or after the modal has been closed.
+    if (this._pollPaused || !this._paymentId) return;
+
     this._pollCount += 1;
 
     if (this._pollCount > POLL_MAX_ATTEMPTS) {
-      this._clearPoll();
-      this._showFailed('Payment verification timed out. Please check your payment history to confirm your transaction.');
+      this._showFailed(null, categorizePaymentError(null, 'timeout'));
       return;
     }
 
-    // Update spinner sub-text so the user knows we're still working
-    const subEl = this._root.querySelector('#pm-processing-sub');
-    if (subEl) {
-      subEl.textContent =
-        this._pollCount <= 3
-          ? 'Please wait. Do not close this window.'
-          : `Verifying with payment gateway… (${this._pollCount}/${POLL_MAX_ATTEMPTS})`;
-    }
+    // Use a slower interval after the first POLL_SLOW_AFTER polls
+    const nextInterval = this._pollCount > POLL_SLOW_AFTER
+      ? POLL_SLOW_INTERVAL_MS
+      : POLL_INTERVAL_MS;
+
+    this._updateProcessingStatus(
+      'Verifying payment…',
+      this._pollCount <= 3
+        ? 'Please wait. Do not close this window.'
+        : `Checking with payment gateway… (${this._pollCount}/${POLL_MAX_ATTEMPTS})`
+    );
 
     try {
       const statusData = await getPaymentStatus(this._paymentId);
+      this._consecutiveNetErrors = 0; // reset on a successful request
 
       if (statusData.status === 'completed') {
         this._clearPoll();
         this._showReceipt(statusData);
       } else if (statusData.status === 'failed' || statusData.status === 'cancelled') {
         this._clearPoll();
-        this._showFailed('Payment was declined or cancelled. Please try a different payment method.');
+        this._showFailed(null, categorizePaymentError(new Error('declined'), 'poll'));
+      } else {
+        // Still pending/processing — schedule the next check
+        this._schedulePoll(nextInterval);
       }
-      // pending / processing: continue polling
 
     } catch (err) {
-      // Transient network errors: keep polling (will timeout eventually)
+      this._consecutiveNetErrors += 1;
       console.warn('[PaymentModal] Poll error:', err.message);
+
+      if (this._consecutiveNetErrors >= POLL_MAX_NET_ERRORS) {
+        this._clearPoll();
+        this._showFailed(null, categorizePaymentError(err, 'poll'));
+        return;
+      }
+
+      // Exponential back-off capped at 2× POLL_SLOW_INTERVAL_MS
+      const backoff = Math.min(
+        POLL_INTERVAL_MS * Math.pow(2, this._consecutiveNetErrors),
+        POLL_SLOW_INTERVAL_MS * 2
+      );
+      this._schedulePoll(backoff);
     }
   }
 
@@ -798,13 +889,42 @@ export class PaymentModal {
 
   /* ── Failed Screen ─────────────────────────────────────────── */
 
-  _showFailed(reason) {
-    const reasonEl = this._root.querySelector('#pm-failed-reason');
-    if (reasonEl) reasonEl.textContent = reason;
+  _showFailed(reason, errorInfo = null) {
+    const info = errorInfo || categorizePaymentError(
+      reason ? new Error(reason) : null,
+      'poll'
+    );
+
+    const titleEl   = this._root.querySelector('#pm-failed-title');
+    const reasonEl  = this._root.querySelector('#pm-failed-reason');
+    const stepsEl   = this._root.querySelector('#pm-failed-steps');
+    const actionBtn = this._root.querySelector('#pm-failed-action-btn');
+
+    if (titleEl)  titleEl.textContent  = info.title;
+    if (reasonEl) reasonEl.textContent = info.message;
+
+    if (stepsEl) {
+      if (info.steps && info.steps.length) {
+        stepsEl.innerHTML = info.steps.map(s => `<li>${s}</li>`).join('');
+        stepsEl.hidden = false;
+      } else {
+        stepsEl.hidden = true;
+      }
+    }
+
+    if (actionBtn) {
+      actionBtn.textContent = info.actionLabel;
+      if (!info.retryable) {
+        actionBtn.dataset.action = info.actionLabel === 'Log In' ? 'nav-login' : 'nav-history';
+      } else {
+        actionBtn.dataset.action = 'retry';
+      }
+    }
+
     this._showScreen('failed');
 
     if (typeof this.onPaymentFailed === 'function') {
-      this.onPaymentFailed(new Error(reason));
+      this.onPaymentFailed(new Error(info.message));
     }
   }
 
@@ -903,6 +1023,67 @@ export class PaymentModal {
       submitBtn.textContent = 'Upload Proof';
       this._showAlert('pm-proof-error', err.message || 'Upload failed. Please try again.');
     }
+  }
+
+  /* ── Network & Processing Status Helpers ──────────────────── */
+
+  /**
+   * Attach window online/offline listeners and apply the initial state.
+   * Called once from the constructor after _inject().
+   */
+  _wireNetworkEvents() {
+    window.addEventListener('online',  () => this._handleNetworkChange(true));
+    window.addEventListener('offline', () => this._handleNetworkChange(false));
+    // Apply initial state in case the page loaded while offline
+    if (!navigator.onLine) this._handleNetworkChange(false);
+  }
+
+  /**
+   * React to the browser going online or offline.
+   * @param {boolean} isOnline
+   */
+  _handleNetworkChange(isOnline) {
+    this._isOnline = isOnline;
+
+    // Toggle the offline banner (only visible while the modal is open)
+    const banner   = this._root && this._root.querySelector('#pm-offline-banner');
+    if (banner) banner.hidden = isOnline;
+
+    // Disable the "Proceed" button on the form screen while offline
+    const proceedBtn = this._root && this._root.querySelector('[data-action="proceed"]');
+    if (proceedBtn) proceedBtn.disabled = !isOnline;
+
+    if (this._pollTimer !== null || this._pollPaused) {
+      if (!isOnline) {
+        // Pause polling — clear the pending timeout but keep _pollCount
+        this._pollPaused = true;
+        this._clearPoll();
+        this._updateProcessingStatus(
+          'Connection lost',
+          'Payment verification is paused. We will resume automatically when you reconnect.'
+        );
+      } else {
+        // Resume polling shortly after coming back online
+        this._pollPaused = false;
+        this._schedulePoll(800);
+        this._updateProcessingStatus(
+          'Verifying payment…',
+          'Connection restored. Resuming verification…'
+        );
+      }
+    }
+  }
+
+  /**
+   * Update the title and sub-text on the processing screen.
+   * @param {string} title
+   * @param {string} [sub]
+   */
+  _updateProcessingStatus(title, sub = '') {
+    const titleEl = this._root && this._root.querySelector('#pm-processing-title');
+    const subEl   = this._root && this._root.querySelector('#pm-processing-sub');
+    if (titleEl) titleEl.textContent = title;
+    if (subEl)   subEl.textContent   = sub;
   }
 
   /* ── Alert Helpers ─────────────────────────────────────────── */
