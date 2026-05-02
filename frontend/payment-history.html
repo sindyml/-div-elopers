@@ -62,23 +62,18 @@
     <div class="card" style="overflow:hidden;">
 
       <div id="filter-bar"
-           role="tablist"
            aria-label="Filter transactions by status"
            style="display:flex; gap:0; border-bottom:1px solid var(--color-border); background:var(--color-surface-2);">
-        <button role="tab"
-                aria-selected="true"
+        <button aria-pressed="true"
                 data-filter="all"
                 class="filter-tab filter-tab--active">All</button>
-        <button role="tab"
-                aria-selected="false"
+        <button aria-pressed="false"
                 data-filter="pending"
                 class="filter-tab">Pending</button>
-        <button role="tab"
-                aria-selected="false"
+        <button aria-pressed="false"
                 data-filter="completed"
                 class="filter-tab">Completed</button>
-        <button role="tab"
-                aria-selected="false"
+        <button aria-pressed="false"
                 data-filter="failed"
                 class="filter-tab">Failed</button>
       </div>
