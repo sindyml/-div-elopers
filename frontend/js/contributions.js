@@ -9,7 +9,8 @@ import {
     where,
     orderBy,
     onSnapshot,
-    updateDoc
+    updateDoc,
+    serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getUserGroups as fetchUserGroups } from '../js/groupService.js';
 import { getUserProfile } from '../js/userService.js';
@@ -74,6 +75,22 @@ async function updateContributionStatus(contributionId, newStatus) {
     });
 }
 
+/**
+ * Mark a contribution as paid after a successful payment transaction.
+ * Sets status → 'confirmed', records the transactionId, and timestamps the payment.
+ *
+ * @param {string} contributionId  Firestore document ID of the contribution.
+ * @param {string} transactionId   Payment transaction ID (from Yoco or mock).
+ */
+async function markContributionAsPaid(contributionId, transactionId) {
+    await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
+        status: 'confirmed',
+        transactionId,
+        paidAt: serverTimestamp(),
+        confirmedAt: serverTimestamp(),
+    });
+}
+
 function listenToMemberContributions(userId, onUpdateCallback) {
     return onSnapshot(
         query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('userId', '==', userId), orderBy('date', 'desc')),
@@ -117,6 +134,7 @@ export {
     getContributionsByMember,
     getContributionsByGroup,
     updateContributionStatus,
+    markContributionAsPaid,
     getPayoutSchedule,
     listenToMemberContributions,
     listenToGroupContributions
