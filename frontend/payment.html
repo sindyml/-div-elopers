@@ -111,6 +111,20 @@
 
     </section>
 
+    <!-- ── Financial Health Score Card ───────────────── -->
+    <section class="card" aria-labelledby="health-pay-heading" id="health-score-section" style="margin-top:var(--space-5);">
+      <header class="widget-section__header">
+        <h2 id="health-pay-heading" class="widget-section__title">🏥 Your Financial Health Score</h2>
+        <button id="health-refresh-btn-pay" class="btn btn--ghost btn--sm" aria-label="Recalculate">↻</button>
+      </header>
+      <div id="health-score-container-pay">
+        <div class="health-loading">
+          <div class="health-spinner" aria-hidden="true"></div>
+          <span>Calculating…</span>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- ── Payment modal mount point (injected by PaymentModal) ── -->
@@ -119,6 +133,34 @@
   <div id="footer-root"></div>
 
   <script type="module" src="js/payment.js"></script>
+
+  <script type="module">
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { computeAndStoreHealthScore, buildHealthScoreHTML } from './js/financial-health.js';
+    import { initPaymentReminders } from './js/payment-reminders.js';
+
+    const auth = getAuth(getApp());
+    const container = document.getElementById('health-score-container-pay');
+    const refreshBtn = document.getElementById('health-refresh-btn-pay');
+
+    async function renderHealthScore(uid) {
+      container.innerHTML = '<div class="health-loading"><div class="health-spinner" aria-hidden="true"></div><span>Calculating…</span></div>';
+      try {
+        const result = await computeAndStoreHealthScore(uid, 'default');
+        container.innerHTML = buildHealthScoreHTML(result);
+      } catch {
+        container.innerHTML = '<p style="padding:var(--space-4);color:var(--color-text-muted);font-size:0.85rem;">Score unavailable — complete a contribution to generate your first score.</p>';
+      }
+    }
+
+    onAuthStateChanged(auth, user => {
+      if (!user) return;
+      initPaymentReminders(user.uid);
+      renderHealthScore(user.uid);
+      refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
+    });
+  </script>
 
   <style>
     /* page-specific tweaks */
