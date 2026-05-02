@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Make a Payment — StokPal</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/payment.css" />
+
+  <script src="components/navbar.js" defer></script>
+  <script src="components/footer.js" defer></script>
+</head>
+
+<body class="app-layout">
+
+  <div id="navbar-root"></div>
+
+  <main class="app-main">
+
+    <!-- ── Page Header ─────────────────────────────── -->
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">💳 Make a Payment</h1>
+        <p class="page-header__sub">
+          Pay your stokvel contributions securely. All transactions are tracked.
+        </p>
+      </hgroup>
+      <a href="payment-history.html" class="btn btn--outline btn--sm">
+        View Payment History →
+      </a>
+    </header>
+
+    <!-- ── Global alert ─────────────────────────────── -->
+    <div class="payment-alert payment-alert--error payment-alert--hidden"
+         id="page-error"
+         role="alert"
+         aria-live="assertive"
+         style="margin-bottom: var(--space-5);"></div>
+
+    <!-- ── Summary stat cards ────────────────────────── -->
+    <ul class="dashboard-grid" aria-label="Payment summary" id="summary-cards">
+      <li class="stat-card stat-card--warning">
+        <small class="stat-card__label">Outstanding Balance</small>
+        <p class="stat-card__value" id="stat-outstanding">—</p>
+        <small class="stat-card__sub">Across all groups</small>
+      </li>
+      <li class="stat-card stat-card--primary">
+        <small class="stat-card__label">Pending Contributions</small>
+        <p class="stat-card__value" id="stat-pending-count">—</p>
+        <small class="stat-card__sub">Need payment</small>
+      </li>
+      <li class="stat-card stat-card--accent">
+        <small class="stat-card__label">Completed Payments</small>
+        <p class="stat-card__value" id="stat-completed">—</p>
+        <small class="stat-card__sub">This period</small>
+      </li>
+    </ul>
+
+    <!-- ── Pending contributions table ──────────────── -->
+    <section class="card" aria-labelledby="pending-heading" id="pending-section">
+
+      <header class="widget-section__header">
+        <h2 id="pending-heading" class="widget-section__title">
+          ⏳ Pending Contributions
+        </h2>
+        <a href="contributions-my.html" class="widget-section__link btn btn--ghost btn--sm" style="color:var(--color-primary);">
+          All contributions →
+        </a>
+      </header>
+
+      <!-- Loading skeleton -->
+      <div id="pending-loading" style="padding: var(--space-6);" aria-label="Loading">
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+          <div style="height:44px;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+          <div style="height:44px;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+          <div style="height:44px;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="pending-empty" class="empty-state" hidden>
+        <div class="empty-state__icon">🎉</div>
+        <h3 class="empty-state__title">All caught up!</h3>
+        <p class="empty-state__sub">You have no pending contributions to pay right now.</p>
+        <a href="payment-history.html"
+           class="btn btn--outline btn--sm"
+           style="margin-top: var(--space-4);">View payment history</a>
+      </div>
+
+      <!-- Contributions table -->
+      <div class="data-table-wrapper" id="pending-table-wrapper" hidden>
+        <table class="data-table" aria-label="Pending contributions">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Amount</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="pending-table-body"></tbody>
+        </table>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ── Payment modal mount point (injected by PaymentModal) ── -->
+  <div id="payment-modal-root"></div>
+
+  <div id="footer-root"></div>
+
+  <script type="module">
+    import { auth, db }    from 'js/firebase-config.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      collection, query, where, orderBy, getDocs, doc, getDoc
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getUserGroups }       from 'js/groupService.js';
+    import { PaymentModal }        from 'components/payment-modal.js';
+    import { COLLECTIONS }         from 'js/constants.js';
+
+    /* ── Initialise modal ─────────────────────────────── */
+    const modal = new PaymentModal();
+
+    modal.onPaymentSuccess = (receipt) => {
+      // Reload pending contributions to reflect the newly completed payment
+      loadPendingContributions(auth.currentUser.uid);
+    };
+
+    modal.onProofUploaded = async (file, paymentId) => {
+      // TODO (Task 3): delegate to payment-upload.js
+      // Placeholder: simulate upload delay
+      await new Promise(r => setTimeout(r, 1200));
+    };
+
+    /* ── Auth gate ────────────────────────────────────── */
+    onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+      loadPendingContributions(user.uid);
+    });
+
+    /* ── Data loading ─────────────────────────────────── */
+    async function loadPendingContributions(userId) {
+      showLoading(true);
+      showError(null);
+
+      try {
+        const groups = await getUserGroups(userId);
+        if (!groups.length) {
+          showLoading(false);
+          showEmpty(true);
+          updateStats(0, 0, 0);
+          return;
+        }
+
+        // Fetch pending/missed contributions across all groups the user belongs to
+        const contribSnap = await getDocs(
+          query(
+            collection(db, COLLECTIONS.CONTRIBUTIONS),
+            where('userId', '==', userId),
+            orderBy('date', 'desc')
+          )
+        );
+
+        const allContribs   = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const pending       = allContribs.filter(c => c.status === 'pending' || c.status === 'missed');
+
+        // Build group lookup for names
+        const groupMap = {};
+        groups.forEach(g => { groupMap[g.id] = g.name; });
+
+        // Stats
+        const outstanding = pending.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
+
+        // Completed payments this period — read from transactions collection
+        let completedCount = 0;
+        try {
+          const txSnap = await getDocs(
+            query(
+              collection(db, 'transactions'),
+              where('userId', '==', userId),
+              where('status', '==', 'completed')
+            )
+          );
+          completedCount = txSnap.size;
+        } catch (_) { /* transactions collection may not exist yet */ }
+
+        updateStats(outstanding, pending.length, completedCount);
+
+        if (pending.length === 0) {
+          showLoading(false);
+          showEmpty(true);
+          return;
+        }
+
+        renderTable(pending, groupMap);
+        showLoading(false);
+        showTable(true);
+
+      } catch (err) {
+        showLoading(false);
+        showError('Failed to load contributions: ' + (err.message || 'Unknown error'));
+      }
+    }
+
+    /* ── Render pending table ─────────────────────────── */
+    function renderTable(contributions, groupMap) {
+      const tbody = document.getElementById('pending-table-body');
+      tbody.innerHTML = '';
+
+      contributions.forEach(contrib => {
+        const tr   = document.createElement('tr');
+        const name = groupMap[contrib.groupId] || contrib.groupId || '—';
+        const date = contrib.date
+          ? (contrib.date.toDate ? contrib.date.toDate().toLocaleDateString('en-ZA') : contrib.date)
+          : '—';
+        const amount = parseFloat(contrib.amount) || 0;
+
+        const statusBadge = contrib.status === 'missed'
+          ? '<span class="status-badge status-badge--failed">Missed</span>'
+          : '<span class="status-badge status-badge--pending">Pending</span>';
+
+        tr.innerHTML = `
+          <td class="td--name">${escHtml(name)}</td>
+          <td>R ${amount.toFixed(2)}</td>
+          <td>${escHtml(date)}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <button class="btn btn--primary btn--sm"
+                    data-contrib-id="${escAttr(contrib.id)}"
+                    data-group-id="${escAttr(contrib.groupId)}"
+                    data-group-name="${escAttr(name)}"
+                    data-amount="${escAttr(String(amount))}">
+              Pay Now
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Wire pay buttons
+      tbody.querySelectorAll('button[data-contrib-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const user = auth.currentUser;
+          if (!user) return;
+          modal.open({
+            userId:         user.uid,
+            groupId:        btn.dataset.groupId,
+            contributionId: btn.dataset.contribId,
+            amount:         parseFloat(btn.dataset.amount),
+            groupName:      btn.dataset.groupName,
+          });
+        });
+      });
+    }
+
+    /* ── Stats ────────────────────────────────────────── */
+    function updateStats(outstanding, pendingCount, completed) {
+      document.getElementById('stat-outstanding').textContent =
+        `R ${outstanding.toFixed(2)}`;
+      document.getElementById('stat-pending-count').textContent =
+        String(pendingCount);
+      document.getElementById('stat-completed').textContent =
+        String(completed);
+    }
+
+    /* ── UI state helpers ─────────────────────────────── */
+    function showLoading(on) {
+      document.getElementById('pending-loading').style.display = on ? '' : 'none';
+    }
+    function showEmpty(on) {
+      document.getElementById('pending-empty').hidden = !on;
+    }
+    function showTable(on) {
+      document.getElementById('pending-table-wrapper').hidden = !on;
+    }
+    function showError(msg) {
+      const el = document.getElementById('page-error');
+      if (msg) {
+        el.textContent = msg;
+        el.classList.remove('payment-alert--hidden');
+      } else {
+        el.classList.add('payment-alert--hidden');
+      }
+    }
+
+    /* ── Security helpers ─────────────────────────────── */
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function escAttr(str) {
+      return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  </script>
+
+  <style>
+    /* page-specific tweaks */
+    .widget-section__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+      background: var(--color-surface-2);
+    }
+    .widget-section__title { font-family: var(--font-display); font-size: 1rem; }
+    .widget-section__link  { font-size: 0.82rem; color: var(--color-primary); }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+  </style>
+
+</body>
+</html>

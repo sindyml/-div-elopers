@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en-ZA">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Payment Proof — StokPal</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/payment.css" />
+
+  <script src="components/navbar.js" defer></script>
+  <script src="components/footer.js" defer></script>
+</head>
+
+<body class="app-layout">
+
+  <div id="navbar-root"></div>
+
+  <main class="app-main" style="max-width:640px;">
+
+    <!-- ── Page Header ─────────────────────────────── -->
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">📎 Upload Payment Proof</h1>
+        <p class="page-header__sub">
+          Attach a screenshot or PDF of your payment confirmation so your
+          treasurer can verify the transaction.
+        </p>
+      </hgroup>
+      <a href="payment-history.html" class="btn btn--outline btn--sm">← History</a>
+    </header>
+
+    <!-- ── Global alerts ────────────────────────────── -->
+    <div class="payment-alert payment-alert--error payment-alert--hidden"
+         id="page-error"
+         role="alert"
+         aria-live="assertive"
+         style="margin-bottom:var(--space-5);"></div>
+
+    <div class="payment-alert payment-alert--success payment-alert--hidden"
+         id="page-success"
+         role="status"
+         aria-live="polite"
+         style="margin-bottom:var(--space-5);"></div>
+
+    <!-- ── Transaction detail card ──────────────────── -->
+    <section class="card"
+             id="tx-detail-card"
+             aria-labelledby="tx-detail-heading"
+             style="margin-bottom:var(--space-5);">
+
+      <!-- Loading state -->
+      <div id="tx-loading" style="padding:var(--space-6);">
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+          <div style="height:20px;width:60%;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+          <div style="height:16px;width:80%;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+          <div style="height:16px;width:50%;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
+        </div>
+      </div>
+
+      <!-- Detail content (shown after load) -->
+      <div id="tx-detail-content" hidden>
+        <header style="padding:var(--space-4) var(--space-5);
+                       border-bottom:1px solid var(--color-border);
+                       background:var(--color-surface-2);
+                       display:flex;justify-content:space-between;align-items:center;">
+          <h2 id="tx-detail-heading"
+              style="font-family:var(--font-display);font-size:1rem;font-weight:400;">
+            Transaction Details
+          </h2>
+          <span id="tx-status-badge"></span>
+        </header>
+        <ul class="payment-receipt__list" id="tx-detail-list" aria-label="Transaction details"></ul>
+      </div>
+
+    </section>
+
+    <!-- ── Existing proofs ───────────────────────────── -->
+    <section id="existing-proofs-section"
+             aria-labelledby="existing-heading"
+             hidden
+             style="margin-bottom:var(--space-5);">
+      <h2 id="existing-heading"
+          style="font-family:var(--font-display);font-size:1rem;
+                 margin-bottom:var(--space-3);color:var(--color-text-primary);">
+        Previously Uploaded Proofs
+      </h2>
+      <ul id="existing-proofs-list"
+          style="list-style:none;padding:0;display:flex;flex-direction:column;gap:var(--space-2);"
+          aria-label="Previously uploaded proof files"></ul>
+    </section>
+
+    <!-- ── Upload form ───────────────────────────────── -->
+    <section class="card"
+             id="upload-section"
+             aria-labelledby="upload-heading">
+
+      <header style="padding:var(--space-4) var(--space-5);
+                     border-bottom:1px solid var(--color-border);
+                     background:var(--color-surface-2);">
+        <h2 id="upload-heading"
+            style="font-family:var(--font-display);font-size:1rem;font-weight:400;">
+          Upload New Proof
+        </h2>
+      </header>
+
+      <div style="padding:var(--space-5);">
+
+        <p class="proof-upload-intro" style="margin-bottom:var(--space-4);">
+          Upload a screenshot or PDF of your bank confirmation, EFT receipt,
+          or payment notification. Max 5 MB per file (JPG, PNG, or PDF).
+        </p>
+
+        <!-- Drop zone -->
+        <div class="proof-upload-zone"
+             id="upload-zone"
+             role="button"
+             tabindex="0"
+             aria-label="Click or drag a file here to upload proof">
+          <span class="proof-upload-zone__icon" aria-hidden="true">📎</span>
+          <p class="proof-upload-zone__text">
+            Drop a file here or
+            <span class="proof-upload-zone__link">browse</span>
+          </p>
+          <p class="proof-upload-zone__hint">JPG, PNG, or PDF · max 5 MB</p>
+          <input type="file"
+                 id="file-input"
+                 accept="image/jpeg,image/png,application/pdf"
+                 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"
+                 aria-label="Choose proof file" />
+        </div>
+
+        <!-- File preview -->
+        <div class="proof-upload-preview" id="upload-preview" hidden style="margin-top:var(--space-3);">
+          <div class="proof-upload-preview__info">
+            <span class="proof-upload-preview__icon" aria-hidden="true">📄</span>
+            <div>
+              <p class="proof-upload-preview__name" id="preview-filename"></p>
+              <p class="proof-upload-preview__size" id="preview-filesize"></p>
+            </div>
+            <button class="proof-upload-preview__remove"
+                    id="remove-file-btn"
+                    type="button"
+                    aria-label="Remove selected file">✕</button>
+          </div>
+          <div class="proof-upload-progress" id="upload-progress" hidden>
+            <div class="proof-upload-progress__bar"
+                 id="progress-bar"
+                 style="width:0%"
+                 role="progressbar"
+                 aria-valuenow="0"
+                 aria-valuemin="0"
+                 aria-valuemax="100"></div>
+          </div>
+        </div>
+
+        <!-- Upload error -->
+        <div class="payment-alert payment-alert--error payment-alert--hidden"
+             id="upload-error"
+             role="alert"
+             aria-live="assertive"
+             style="margin-top:var(--space-3);"></div>
+
+        <!-- Actions -->
+        <div style="display:flex;justify-content:flex-end;gap:var(--space-3);margin-top:var(--space-5);">
+          <a href="payment-history.html" class="btn btn--outline">Cancel</a>
+          <button class="btn btn--primary"
+                  id="upload-submit-btn"
+                  type="button"
+                  disabled>
+            Upload Proof
+          </button>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <div id="footer-root"></div>
+
+  <script type="module">
+    import { auth, db }    from 'js/firebase-config.js';
+    import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import {
+      doc, getDoc, collection, getDocs, addDoc, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytesResumable, getDownloadURL }
+      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+    /* ── Constants ─────────────────────────────────── */
+    const MAX_SIZE         = 5 * 1024 * 1024;
+    const ALLOWED_TYPES    = ['image/jpeg', 'image/png', 'application/pdf'];
+    const ICON_MAP         = { 'image/jpeg': '🖼️', 'image/png': '🖼️', 'application/pdf': '📄' };
+
+    /* ── State ─────────────────────────────────────── */
+    let _txId        = null;
+    let _txData      = null;
+    let _selectedFile = null;
+
+    /* ── Bootstrap ─────────────────────────────────── */
+    const params = new URLSearchParams(window.location.search);
+    _txId = params.get('txId');
+
+    if (!_txId) {
+      showError('No transaction ID provided. Please return to Payment History.', 'page-error');
+      document.getElementById('upload-section').hidden = true;
+      document.getElementById('tx-detail-card').hidden = true;
+    }
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) { window.location.href = 'login.html'; return; }
+      if (_txId) {
+        loadTransaction(user.uid, _txId);
+        loadExistingProofs(_txId);
+      }
+    });
+
+    /* ── Load transaction ───────────────────────────── */
+    async function loadTransaction(userId, txId) {
+      try {
+        // Try to read from Firestore transactions collection (Developer A creates this)
+        let tx = null;
+        try {
+          const snap = await getDoc(doc(db, 'transactions', txId));
+          if (snap.exists()) {
+            tx = { id: snap.id, ...snap.data() };
+            // Security: verify this transaction belongs to the logged-in user
+            if (tx.userId && tx.userId !== userId) {
+              showError('You are not authorised to view this transaction.', 'page-error');
+              document.getElementById('tx-detail-card').hidden = true;
+              document.getElementById('upload-section').hidden = true;
+              return;
+            }
+          }
+        } catch (_) { /* fallback to mock below */ }
+
+        // Mock fallback for development
+        if (!tx) {
+          tx = {
+            id: txId,
+            userId,
+            groupId: 'mock-group',
+            amount: 500,
+            currency: 'ZAR',
+            status: 'pending',
+            paymentMethod: 'eft',
+            transactionId: null,
+            createdAt: null,
+          };
+        }
+
+        _txData = tx;
+        renderTxDetail(tx);
+
+      } catch (err) {
+        showError('Could not load transaction: ' + err.message, 'page-error');
+        document.getElementById('tx-loading').hidden = true;
+      }
+    }
+
+    function renderTxDetail(tx) {
+      document.getElementById('tx-loading').hidden = true;
+      document.getElementById('tx-detail-content').hidden = false;
+
+      const statusBadgeEl = document.getElementById('tx-status-badge');
+      statusBadgeEl.innerHTML = statusBadge(tx.status);
+
+      const list = document.getElementById('tx-detail-list');
+      const rows = [
+        { label: 'Transaction ID', value: tx.id },
+        { label: 'Amount',         value: `R ${(parseFloat(tx.amount) || 0).toFixed(2)}` },
+        { label: 'Method',         value: tx.paymentMethod === 'card' ? '💳 Card' : tx.paymentMethod === 'eft' ? '🏦 EFT' : '—' },
+        { label: 'Date',           value: formatTimestamp(tx.createdAt) },
+        { label: 'Status',         value: statusBadge(tx.status) },
+      ];
+
+      list.innerHTML = rows
+        .map(r => `
+          <li class="payment-receipt__row">
+            <span class="payment-receipt__row-label">${escHtml(r.label)}</span>
+            <span class="payment-receipt__row-value">${r.value}</span>
+          </li>`)
+        .join('');
+    }
+
+    /* ── Load existing proofs ───────────────────────── */
+    async function loadExistingProofs(txId) {
+      try {
+        const snap = await getDocs(
+          collection(db, 'transactions', txId, 'proofs')
+        );
+        if (snap.empty) return;
+
+        const section = document.getElementById('existing-proofs-section');
+        const ul      = document.getElementById('existing-proofs-list');
+        section.hidden = false;
+
+        snap.docs.forEach(d => {
+          const proof = d.data();
+          const li = document.createElement('li');
+          li.style.cssText =
+            'display:flex;align-items:center;gap:var(--space-3);' +
+            'padding:var(--space-3) var(--space-4);' +
+            'background:var(--color-surface-2);border:1px solid var(--color-border);' +
+            'border-radius:var(--radius-sm);font-size:0.88rem;';
+
+          const verifiedBadge = proof.verified
+            ? '<span class="status-badge status-badge--completed" style="margin-left:auto;">✓ Verified</span>'
+            : '<span class="status-badge status-badge--pending" style="margin-left:auto;">Pending review</span>';
+
+          li.innerHTML = `
+            <span aria-hidden="true">📄</span>
+            <div style="flex:1;min-width:0;">
+              <a href="${escAttr(proof.fileUrl)}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 style="color:var(--color-primary);font-weight:500;word-break:break-all;">
+                View uploaded proof
+              </a>
+              <p style="font-size:0.78rem;color:var(--color-text-muted);margin-top:2px;">
+                Uploaded ${formatTimestamp(proof.uploadedAt)}
+              </p>
+            </div>
+            ${verifiedBadge}
+          `;
+          ul.appendChild(li);
+        });
+
+      } catch (_) { /* proofs subcollection may not exist yet */ }
+    }
+
+    /* ── File handling ──────────────────────────────── */
+    const zone       = document.getElementById('upload-zone');
+    const fileInput  = document.getElementById('file-input');
+    const removeBtn  = document.getElementById('remove-file-btn');
+    const submitBtn  = document.getElementById('upload-submit-btn');
+
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    zone.addEventListener('dragover',  (e) => { e.preventDefault(); zone.classList.add('is-dragover'); });
+    zone.addEventListener('dragleave', ()  => zone.classList.remove('is-dragover'));
+    zone.addEventListener('drop',      (e) => {
+      e.preventDefault();
+      zone.classList.remove('is-dragover');
+      const file = e.dataTransfer?.files?.[0];
+      if (file) handleFileSelected(file);
+    });
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (file) handleFileSelected(file);
+    });
+    removeBtn.addEventListener('click', clearFileSelection);
+    submitBtn.addEventListener('click', handleUpload);
+
+    function handleFileSelected(file) {
+      hideAlert('upload-error');
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        showError('Invalid file type. Please upload a JPG, PNG, or PDF.', 'upload-error');
+        return;
+      }
+      if (file.size > MAX_SIZE) {
+        showError(
+          `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Max size is 5 MB.`,
+          'upload-error'
+        );
+        return;
+      }
+
+      _selectedFile = file;
+      const preview = document.getElementById('upload-preview');
+      preview.hidden = false;
+      document.getElementById('preview-filename').textContent = file.name;
+      document.getElementById('preview-filesize').textContent =
+        `${(file.size / 1024).toFixed(1)} KB`;
+
+      const iconEl = preview.querySelector('.proof-upload-preview__icon');
+      iconEl.textContent = ICON_MAP[file.type] || '📄';
+
+      zone.classList.add('has-file');
+      submitBtn.disabled = false;
+    }
+
+    function clearFileSelection() {
+      _selectedFile           = null;
+      fileInput.value         = '';
+      document.getElementById('upload-preview').hidden = true;
+      zone.classList.remove('has-file');
+      submitBtn.disabled      = true;
+      submitBtn.textContent   = 'Upload Proof';
+      hideAlert('upload-error');
+      hideAlert('page-success');
+    }
+
+    /* ── Upload to Firebase Storage + write proof doc ── */
+    async function handleUpload() {
+      if (!_selectedFile || !_txId) return;
+
+      const user = auth.currentUser;
+      if (!user) { window.location.href = 'login.html'; return; }
+
+      submitBtn.disabled    = true;
+      submitBtn.textContent = 'Uploading…';
+      hideAlert('upload-error');
+
+      const progressWrapper = document.getElementById('upload-progress');
+      const progressBar     = document.getElementById('progress-bar');
+      progressWrapper.hidden = false;
+
+      try {
+        const storage  = getStorage();
+        const fileName = `proof_${Date.now()}_${_selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const storagePath = `payment-proofs/${user.uid}/${_txId}/${fileName}`;
+        const storageRef  = ref(storage, storagePath);
+        const uploadTask  = uploadBytesResumable(storageRef, _selectedFile);
+
+        await new Promise((resolve, reject) => {
+          uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+              const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+              progressBar.style.width = `${pct}%`;
+              progressBar.setAttribute('aria-valuenow', String(pct));
+            },
+            reject,
+            resolve
+          );
+        });
+
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        // Write proof document to Firestore subcollection
+        // Schema: transactions/{txId}/proofs/{proofId}
+        await addDoc(collection(db, 'transactions', _txId, 'proofs'), {
+          uploadedBy:  user.uid,
+          fileUrl:     downloadUrl,
+          uploadedAt:  serverTimestamp(),
+          verified:    false,
+          verifiedBy:  null,
+          verifiedAt:  null,
+        });
+
+        progressWrapper.hidden = true;
+        progressBar.style.width = '0%';
+        submitBtn.textContent = '✓ Uploaded';
+
+        showAlert(
+          '✅ Proof uploaded successfully! Your group treasurer will review it shortly.',
+          'page-success'
+        );
+
+        // Reload existing proofs list
+        document.getElementById('existing-proofs-list').innerHTML = '';
+        await loadExistingProofs(_txId);
+        clearFileSelection();
+
+      } catch (err) {
+        progressWrapper.hidden = true;
+        progressBar.style.width = '0%';
+        submitBtn.disabled    = false;
+        submitBtn.textContent = 'Upload Proof';
+        showError(
+          'Upload failed: ' + (err.message || 'Unknown error. Please try again.'),
+          'upload-error'
+        );
+      }
+    }
+
+    /* ── Helpers ────────────────────────────────────── */
+    function statusBadge(status) {
+      const map = {
+        pending:    '<span class="status-badge status-badge--pending">Pending</span>',
+        processing: '<span class="status-badge status-badge--processing">Processing</span>',
+        completed:  '<span class="status-badge status-badge--completed">Completed</span>',
+        failed:     '<span class="status-badge status-badge--failed">Failed</span>',
+        cancelled:  '<span class="status-badge status-badge--cancelled">Cancelled</span>',
+      };
+      return map[status] || `<span class="status-badge">${escHtml(String(status || '—'))}</span>`;
+    }
+
+    function formatTimestamp(ts) {
+      if (!ts) return '—';
+      const ms = ts.toMillis ? ts.toMillis() : (typeof ts === 'number' ? ts : Date.parse(ts));
+      if (!ms || isNaN(ms)) return '—';
+      return new Date(ms).toLocaleString('en-ZA', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function showError(msg, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('payment-alert--hidden');
+    }
+    function showAlert(msg, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.remove('payment-alert--hidden');
+    }
+    function hideAlert(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('payment-alert--hidden');
+    }
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function escAttr(str) {
+      return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  </script>
+
+</body>
+</html>

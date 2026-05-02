@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - My Contributions</title>
+    <link rel="stylesheet" href="css/theme.css" />
     <link rel="stylesheet" href="css/contributions.css">
+    <link rel="stylesheet" href="css/payment.css" />
 </head>
 <body>
 
@@ -21,6 +23,9 @@
         <h1>Contribution Tracking</h1>
         <section id="dynamicContent"></section>
     </main>
+
+    <!-- Payment modal mount point -->
+    <div id="payment-modal-root"></div>
 
     <script type="module">
         import { auth, db } from 'js/firebase-config.js';
@@ -39,6 +44,11 @@
             getUserGroups,
             listenToMemberContributions
         } from 'js/contributions.js';
+        import { PaymentModal } from 'components/payment-modal.js';
+
+        // ── Payment modal ────────────────────────────────────────
+        const paymentModal = new PaymentModal();
+        paymentModal.onPaymentSuccess = () => loadMyPage();
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -165,7 +175,7 @@
             const table = document.createElement('table');
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
-            const headers = ['Amount', 'Date', 'Status'];
+            const headers = ['Amount', 'Date', 'Status', 'Payment'];
             headers.forEach(text => {
                 const th = document.createElement('th');
                 th.textContent = text;
@@ -211,6 +221,27 @@
                     } else {
                         statusCell.textContent = '⏳ Pending';
                     }
+
+                    // Add Pay button for pending / missed contributions
+                    if (contribution.status === 'pending' || contribution.status === 'missed') {
+                        const actionCell = row.insertCell(3);
+                        actionCell.setAttribute('data-label', 'Payment');
+                        const payBtn = document.createElement('button');
+                        payBtn.textContent = '💳 Pay';
+                        payBtn.className = 'btn btn--primary btn--sm';
+                        payBtn.addEventListener('click', () => {
+                            const user = auth.currentUser;
+                            if (!user) return;
+                            paymentModal.open({
+                                userId: user.uid,
+                                groupId: contribution.groupId,
+                                contributionId: contribution.id,
+                                amount: parseFloat(contribution.amount) || 0,
+                                groupName: groupId,
+                            });
+                        });
+                        actionCell.appendChild(payBtn);
+                    }
                 });
             });
         }
@@ -252,7 +283,24 @@
                     window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=my`;
                 });
                 listItem.appendChild(viewPayoutBtn);
-                
+
+                const makePaymentBtn = document.createElement('button');
+                makePaymentBtn.textContent = '💳 Make Payment';
+                makePaymentBtn.className = 'btn btn--primary btn--sm';
+                makePaymentBtn.style.marginLeft = '0.5rem';
+                makePaymentBtn.addEventListener('click', () => {
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    paymentModal.open({
+                        userId: user.uid,
+                        groupId: group.id,
+                        contributionId: `pending-${group.id}`,
+                        amount: group.contributionAmount || 0,
+                        groupName: group.name,
+                    });
+                });
+                listItem.appendChild(makePaymentBtn);
+
                 groupList.appendChild(listItem);
             });
             
