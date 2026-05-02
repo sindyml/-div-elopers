@@ -24,43 +24,30 @@ import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/
 // Just to verify the script is loading properly
 console.log("register is running");
 
-// STEP 4: Helper function that handles ALL OAuth sign-ins (Google, GitHub, LinkedIn)
-// I made this to avoid repeating the same code for each provider
-// provider = the OAuth service (Google, GitHub, etc.), providerName = just a label
+// STEP 4: Helper function that handles ALL OAuth sign-ins (Google, GitHub, Microsoft)
+// Assigns the default "Member" role to new OAuth users to prevent privilege escalation.
 async function handleOAuthSignIn(provider, providerName) {
   try {
-    // Opens a popup window for the user to sign in with their chosen account
     const result = await signInWithPopup(auth, provider);
-    const user = result.user;  // Firebase gives us the user object
+    const user = result.user;
     
     // Check if this user already exists in our Firestore database
     const userDoc = await getDoc(doc(db, "users", user.uid));
     
     if (!userDoc.exists()) {
-      // FIRST TIME USER: Ask them to choose a role
-      const role = prompt("Select your role: Member, Treasurer, or Admin");
-      
-      // Validate that they picked a valid role
-      if (role && ["Member", "Treasurer", "Admin"].includes(role)) {
-        // Save their info to Firestore so other pages know their role
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          displayName: user.displayName || "",
-          role: role,
-          provider: providerName,  // Track which OAuth they used
-          createdAt: new Date().toISOString()  // Timestamp for record keeping
-        });
-        alert("Account created successfully!");
-        window.location.href = "dashboard.html";  // Send them to the main app
-      } else {
-        // They picked an invalid role - delete the auth account to keep things clean
-        await user.delete();
-        alert("Invalid role selection. Registration cancelled.");
-        return;
-      }
+      // First-time OAuth user — create profile with default Member role.
+      // Role assignment via prompt() was removed as it allowed users to
+      // self-assign privileged roles (Admin/Treasurer) — a security risk.
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        displayName: user.displayName || "",
+        role: "Member",
+        provider: providerName,
+        createdAt: new Date().toISOString()
+      });
+      window.location.href = "dashboard.html";
     } else {
-      // RETURNING USER: Just welcome them back and redirect
-      alert("Welcome back!");
+      // Returning user — redirect to dashboard
       window.location.href = "dashboard.html";
     }
     

@@ -228,7 +228,6 @@ async function renderSADataWidget(container, groupBalance = 0) {
       ` : ''}
     </div>
   `;
-  injectWidgetStyles();
 }
 
 function injectWidgetStyles() {

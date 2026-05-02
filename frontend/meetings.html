@@ -13,21 +13,6 @@
   <link rel="stylesheet" href="css/meetings.css" />
 
   <!--
-    Firebase config is injected by Azure Static Web Apps at build time
-    via staticwebapp.config.json → applicationSettings.
-    The placeholder %FIREBASE_CONFIG% is replaced with a JSON string
-    at deploy time, making it available to meetings.js as
-    window.__FIREBASE_CONFIG__ — no API keys are committed to source.
-  -->
-  <script>
-    try {
-      window.__FIREBASE_CONFIG__ = JSON.parse('%FIREBASE_CONFIG%');
-    } catch (_) {
-      window.__FIREBASE_CONFIG__ = {};
-    }
-  </script>
-
-  <!--
     type="module" is required:
       - Enables ES import/export syntax in meetings.js.
       - Module scope is NOT global scope — functions defined inside a
@@ -37,14 +22,6 @@
       - Modules are deferred by default, so this tag is safe in <head>.
   -->
   <script type="module" src="js/meetings.js"></script>
-
-  <!--
-    Shared components (navbar, footer) are plain scripts that write
-    to their respective root elements and do not use ES module syntax,
-    so they remain classic <script> tags with defer.
-  -->
-  <script src="components/navbar.js" defer></script>
-  <script src="components/footer.js" defer></script>
 </head>
 
 <body>
@@ -454,11 +431,12 @@
 
   <!-- ── Shared footer ──────────────────────────────────── -->
   <footer id="footer-root"></footer>
-  <!-- firebase-compat-init.js must run first — it fetches config and initialises Firebase -->
+  <!-- Firebase compat SDK for navbar auth state -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="js/firebase-compat-init.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
-  <script src="js/meetings.js"></script>
 
 </body>
 </html>

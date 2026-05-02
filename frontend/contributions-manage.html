@@ -4,27 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - Manage Contributions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
 </head>
-<body>
+<body class="app-layout">
 
-    <header>
-        <h1>StokPal</h1>
-        <nav>
-            <button id="dashboardButton">Dashboard</button>
-            <button id="backButton">Back</button>
-            <button id="logoutButton">Logout</button>
-        </nav>
-    </header>
+    <div id="navbar-root"></div>
 
-    <main>
-        <h1>Manage Contributions</h1>
+    <main class="app-main">
+        <header class="page-header">
+            <hgroup>
+                <h1 class="page-header__title">Manage Contributions</h1>
+                <p class="page-header__sub">Confirm or flag member payments as Treasurer or Admin.</p>
+            </hgroup>
+        </header>
         <section id="manageContent"></section>
     </main>
 
+    <div id="footer-root"></div>
+
     <script type="module">
         import { auth, db } from 'js/firebase-config.js';
-        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { 
             getCurrentUserId,
@@ -38,35 +42,8 @@
         let activeGroupId = null;
         let activeUnsubscribe = null;
 
-        async function logout() {
-            try {
-                await signOut(auth);
-                window.location.href = 'login.html';
-            } catch (error) {
-                console.error('Logout failed:', error);
-            }
-        }
-
         function goToDashboard() {
             window.location.href = 'dashboard.html';
-        }
-
-        function goBack() {
-            if (activeGroupId) {
-                if (activeUnsubscribe) {
-                    activeUnsubscribe();
-                    activeUnsubscribe = null;
-                }
-                activeGroupId = null;
-                loadManagePage();
-                return;
-            }
-
-            if (document.referrer && document.referrer !== '') {
-                window.history.back();
-            } else {
-                window.location.href = 'dashboard.html';
-            }
         }
 
         function displayGroupList(groups, container) {
@@ -208,8 +185,6 @@
                         missButton.className = 'miss';
                         missButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'missed');
-                            
-                            // NEW: Create notification for the affected member
                             try {
                                 await addDoc(collection(db, 'notifications'), {
                                     userId: contribution.userId,
@@ -218,7 +193,6 @@
                                     createdAt: new Date(),
                                     contributionId: contribution.id
                                 });
-                                console.log('Notification sent to member');
                             } catch (notifError) {
                                 console.error('Failed to send notification:', notifError);
                             }
@@ -240,12 +214,17 @@
         }
 
         function displayNoGroupsMessage(container) {
-            container.innerHTML = `
-                <p>You are not assigned as a treasurer for any group.</p>
-                <p>Ask an Admin to assign you as treasurer.</p>
-                <button id="dashboardBtn">Go to Dashboard</button>
-            `;
-            document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
+            container.innerHTML = '';
+            const p1 = document.createElement('p');
+            p1.textContent = 'You are not assigned as a treasurer for any group.';
+            const p2 = document.createElement('p');
+            p2.textContent = 'Ask an Admin to assign you as treasurer.';
+            const btn = document.createElement('button');
+            btn.textContent = 'Go to Dashboard';
+            btn.addEventListener('click', goToDashboard);
+            container.appendChild(p1);
+            container.appendChild(p2);
+            container.appendChild(btn);
         }
 
         async function loadManagePage() {
@@ -257,11 +236,15 @@
 
             const userRole = await getCurrentUserRole();
             if (userRole !== 'Treasurer' && userRole !== 'Admin') {
-                document.getElementById('manageContent').innerHTML = `
-                    <p>Access denied. Only Treasurers and Admins can access this page.</p>
-                    <button id="dashboardBtn">Go to Dashboard</button>
-                `;
-                document.getElementById('dashboardBtn')?.addEventListener('click', goToDashboard);
+                const container = document.getElementById('manageContent');
+                container.innerHTML = '';
+                const p = document.createElement('p');
+                p.textContent = 'Access denied. Only Treasurers and Admins can access this page.';
+                const btn = document.createElement('button');
+                btn.textContent = 'Go to Dashboard';
+                btn.addEventListener('click', goToDashboard);
+                container.appendChild(p);
+                container.appendChild(btn);
                 return;
             }
 
@@ -280,11 +263,21 @@
             }
         }
 
-        document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
-        document.getElementById('backButton').addEventListener('click', goBack);
-        document.getElementById('logoutButton').addEventListener('click', logout);
-
-        loadManagePage();
+        // Wait for Firebase auth state before loading page data
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadManagePage();
+        });
     </script>
+
+    <!-- Firebase compat SDK for navbar auth state -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="js/firebase-compat-init.js"></script>
+    <script src="components/navbar.js"></script>
+    <script src="components/footer.js"></script>
 </body>
 </html>

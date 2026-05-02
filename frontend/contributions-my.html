@@ -4,32 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StokPal - My Contributions</title>
-    <link rel="stylesheet" href="css/theme.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
     <link rel="stylesheet" href="css/payment.css" />
 </head>
-<body>
+<body class="app-layout">
 
-    <header>
-        <h1>StokPal</h1>
-        <nav>
-            <button id="dashboardButton">Dashboard</button>
-            <button id="backButton">Back</button>
-            <button id="logoutButton">Logout</button>
-        </nav>
-    </header>
+    <div id="navbar-root"></div>
 
-    <main>
-        <h1>Contribution Tracking</h1>
+    <main class="app-main">
+        <header class="page-header">
+            <hgroup>
+                <h1 class="page-header__title">Contribution Tracking</h1>
+                <p class="page-header__sub">View and track your stokvel contributions.</p>
+            </hgroup>
+        </header>
         <section id="dynamicContent"></section>
     </main>
 
     <!-- Payment modal mount point -->
     <div id="payment-modal-root"></div>
 
+    <div id="footer-root"></div>
+
     <script type="module">
         import { auth, db } from 'js/firebase-config.js';
-        import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             collection, 
             query, 
@@ -63,28 +66,7 @@
         let activeTableSection = null;
         let notificationsUnsubscribe = null;
 
-        async function logout() {
-            try {
-                await signOut(auth);
-                window.location.href = 'login.html';
-            } catch (error) {
-                console.error('Logout failed:', error);
-            }
-        }
-
-        function goToDashboard() {
-            window.location.href = 'dashboard.html';
-        }
-
-        function goBack() {
-            if (document.referrer && document.referrer !== '') {
-                window.history.back();
-            } else {
-                window.location.href = 'dashboard.html';
-            }
-        }
-
-        // NEW: Show notification banner
+        // Show notification banner safely using DOM construction (no innerHTML)
         function showNotificationBanner(message, notificationId) {
             // Check if banner already exists for this notification
             if (document.getElementById(`notif-${notificationId}`)) return;
@@ -100,25 +82,26 @@
             banner.style.justifyContent = 'space-between';
             banner.style.alignItems = 'center';
             banner.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-            
-            banner.innerHTML = `
-                <span>🔔 ${message}</span>
-                <button class="dismiss-notif" data-id="${notificationId}" style="background:white; color:#ff9800; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">Dismiss</button>
-            `;
-            
-            // Insert at top of main content
-            const main = document.querySelector('main');
-            const firstChild = main.firstChild;
-            main.insertBefore(banner, firstChild);
-            
-            // Add dismiss event listener
-            const dismissBtn = banner.querySelector('.dismiss-notif');
+
+            const textSpan = document.createElement('span');
+            textSpan.textContent = '🔔 ' + message;
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Dismiss';
+            dismissBtn.style.cssText = 'background:white; color:#ff9800; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;';
             dismissBtn.addEventListener('click', async () => {
                 await updateDoc(doc(db, 'notifications', notificationId), {
                     read: true
                 });
                 banner.remove();
             });
+
+            banner.appendChild(textSpan);
+            banner.appendChild(dismissBtn);
+            
+            // Insert at top of main content
+            const main = document.querySelector('main');
+            main.insertBefore(banner, main.firstChild);
         }
 
         // NEW: Listen for notifications
@@ -142,9 +125,6 @@
         }
 
         function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
-            console.log('=== displayContributionsTable ===');
-            console.log('Looking for groupId:', groupId);
-            console.log('Group name:', groupName);
             // Remove active table if exists
             if (activeTableSection && activeTableSection.parentNode) {
                 activeTableSection.remove();
@@ -201,11 +181,7 @@
             activeTableSection = tableSection;
 
             activeUnsubscribe = listenToMemberContributions(getCurrentUserId(), (allContributions) => {
-                console.log('=== LISTENER CALLBACK ===');
-    console.log('All contributions received:', allContributions);
-    console.log('Looking for groupId:', groupId);
                 const groupContributions = allContributions.filter(c => c.groupId === groupId);
-                console.log('Filtered contributions:', groupContributions);
                 const targetTbody = document.getElementById(`contributions-body-${groupId}`);
                 if (!targetTbody) return;
                 
@@ -348,7 +324,7 @@
                 return;
             }
             
-            // NEW: Start listening for notifications
+            // Start listening for notifications
             if (notificationsUnsubscribe) {
                 notificationsUnsubscribe();
             }
@@ -367,11 +343,21 @@
             }
         }
 
-        document.getElementById('dashboardButton').addEventListener('click', goToDashboard);
-        document.getElementById('backButton').addEventListener('click', goBack);
-        document.getElementById('logoutButton').addEventListener('click', logout);
-
-        loadMyPage();
+        // Wait for Firebase auth state before loading page data
+        auth.onAuthStateChanged((user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadMyPage();
+        });
     </script>
+
+    <!-- Firebase compat SDK for navbar auth state -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="js/firebase-compat-init.js"></script>
+    <script src="components/navbar.js"></script>
+    <script src="components/footer.js"></script>
 </body>
 </html>

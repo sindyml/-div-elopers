@@ -114,7 +114,14 @@ function listenToGroupContributions(groupId, onUpdateCallback) {
 async function getPayoutSchedule(groupId) {
     const q = query(collection(db, COLLECTIONS.PAYOUTS), where('groupId', '==', groupId), orderBy('order', 'asc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snapshot.docs.map(d => {
+        const data = d.data();
+        // Convert Firestore Timestamp to ISO date string for display and comparison
+        if (data.payoutDate && typeof data.payoutDate.toDate === 'function') {
+            data.payoutDate = data.payoutDate.toDate().toISOString().slice(0, 10);
+        }
+        return { id: d.id, ...data };
+    });
 }
 
 export {

@@ -168,7 +168,6 @@ export function buildMeetingItem(meeting, role) {
   const day       = d.getDate();
   const monthStr  = d.toLocaleString('en-ZA', { month: 'short' }).toUpperCase();
   const title     = (meeting.title || meeting.agenda?.split('\n')[0] || 'Untitled').substring(0, 60);
-  const safeTitle = title.replace(/'/g, "\\'");
   const hasMinutes = !!(meeting.minutes && meeting.minutes.trim());
 
   const canEditMinutes  = role === ROLES.ADMIN || role === ROLES.TREASURER;
@@ -178,47 +177,99 @@ export function buildMeetingItem(meeting, role) {
   li.className         = isPast ? 'past' : 'upcoming';
   li.dataset.meetingId = meeting.id;
 
-  li.innerHTML = `
-    <time class="date-block" datetime="${meeting.date}">
-      <strong>${day}</strong>
-      <em>${monthStr}</em>
-    </time>
-    <article class="meeting-details">
-      <h3>${title}</h3>
-      <ul class="meta" aria-label="Meeting details">
-        <li><time datetime="${meeting.time}">${meeting.time}</time></li>
-        <li><address>${meeting.location}</address></li>
-        <li><mark class="badge ${isPast ? 'badge-past' : 'badge-upcoming'}">${isPast ? 'Past' : 'Upcoming'}</mark></li>
-        ${hasMinutes ? '<li><mark class="badge badge-past">Minutes recorded</mark></li>' : ''}
-      </ul>
-    </article>
-    <button class="ghost" type="button" aria-label="${minutesBtnLabel} minutes for ${title}" onclick="openMinutes('${meeting.id}', '${safeTitle}', ${canEditMinutes})">
-      ${minutesBtnLabel}
-    </button>
-  `;
+  const timeBlock = document.createElement('time');
+  timeBlock.className     = 'date-block';
+  timeBlock.dateTime      = meeting.date;
+  const dayEl = document.createElement('strong');
+  dayEl.textContent = String(day);
+  const monthEl = document.createElement('em');
+  monthEl.textContent = monthStr;
+  timeBlock.appendChild(dayEl);
+  timeBlock.appendChild(monthEl);
+
+  const article = document.createElement('article');
+  article.className = 'meeting-details';
+
+  const h3 = document.createElement('h3');
+  h3.textContent = title;
+
+  const metaUl = document.createElement('ul');
+  metaUl.className = 'meta';
+  metaUl.setAttribute('aria-label', 'Meeting details');
+
+  const timeLi = document.createElement('li');
+  const timeEl = document.createElement('time');
+  timeEl.dateTime    = meeting.time || '';
+  timeEl.textContent = meeting.time || '';
+  timeLi.appendChild(timeEl);
+
+  const locLi = document.createElement('li');
+  const addr = document.createElement('address');
+  addr.textContent = meeting.location || '';
+  locLi.appendChild(addr);
+
+  const badgeLi = document.createElement('li');
+  const badge = document.createElement('mark');
+  badge.className   = `badge ${isPast ? 'badge-past' : 'badge-upcoming'}`;
+  badge.textContent = isPast ? 'Past' : 'Upcoming';
+  badgeLi.appendChild(badge);
+
+  metaUl.appendChild(timeLi);
+  metaUl.appendChild(locLi);
+  metaUl.appendChild(badgeLi);
+
+  if (hasMinutes) {
+    const minutesBadgeLi = document.createElement('li');
+    const minutesBadge = document.createElement('mark');
+    minutesBadge.className   = 'badge badge-past';
+    minutesBadge.textContent = 'Minutes recorded';
+    minutesBadgeLi.appendChild(minutesBadge);
+    metaUl.appendChild(minutesBadgeLi);
+  }
+
+  article.appendChild(h3);
+  article.appendChild(metaUl);
+
+  const minutesBtn = document.createElement('button');
+  minutesBtn.className   = 'ghost';
+  minutesBtn.type        = 'button';
+  minutesBtn.setAttribute('aria-label', `${minutesBtnLabel} minutes for ${title}`);
+  minutesBtn.textContent = minutesBtnLabel;
+  minutesBtn.addEventListener('click', () => openMinutes(meeting.id, title, canEditMinutes));
+
+  li.appendChild(timeBlock);
+  li.appendChild(article);
+  li.appendChild(minutesBtn);
+
   return li;
+}
+
+function setScheduleStatus(message) {
+  const statusEl = document.getElementById('schedule-status');
+  if (statusEl) statusEl.textContent = message;
 }
 
 const scheduleForm = document.getElementById('schedule-form');
 if (scheduleForm) {
   scheduleForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    setScheduleStatus('');
     if (currentRole !== ROLES.ADMIN && currentRole !== ROLES.TREASURER) {
-      alert('Only Admins and Treasurers can schedule meetings.');
+      setScheduleStatus('Only Admins and Treasurers can schedule meetings.');
       return;
     }
     const data = Object.fromEntries(new FormData(e.currentTarget));
     if (!data.group || !data.date || !data.time || !data.location || !data.agenda) {
-      alert('Please fill in all required fields.');
+      setScheduleStatus('Please fill in all required fields.');
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
     if (data.date < today) {
-      alert('Please select a future date.');
+      setScheduleStatus('Please select a future date.');
       return;
     }
     if (data.time < MEETING_TIME.MIN || data.time > MEETING_TIME.MAX) {
-      alert('Meeting time must be between 8:00 AM and 8:00 PM.');
+      setScheduleStatus('Meeting time must be between 8:00 AM and 8:00 PM.');
       return;
     }
     const submitBtn = e.currentTarget.querySelector('button[type="submit"]');
@@ -237,6 +288,7 @@ if (scheduleForm) {
         createdAt: serverTimestamp(),
       });
       e.currentTarget.reset();
+      setScheduleStatus('');
     } catch (err) {
       console.error('Failed to schedule meeting:', err);
     } finally {
@@ -271,8 +323,12 @@ export async function saveMinutes() {
   if (currentRole !== ROLES.ADMIN && currentRole !== ROLES.TREASURER) return;
   const textarea = document.getElementById('minutes-text');
   const text = textarea ? textarea.value.trim() : '';
-  if (!text) return;
-  const saveBtn = document.querySelector('#minutes-form button[type="submit"]');
+  const minutesStatus = document.getElementById('minutes-status');
+  if (!text) {
+    if (minutesStatus) minutesStatus.textContent = 'Please enter meeting minutes before saving.';
+    return;
+  }
+  const saveBtn = document.getElementById('minutes-save-btn');
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
@@ -283,11 +339,13 @@ export async function saveMinutes() {
       minutesUpdatedAt: serverTimestamp(),
       minutesUpdatedBy: currentUser.uid,
     });
+    if (minutesStatus) minutesStatus.textContent = '';
     const dialog = document.getElementById('minutes-dialog');
     if (dialog) dialog.close();
     showNotification('Minutes saved successfully.');
   } catch (err) {
     console.error('Failed to save minutes:', err);
+    if (minutesStatus) minutesStatus.textContent = 'Failed to save minutes. Please try again.';
   } finally {
     if (saveBtn) {
       saveBtn.disabled = false;
@@ -301,13 +359,13 @@ export function showNotification(message) {
   const banner = document.getElementById('notification-banner');
   const body = document.getElementById('notification-body');
   if (body) body.textContent = message;
-  if (banner) banner.style.display = 'block';
+  if (banner) banner.removeAttribute('hidden');
   clearTimeout(showNotification._timer);
   showNotification._timer = setTimeout(closeBanner, 6000);
 }
 export function closeBanner() {
   const banner = document.getElementById('notification-banner');
-  if (banner) banner.style.display = 'none';
+  if (banner) banner.setAttribute('hidden', '');
 }
 window.closeBanner = closeBanner;
 
@@ -323,6 +381,27 @@ export function formatDate(isoDate) {
   if (!isoDate) return '';
   return new Date(isoDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+// ── Minutes form submit ────────────────────────────────────
+const minutesForm = document.getElementById('minutes-form');
+if (minutesForm) {
+  minutesForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveMinutes();
+  });
+}
+
+// ── Delegated click handler for data-action buttons ────────
+document.addEventListener('click', (e) => {
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (!action) return;
+  if (action === 'close-banner') {
+    closeBanner();
+  } else if (action === 'close-minutes-dialog') {
+    const dialog = document.getElementById('minutes-dialog');
+    if (dialog) dialog.close();
+  }
+});
 
 window.addEventListener('beforeunload', () => {
   if (_unsubscribe) _unsubscribe();
