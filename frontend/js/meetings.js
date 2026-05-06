@@ -44,11 +44,11 @@ auth.onAuthStateChanged(async (user) => {
 
     const groups = await getUserGroups(user.uid);
     if (groups.length > 0) {
-      currentGroupId = groups[0].id;
+      currentGroupId = groups[0].id; // default to first group
     }
 
     applyRoleUI(currentRole);
-    await loadUserGroups();
+    await loadUserGroups(groups); // pass the full groups array
     startMeetingListener(currentRole);
 
   } catch (err) {
@@ -74,12 +74,25 @@ export function applyRoleUI(role) {
   }
 }
 
-export async function loadUserGroups() {
+/**
+ * Populates the group <select> from the groups array already returned
+ * by getUserGroups() — no extra Firestore read needed.
+ *
+ * Each group object is expected to have { id, name } properties,
+ * which is what getUserGroups() should return when it maps snapshots:
+ *   docs.map(doc => ({ id: doc.id, ...doc.data() }))
+ *
+ * If getUserGroups() returns raw DocumentSnapshots instead of plain
+ * objects, update groupService.js to map them as shown above.
+ *
+ * @param {Array<{id: string, name: string}>} groups
+ */
+export async function loadUserGroups(groups = []) {
   const select = document.getElementById('meeting-group');
   if (!select) return;
   select.innerHTML = '<option value="" disabled selected>Select a group</option>';
 
-  if (!currentGroupId) {
+  if (!groups.length) {
     const opt    = document.createElement('option');
     opt.disabled = true;
     opt.textContent = 'You are not in any groups yet';
@@ -87,19 +100,19 @@ export async function loadUserGroups() {
     return;
   }
 
-  try {
-    const groupSnap = await getDoc(doc(db, COLLECTIONS.GROUPS, currentGroupId));
-    if (!groupSnap.exists()) return;
-
+  groups.forEach((group, index) => {
     const opt       = document.createElement('option');
-    opt.value       = groupSnap.id;
-    opt.textContent = groupSnap.data().name;
-    opt.selected    = true;
+    opt.value       = group.id;
+    opt.textContent = group.name;
+    if (index === 0) opt.selected = true;
     select.appendChild(opt);
+  });
 
-  } catch (err) {
-    console.error('Failed to load group:', err);
-  }
+  // Re-initialise the meeting listener whenever the user switches group
+  select.addEventListener('change', () => {
+    currentGroupId = select.value;
+    startMeetingListener(currentRole);
+  });
 }
 
 export function startMeetingListener(role) {
