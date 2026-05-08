@@ -1,12 +1,38 @@
-// server.js — lightweight static file server for Azure Web App
+// server.js — Static file server with Payment API integration
 // Serves all HTML/CSS/JS files from the frontend/ directory
 // Also provides /api/getSAData proxy for Frankfurter API (CORS fallback)
+// And /api/payments/* endpoints for Yoco payment processing
 
 const http    = require('http');
 const https   = require('https');
 const fs      = require('fs');
 const path    = require('path');
+const admin   = require('firebase-admin');
 const PORT    = process.env.PORT || 8080;
+
+// Import payment routes
+const paymentRoutes = require('./api/payments');
+
+// Initialize Firebase Admin (if not already initialized)
+if (!admin.apps.length) {
+  // Check if running in Azure with environment variables
+  if (process.env.FIREBASE_PROJECT_ID) {
+    admin.initializeApp({
+      credential: admin.credential.applicationDefault(),
+      projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+  } else {
+    // Local development - use service account key file
+    try {
+      const serviceAccount = require('../firebase/service-account-key.json');
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+    } catch (error) {
+      console.warn('Firebase Admin not initialized. Payment features will be limited.');
+    }
+  }
+}
 
 // Resolve the frontend directory (one level up from backend/)
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
@@ -44,12 +70,107 @@ function sendFallbackSAData(res, saStatic) {
   res.end(JSON.stringify(payload));
 }
 
+// Helper to parse JSON body for POST requests
+function parseJSONBody(req, callback) {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    try {
+      callback(null, body ? JSON.parse(body) : {});
+    } catch (error) {
+      callback(error, null);
+    }
+  });
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
 
+  // ── API: /api/payments/* - Payment endpoints ─────────────────
+  if (urlPath.startsWith('/api/payments/')) {
+    // Extract the payment endpoint path (remove /api/payments)
+    const paymentPath = urlPath.replace('/api/payments', '');
+    
+    // Create a fake Express-like request object for our payment routes
+    const fakeReq = {
+      method: req.method,
+      url: paymentPath,
+      headers: req.headers,
+      body: null,
+      params: {},
+      query: {},
+      user: null,
+    };
+    
+    const fakeRes = {
+      statusCode: 200,
+      headers: {},
+      json: (data) => {
+        fakeRes.setHeader('Content-Type', 'application/json');
+        fakeRes.end(JSON.stringify(data));
+      },
+      status: (code) => {
+        fakeRes.statusCode = code;
+        return fakeRes;
+      },
+      setHeader: (key, value) => {
+        fakeRes.headers[key] = value;
+      },
+      end: (data) => {
+        fakeRes.headers['Content-Type'] = fakeRes.headers['Content-Type'] || 'application/json';
+        Object.keys(fakeRes.headers).forEach(key => {
+          res.setHeader(key, fakeRes.headers[key]);
+        });
+        res.writeHead(fakeRes.statusCode);
+        res.end(data);
+      },
+      getHeader: (key) => fakeRes.headers[key],
+    };
+    
+    // Parse body for POST/PUT requests
+    if (req.method === 'POST' || req.method === 'PUT') {
+      parseJSONBody(req, (err, body) => {
+        if (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          return;
+        }
+        fakeReq.body = body;
+        
+        // Add helper to get params
+        fakeReq.params = {};
+        const match = paymentPath.match(/\/status\/(.+)$/);
+        if (match) fakeReq.params.paymentId = match[1];
+        
+        const historyMatch = paymentPath.match(/\/history\/(.+)$/);
+        if (historyMatch) fakeReq.params.userId = historyMatch[1];
+        
+        // Call payment route handler
+        paymentRoutes(fakeReq, fakeRes);
+      });
+    } else {
+      // Handle GET requests
+      fakeReq.body = {};
+      
+      // Parse query parameters
+      const urlObj = new URL(req.url, `http://${req.headers.host}`);
+      fakeReq.query = Object.fromEntries(urlObj.searchParams);
+      
+      // Extract params from URL
+      fakeReq.params = {};
+      const match = paymentPath.match(/\/status\/(.+)$/);
+      if (match) fakeReq.params.paymentId = match[1];
+      
+      const historyMatch = paymentPath.match(/\/history\/(.+)$/);
+      if (historyMatch) fakeReq.params.userId = historyMatch[1];
+      
+      // Call payment route handler
+      paymentRoutes(fakeReq, fakeRes);
+    }
+    return;
+  }
+
   // ── API: /api/getFirebaseConfig ────────────────────────────
-  // Returns Firebase client config from environment variables.
-  // Mirrors the Azure Function in backend/api/getFirebaseConfig/.
   if (urlPath === '/api/getFirebaseConfig' && req.method === 'GET') {
     const config = {
       apiKey:            process.env.FIREBASE_API_KEY            || '',
@@ -77,11 +198,9 @@ const server = http.createServer((req, res) => {
   }
 
   // ── API proxy: /api/getSAData ──────────────────────────────
-  // Proxies Frankfurter API server-side to avoid browser CORS issues.
   if (urlPath === '/api/getSAData' && req.method === 'GET') {
     const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
 
-    // SA rates (updated each sprint — SARB MPC decision)
     const SA_STATIC = {
       primeRate:      10.25,
       inflationRate:   4.0,
@@ -125,13 +244,10 @@ const server = http.createServer((req, res) => {
   }
 
   // ── Static file serving ────────────────────────────────────
-  // Sanitise URL — strip query strings and prevent directory traversal
   let staticPath = decodeURIComponent(urlPath).replace(/\.\./g, '');
 
-  // Default to index.html for root
   if (staticPath === '/') staticPath = '/index.html';
 
-  // If URL has no extension, try adding .html (clean URLs)
   const ext = path.extname(staticPath);
   if (!ext) staticPath = staticPath + '.html';
 
@@ -139,7 +255,6 @@ const server = http.createServer((req, res) => {
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      // File not found — serve index.html (SPA-style fallback)
       fs.readFile(path.join(FRONTEND_DIR, 'index.html'), (err2, fallback) => {
         if (err2) {
           res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -165,4 +280,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`StokPal server running on port ${PORT}`);
+  console.log(`Payment API available at: http://localhost:${PORT}/api/payments/`);
 });

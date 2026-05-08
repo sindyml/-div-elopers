@@ -18,7 +18,11 @@
     "type": "git",
     "url": "git+https://github.com/SindyMl/-div-elopers.git"
   },
-  "keywords": ["stokvel", "firebase", "azure"],
+  "keywords": [
+    "stokvel",
+    "firebase",
+    "azure"
+  ],
   "author": "Sindiswa, Alondwe, Ziya, Owen, Athandwa & Kwezi",
   "license": "ISC",
   "bugs": {
@@ -26,7 +30,9 @@
   },
   "homepage": "https://github.com/SindyMl/-div-elopers#readme",
   "dependencies": {
-    "firebase": "^12.11.0"
+    "axios": "^1.16.0",
+    "firebase": "^12.11.0",
+    "firebase-admin": "^13.9.0"
   },
   "devDependencies": {
     "jest": "^30.3.0"
