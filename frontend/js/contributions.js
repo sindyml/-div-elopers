@@ -1,4 +1,3 @@
-// contributions/contributions.js
 import { auth, db } from '../js/firebase-config.js';
 import {
     collection,
@@ -11,6 +10,8 @@ import {
     onSnapshot,
     updateDoc,
     serverTimestamp,
+    addDoc,
+    setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getUserGroups as fetchUserGroups } from '../js/groupService.js';
 import { getUserProfile } from '../js/userService.js';
@@ -56,6 +57,122 @@ async function getMemberName(userId) {
     return profile ? (profile.displayName || profile.email) : userId;
 }
 
+// ============================================================
+// NEW: Get user's display name for greeting
+// ============================================================
+async function getUserDisplayName(userId) {
+    const profile = await getUserProfile(userId);
+    return profile ? (profile.displayName || profile.email || 'Member') : 'Member';
+}
+
+// ============================================================
+// NEW: Get disputes for a specific member
+// ============================================================
+async function getMemberDisputes(userId) {
+    const q = query(
+        collection(db, 'disputes'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString().split('T')[0] : data.createdAt
+        };
+    });
+}
+
+// ============================================================
+// NEW: Create a dispute for a missed payment
+// ============================================================
+async function createDispute(contributionId, userId, groupId, groupName, amount, deadlineDate, reason) {
+    await addDoc(collection(db, 'disputes'), {
+        contributionId: contributionId,
+        userId: userId,
+        groupId: groupId,
+        groupName: groupName,
+        amount: amount,
+        deadlineDate: deadlineDate,
+        reason: reason,
+        status: 'pending',
+        rejectionReason: null,
+        createdAt: new Date(),
+        resolvedAt: null,
+        resolvedBy: null
+    });
+}
+
+// ============================================================
+// NEW: Real-time listener for member notifications
+// ============================================================
+function listenToNotifications(userId, onNotificationCallback) {
+    const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === 'added') {
+                const notification = change.doc.data();
+                const notificationId = change.doc.id;
+                onNotificationCallback(notification.message, notificationId);
+            }
+        });
+    });
+}
+
+// ============================================================
+// NEW: Get all pending disputes (for treasurer)
+// ============================================================
+async function getPendingDisputes() {
+    const q = query(
+        collection(db, 'disputes'),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
+}
+
+// ============================================================
+// NEW: Approve a dispute and update contribution status
+// ============================================================
+async function approveDispute(disputeId, contributionId) {
+    // Update dispute status
+    await updateDoc(doc(db, 'disputes', disputeId), {
+        status: 'approved',
+        resolvedAt: new Date(),
+        resolvedBy: getCurrentUserId()
+    });
+    
+    // Update contribution status to confirmed
+    await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
+        status: 'confirmed',
+        confirmedAt: new Date()
+    });
+}
+
+// ============================================================
+// NEW: Reject a dispute with reason
+// ============================================================
+async function rejectDispute(disputeId, rejectionReason) {
+    await updateDoc(doc(db, 'disputes', disputeId), {
+        status: 'rejected',
+        rejectionReason: rejectionReason,
+        resolvedAt: new Date(),
+        resolvedBy: getCurrentUserId()
+    });
+}
+
 async function getContributionsByMember(userId) {
     const q = query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('userId', '==', userId), orderBy('date', 'desc'));
     const snapshot = await getDocs(q);
@@ -72,22 +189,6 @@ async function updateContributionStatus(contributionId, newStatus) {
     await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
         status: newStatus,
         confirmedAt: new Date()
-    });
-}
-
-/**
- * Mark a contribution as paid after a successful payment transaction.
- * Sets status → 'confirmed', records the transactionId, and timestamps the payment.
- *
- * @param {string} contributionId  Firestore document ID of the contribution.
- * @param {string} transactionId   Payment transaction ID (from Yoco or mock).
- */
-async function markContributionAsPaid(contributionId, transactionId) {
-    await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
-        status: 'confirmed',
-        transactionId,
-        paidAt: serverTimestamp(),
-        confirmedAt: serverTimestamp(),
     });
 }
 
@@ -131,10 +232,16 @@ export {
     getTreasurerGroups,
     getGroupById,
     getMemberName,
+    getUserDisplayName,
+    getMemberDisputes,
+    createDispute,
+    listenToNotifications,
+    getPendingDisputes,
+    approveDispute,
+    rejectDispute,
     getContributionsByMember,
     getContributionsByGroup,
     updateContributionStatus,
-    markContributionAsPaid,
     getPayoutSchedule,
     listenToMemberContributions,
     listenToGroupContributions

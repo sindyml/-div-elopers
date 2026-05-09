@@ -22,6 +22,28 @@
                 <p class="page-header__sub">Confirm or flag member payments as Treasurer or Admin.</p>
             </hgroup>
         </header>
+
+        <!-- PENDING DISPUTES section -->
+        <section id="pending-disputes-section">
+            <h2>PENDING DISPUTES</h2>
+            <button id="viewPendingDisputesBtn" class="btn btn--primary">View Pending Disputes</button>
+            <section id="pendingDisputesContainer">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Member</th>
+                            <th>Group</th>
+                            <th>Amount</th>
+                            <th>Deadline</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingDisputesTableBody"></tbody>
+                </table>
+            </section>
+        </section>
+
         <section id="manageContent"></section>
     </main>
 
@@ -29,14 +51,17 @@
 
     <script type="module">
         import { auth, db } from 'js/firebase-config.js';
-        import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { collection, addDoc, getDocs, query, where, updateDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
         import { 
             getCurrentUserId,
             getCurrentUserRole,
             getTreasurerGroups,
             getMemberName,
             updateContributionStatus,
-            listenToGroupContributions
+            listenToGroupContributions,
+            getPendingDisputes,
+            approveDispute,
+            rejectDispute
         } from 'js/contributions.js';
 
         let activeGroupId = null;
@@ -44,6 +69,58 @@
 
         function goToDashboard() {
             window.location.href = 'dashboard.html';
+        }
+
+        // Load pending disputes for treasurer
+        async function loadPendingDisputes() {
+            const disputes = await getPendingDisputes();
+            const tbody = document.getElementById('pendingDisputesTableBody');
+            tbody.innerHTML = '';
+            
+            if (disputes.length === 0) {
+                const row = tbody.insertRow();
+                const cell = row.insertCell(0);
+                cell.colSpan = 6;
+                cell.textContent = 'No pending disputes.';
+                return;
+            }
+            
+            for (const dispute of disputes) {
+                const row = tbody.insertRow();
+                const memberName = await getMemberName(dispute.userId);
+                row.insertCell(0).textContent = memberName;
+                row.insertCell(1).textContent = dispute.groupName || '—';
+                row.insertCell(2).textContent = `R${dispute.amount || 0}`;
+                row.insertCell(3).textContent = dispute.deadlineDate || '—';
+                row.insertCell(4).textContent = dispute.reason || '—';
+                
+                const actionsCell = row.insertCell(5);
+                
+                const approveBtn = document.createElement('button');
+                approveBtn.textContent = 'Approve';
+                approveBtn.classList.add('btn', 'btn--success', 'btn--sm');
+                approveBtn.addEventListener('click', async () => {
+                    await approveDispute(dispute.id, dispute.contributionId);
+                    alert('Dispute approved. Contribution status updated to confirmed.');
+                    loadPendingDisputes(); // Refresh
+                    loadManagePage(); // Refresh contribution table
+                });
+                
+                const rejectBtn = document.createElement('button');
+                rejectBtn.textContent = 'Reject';
+                rejectBtn.classList.add('btn', 'btn--danger', 'btn--sm');
+                rejectBtn.addEventListener('click', async () => {
+                    const reason = prompt('Reason for rejection:');
+                    if (reason) {
+                        await rejectDispute(dispute.id, reason);
+                        alert('Dispute rejected.');
+                        loadPendingDisputes(); // Refresh
+                    }
+                });
+                
+                actionsCell.appendChild(approveBtn);
+                actionsCell.appendChild(rejectBtn);
+            }
         }
 
         function displayGroupList(groups, container) {
@@ -54,15 +131,11 @@
             container.appendChild(instruction);
 
             const groupList = document.createElement('ul');
-            groupList.style.listStyle = 'none';
-            groupList.style.padding = '0';
+            groupList.classList.add('group-list');
 
             groups.forEach(group => {
                 const listItem = document.createElement('li');
-                listItem.style.marginBottom = '1rem';
-                listItem.style.padding = '1rem';
-                listItem.style.border = '1px solid #ddd';
-                listItem.style.borderRadius = '8px';
+                listItem.classList.add('group-list-item');
 
                 const groupName = document.createElement('strong');
                 groupName.textContent = group.name;
@@ -71,6 +144,7 @@
 
                 const selectButton = document.createElement('button');
                 selectButton.textContent = 'Select';
+                selectButton.classList.add('btn', 'btn--primary');
                 selectButton.addEventListener('click', () => {
                     loadContributionsForGroup(group.id, group.name);
                 });
@@ -96,7 +170,7 @@
 
             const backToGroupsButton = document.createElement('button');
             backToGroupsButton.textContent = 'Back to Groups';
-            backToGroupsButton.style.marginBottom = '1rem';
+            backToGroupsButton.classList.add('btn', 'btn--secondary');
             backToGroupsButton.addEventListener('click', () => {
                 if (activeUnsubscribe) {
                     activeUnsubscribe();
@@ -110,7 +184,7 @@
             const table = document.createElement('table');
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
-            const headers = ['Member', 'Amount', 'Date', 'Status', 'Action'];
+            const headers = ['Member', 'Amount', 'Date', 'Status', 'Payment Evidence', 'Action'];
             headers.forEach(text => {
                 const th = document.createElement('th');
                 th.textContent = text;
@@ -126,7 +200,7 @@
 
             const payoutButton = document.createElement('button');
             payoutButton.textContent = 'View Payout Schedule';
-            payoutButton.style.marginTop = '1rem';
+            payoutButton.classList.add('btn', 'btn--secondary');
             payoutButton.addEventListener('click', () => {
                 window.location.href = `contributions-payout.html?groupId=${groupId}&returnTo=manage`;
             });
@@ -140,7 +214,7 @@
                 if (contributions.length === 0) {
                     const emptyRow = tbodyElement.insertRow();
                     const emptyCell = emptyRow.insertCell(0);
-                    emptyCell.colSpan = 5;
+                    emptyCell.colSpan = 6;
                     emptyCell.textContent = 'No contributions found for this group.';
                     return;
                 }
@@ -150,17 +224,13 @@
                     const memberName = await getMemberName(contribution.userId);
 
                     const memberCell = row.insertCell(0);
-                    memberCell.setAttribute('data-label', 'Member');
                     memberCell.textContent = memberName;
                     const amountCell = row.insertCell(1);
-                    amountCell.setAttribute('data-label', 'Amount');
                     amountCell.textContent = `R${contribution.amount}`;
                     const dateCell = row.insertCell(2);
-                    dateCell.setAttribute('data-label', 'Date');
                     dateCell.textContent = contribution.date;
 
                     const statusCell = row.insertCell(3);
-                    statusCell.setAttribute('data-label', 'Status');
                     if (contribution.status === 'confirmed') {
                         statusCell.textContent = '✅ Confirmed';
                     } else if (contribution.status === 'missed') {
@@ -169,20 +239,35 @@
                         statusCell.textContent = '⏳ Pending';
                     }
 
-                    const actionCell = row.insertCell(4);
-                    actionCell.setAttribute('data-label', 'Action');
+                    // Payment Evidence column
+                    const evidenceCell = row.insertCell(4);
+                    if (contribution.paymentEvidence === 'online') {
+                        evidenceCell.textContent = '💳 Online';
+                    } else if (contribution.paymentEvidence === 'proof' && contribution.evidenceUrl) {
+                        evidenceCell.textContent = '📎 Proof uploaded';
+                        const viewBtn = document.createElement('button');
+                        viewBtn.textContent = 'View';
+                        viewBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                        viewBtn.addEventListener('click', () => {
+                            window.open(contribution.evidenceUrl, '_blank');
+                        });
+                        evidenceCell.appendChild(viewBtn);
+                    } else {
+                        evidenceCell.textContent = '—';
+                    }
+
+                    const actionCell = row.insertCell(5);
                     if (contribution.status === 'pending') {
                         const confirmButton = document.createElement('button');
                         confirmButton.textContent = 'Confirm';
-                        confirmButton.className = 'confirm';
-                        confirmButton.style.marginRight = '0.5rem';
+                        confirmButton.classList.add('btn', 'confirm');
                         confirmButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'confirmed');
                         });
 
                         const missButton = document.createElement('button');
                         missButton.textContent = 'Miss';
-                        missButton.className = 'miss';
+                        missButton.classList.add('btn', 'miss');
                         missButton.addEventListener('click', async () => {
                             await updateContributionStatus(contribution.id, 'missed');
                             try {
@@ -221,6 +306,7 @@
             p2.textContent = 'Ask an Admin to assign you as treasurer.';
             const btn = document.createElement('button');
             btn.textContent = 'Go to Dashboard';
+            btn.classList.add('btn', 'btn--primary');
             btn.addEventListener('click', goToDashboard);
             container.appendChild(p1);
             container.appendChild(p2);
@@ -242,6 +328,7 @@
                 p.textContent = 'Access denied. Only Treasurers and Admins can access this page.';
                 const btn = document.createElement('button');
                 btn.textContent = 'Go to Dashboard';
+                btn.classList.add('btn', 'btn--primary');
                 btn.addEventListener('click', goToDashboard);
                 container.appendChild(p);
                 container.appendChild(btn);
@@ -262,6 +349,25 @@
                 displayGroupList(groups, container);
             }
         }
+
+        // Hide pending disputes container by default
+        const pendingContainer = document.getElementById('pendingDisputesContainer');
+        if (pendingContainer) {
+            pendingContainer.style.display = 'none';
+        }
+
+        // View Pending Disputes button handler
+        document.getElementById('viewPendingDisputesBtn').addEventListener('click', async () => {
+            const container = document.getElementById('pendingDisputesContainer');
+            if (container.style.display === 'none') {
+                await loadPendingDisputes();
+                container.style.display = 'block';
+                document.getElementById('viewPendingDisputesBtn').textContent = 'Hide Pending Disputes';
+            } else {
+                container.style.display = 'none';
+                document.getElementById('viewPendingDisputesBtn').textContent = 'View Pending Disputes';
+            }
+        });
 
         // Wait for Firebase auth state before loading page data
         auth.onAuthStateChanged((user) => {
