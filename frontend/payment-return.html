@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful | Stockpal</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .payment-return-container {
+      max-width: 600px;
+      margin: 100px auto;
+      padding: 40px;
+      text-align: center;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .payment-return-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    .payment-return-title {
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+    .payment-return-message {
+      font-size: 16px;
+      color: #7f8c8d;
+      margin-bottom: 30px;
+    }
+    .payment-status {
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .payment-status p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 30px;
+      background: #3498db;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 16px;
+      margin: 5px;
+    }
+    .btn:hover {
+      background: #2980b9;
+    }
+    .btn-secondary {
+      background: #95a5a6;
+    }
+    .btn-secondary:hover {
+      background: #7f8c8d;
+    }
+  </style>
+</head>
+<body>
+  <div class="payment-return-container">
+    <div class="payment-return-icon">⏳</div>
+    <h1 class="payment-return-title">Verifying Payment</h1>
+    <p class="payment-return-message">Please wait while we confirm your payment with PayFast...</p>
+
+    <div class="spinner"></div>
+
+    <div class="payment-status" id="status-message">
+      <p>Checking payment status...</p>
+    </div>
+
+    <div id="action-buttons" style="display: none;">
+      <a href="/frontend/dashboard.html" class="btn">Go to Dashboard</a>
+      <a href="/frontend/payment.html" class="btn btn-secondary">View Payment History</a>
+    </div>
+  </div>
+
+  <script type="module">
+    // Get payment ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentId = urlParams.get('paymentId') || localStorage.getItem('pendingPaymentId');
+
+    const statusMessage = document.getElementById('status-message');
+    const actionButtons = document.getElementById('action-buttons');
+    const icon = document.querySelector('.payment-return-icon');
+    const title = document.querySelector('.payment-return-title');
+    const message = document.querySelector('.payment-return-message');
+    const spinner = document.querySelector('.spinner');
+
+    if (!paymentId) {
+      icon.textContent = '❌';
+      title.textContent = 'No Payment Found';
+      message.textContent = 'Could not find payment information.';
+      statusMessage.innerHTML = '<p>Please contact support if you made a payment.</p>';
+      spinner.style.display = 'none';
+      actionButtons.style.display = 'block';
+    } else {
+      // Poll for payment status
+      let pollCount = 0;
+      const maxPolls = 30;
+
+      async function checkPaymentStatus() {
+        try {
+          const response = await fetch(`/api/payments/status/${paymentId}`);
+
+          if (!response.ok) {
+            throw new Error('Failed to check payment status');
+          }
+
+          const data = await response.json();
+
+          if (data.status === 'completed') {
+            // Payment successful
+            icon.textContent = '✅';
+            title.textContent = 'Payment Successful!';
+            message.textContent = 'Your payment has been confirmed.';
+            statusMessage.innerHTML = `
+              <p><strong>Payment ID:</strong> ${data.paymentId}</p>
+              <p><strong>Amount:</strong> R ${data.amount.toFixed(2)}</p>
+              <p><strong>Status:</strong> Completed</p>
+            `;
+            spinner.style.display = 'none';
+            actionButtons.style.display = 'block';
+            localStorage.removeItem('pendingPaymentId');
+          } else if (data.status === 'failed' || data.status === 'cancelled') {
+            // Payment failed
+            icon.textContent = '❌';
+            title.textContent = 'Payment Failed';
+            message.textContent = 'Your payment was not successful.';
+            statusMessage.innerHTML = `
+              <p><strong>Status:</strong> ${data.status}</p>
+              <p>Please try again or contact support.</p>
+            `;
+            spinner.style.display = 'none';
+            actionButtons.style.display = 'block';
+            localStorage.removeItem('pendingPaymentId');
+          } else {
+            // Still pending
+            pollCount++;
+            if (pollCount < maxPolls) {
+              statusMessage.innerHTML = `<p>Payment pending... (${pollCount}/${maxPolls})</p>`;
+              setTimeout(checkPaymentStatus, 2000);
+            } else {
+              // Timeout
+              icon.textContent = '⚠️';
+              title.textContent = 'Payment Verification Timeout';
+              message.textContent = 'We are still processing your payment.';
+              statusMessage.innerHTML = `
+                <p>Your payment may take a few minutes to process.</p>
+                <p>Please check your payment history in a few minutes.</p>
+              `;
+              spinner.style.display = 'none';
+              actionButtons.style.display = 'block';
+            }
+          }
+        } catch (error) {
+          console.error('Error checking payment status:', error);
+          pollCount++;
+          if (pollCount < maxPolls) {
+            setTimeout(checkPaymentStatus, 3000);
+          } else {
+            icon.textContent = '⚠️';
+            title.textContent = 'Connection Error';
+            message.textContent = 'Could not verify payment status.';
+            statusMessage.innerHTML = '<p>Please check your payment history or contact support.</p>';
+            spinner.style.display = 'none';
+            actionButtons.style.display = 'block';
+          }
+        }
+      }
+
+      // Start checking
+      checkPaymentStatus();
+    }
+  </script>
+</body>
+</html>

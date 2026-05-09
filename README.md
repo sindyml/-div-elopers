@@ -41,6 +41,7 @@ Stokvels are a cornerstone of South African financial culture — informal savin
 | **Authentication** | Firebase Auth with email/password; role-based access control (Admin, Treasurer, Member) |
 | **Group Management** | Create stokvel groups with a contribution amount, payout order, and meeting frequency; invite members by email |
 | **Contribution Tracking** | Members view contribution history; Treasurers confirm payments and flag missed contributions |
+| **Payment Integration** | PayFast payment gateway for secure card and EFT payments (ZAR only) |
 | **Meeting Management** | Schedule meetings (08:00–20:00), post agendas, record minutes; real-time notifications via Firestore `onSnapshot` |
 | **SA Data Widget** | Live prime rate, repo rate, inflation rate, and USD/ZAR exchange with a projected savings growth calculator |
 | **Dashboard** | Personalised view of group stats, upcoming meetings, and SA financial indicators |
@@ -55,7 +56,8 @@ Stokvels are a cornerstone of South African financial culture — informal savin
 | Authentication | Firebase Authentication (email/password) |
 | Database | Cloud Firestore (NoSQL, real-time) |
 | Data Connect | Firebase Data Connect (GraphQL schema) |
-| Server | Node.js static file server + `/api/getSAData` proxy |
+| Payments | PayFast Payment Gateway (ZAR transactions) |
+| Server | Node.js static file server + `/api/getSAData` proxy + `/api/payments` |
 | SA Data | Frankfurter API (live USD/ZAR); SARB static rates as fallback |
 | Hosting | Azure Static Web Apps |
 | CI/CD | GitHub Actions |
@@ -287,6 +289,7 @@ stockpal/
 - Git
 - A Firebase project (free Spark tier is sufficient)
 - An Azure account (free tier for Static Web Apps)
+- A PayFast account ([sign up here](https://www.payfast.co.za/)) or use sandbox for testing
 
 ### Local Setup
 
@@ -298,9 +301,12 @@ cd -div-elopers
 # 2. Install dependencies
 npm install
 
-# 3. Copy the environment template and fill in your Firebase values
+# 3. Copy the environment template and fill in your values
 cp .env.example .env
-# Edit .env with values from Firebase Console → Project Settings → General
+# Edit .env with:
+#   - Firebase values from Firebase Console → Project Settings → General
+#   - PayFast credentials from PayFast Dashboard → Settings → Integration
+#   - Or use sandbox credentials for testing (already in .env.example)
 
 # 4. Start the local server
 npm start
@@ -308,6 +314,8 @@ npm start
 ```
 
 > **Firebase config:** Firebase credentials are **not** stored in source code. They are loaded at runtime from environment variables via the `/api/getFirebaseConfig` Azure Function. See `.env.example` for the required variables and the [Secrets & Key Vault](#secrets--azure-key-vault) section below for production setup.
+
+> **PayFast config:** For local testing, use the sandbox credentials provided in `.env.example`. For production, get your credentials from the [PayFast Dashboard](https://www.payfast.co.za/login). See [docs/payfast-integration-guide.md](docs/payfast-integration-guide.md) for detailed setup instructions.
 
 ### Running Tests
 
@@ -333,7 +341,7 @@ Route protection is enforced via `staticwebapp.config.json` (Azure) and Firestor
 
 ### Environment Variables
 
-All Firebase configuration is supplied through **environment variables** — never committed to source code.
+All Firebase and PayFast configuration is supplied through **environment variables** — never committed to source code.
 
 | Variable | Description |
 |---|---|
@@ -345,8 +353,13 @@ All Firebase configuration is supplied through **environment variables** — nev
 | `FIREBASE_MESSAGING_SENDER_ID` | FCM sender ID |
 | `FIREBASE_APP_ID` | Firebase Web app ID |
 | `FIREBASE_MEASUREMENT_ID` | Google Analytics measurement ID |
+| `PAYFAST_MERCHANT_ID` | PayFast Merchant ID (sandbox: `10000100`) |
+| `PAYFAST_MERCHANT_KEY` | PayFast Merchant Key (sandbox: `46f0cd694581a`) |
+| `PAYFAST_PASSPHRASE` | PayFast security passphrase |
+| `BASE_URL` | Your application URL (e.g., `https://yourdomain.com`) |
+| `NODE_ENV` | `development` or `production` |
 
-**Local development:** copy `.env.example` → `.env` and fill in values from the Firebase Console.
+**Local development:** copy `.env.example` → `.env` and fill in values from the Firebase Console and PayFast Dashboard.
 
 **Azure Static Web Apps:** add the same variables as **Application Settings** in the Azure portal (Settings → Configuration → Application settings).
 
