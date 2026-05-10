@@ -320,8 +320,15 @@ npm start
 ### Running Tests
 
 ```bash
+# Run unit tests
 npm test
+
+# Test PayFast integration (requires server running)
+npm start  # In one terminal
+node test-integration.js  # In another terminal
 ```
+
+**Integration Test**: The `test-integration.js` script verifies that the PayFast payment gateway is properly integrated and that backend-frontend communication is working correctly.
 
 ---
 
