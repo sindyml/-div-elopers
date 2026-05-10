@@ -1,38 +1,46 @@
-name: Deploy StokPal to Azure Web App
+name: Deploy StokPal to Azure Static Web Apps
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # allows manual trigger from GitHub Actions tab
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
 
 jobs:
-  deploy:
+  build_and_deploy_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    name: Build and Deploy
-
+    name: Build and Deploy Job
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: '18'
+          submodules: true
+          lfs: false
 
-      # No npm install needed — we have no dependencies (pure Node built-ins)
-      # If you add packages later, uncomment the line below:
-      # - run: npm install
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
         with:
-          # ⚠️  Add this secret in GitHub:
-          #   Repo → Settings → Secrets and variables → Actions
-          #   → New repository secret
-          #   Name:  AZURE_WEBAPP_PUBLISH_PROFILE
-          #   Value: paste the full XML from Azure → Download publish profile
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          ###### Repository/Build Configurations ######
+          app_location: "/frontend"
+          api_location: "/backend/api"
+          output_location: ""
+          ###### End of Repository/Build Configurations ######
 
-          app-name: stockpal-app   # ← must match your Azure Web App name exactly
-          package: .               # deploy everything in the repo root
+  close_pull_request_job:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Close Pull Request Job
+    steps:
+      - name: Close Pull Request
+        id: closepullrequest
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: "close"
