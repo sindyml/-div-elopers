@@ -9,7 +9,11 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
-    "test": "jest"
+    "test": "jest",
+    "deploy": "firebase deploy",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:firestore": "firebase deploy --only firestore"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -21,7 +25,7 @@
   "keywords": [
     "stokvel",
     "firebase",
-    "azure"
+    "firebase-hosting"
   ],
   "author": "Sindiswa, Alondwe, Ziya, Owen, Athandwa & Kwezi",
   "license": "ISC",
@@ -35,6 +39,7 @@
     "firebase-admin": "^13.9.0"
   },
   "devDependencies": {
-    "jest": "^30.3.0"
+    "jest": "^30.3.0",
+    "firebase-tools": "^13.0.0"
   }
 }
