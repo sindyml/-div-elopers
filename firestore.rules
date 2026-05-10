@@ -154,5 +154,75 @@ service cloud.firestore {
       allow delete: if request.auth != null &&
         get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin';
     }
+
+    // ============================================
+    // TRANSACTIONS COLLECTION (PAYMENTS)
+    // ============================================
+    match /transactions/{transactionId} {
+      // Users can read their own transactions
+      // Admins can read all transactions
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+      
+      // System creates transactions via payment processing
+      // Users can only create if they are the user
+      allow create: if request.auth != null && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      
+      // Only the system (via cloud functions/webhooks) can update transaction status
+      // Users cannot modify transaction status directly
+      allow update: if false;
+      
+      // No deleting transactions
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PAYMENT PROOFS SUBCOLLECTION
+    // ============================================
+    match /transactions/{transactionId}/paymentProofs/{proofId} {
+      // Users can read payment proofs for their own transactions
+      // Admins can read all payment proofs
+      allow read: if request.auth != null && (
+        get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+      
+      // Only the system can create payment proofs (via webhooks)
+      allow create: if false;
+      
+      // No updates or deletes
+      allow update, delete: if false;
+    }
+
+    // ============================================
+    // WEBHOOK EVENTS COLLECTION (System Logs)
+    // ============================================
+    match /webhookEvents/{eventId} {
+      // Only Admins can read webhook events for debugging
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      
+      // Only the system can write webhook events
+      allow write: if false;
+      
+      // No deletes
+      allow delete: if false;
+    }
+
+    // ============================================
+    // PAYMENT QUEUES COLLECTION (Async Processing)
+    // ============================================
+    match /paymentQueues/{queueId} {
+      // Only Admins can read payment queues
+      allow read: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      
+      // Only the system can manage payment queues
+      allow write: if false;
+    }
   }
 }

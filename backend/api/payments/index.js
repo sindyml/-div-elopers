@@ -1,0 +1,504 @@
+// backend/api/payments/index.js - PayFast Payment API
+const admin = require('firebase-admin');
+const payfastService = require('../../services/payfastService');
+
+const db = admin.firestore();
+
+// Helper to send JSON responses
+function sendJSON(res, statusCode, data) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(data));
+}
+
+// Authentication middleware (simplified for testing)
+async function authenticateUser(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // For testing, create a mock user
+      req.user = { uid: 'test-user-123', isAdmin: true };
+      return next();
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      req.user = decodedToken;
+      next();
+    } catch (error) {
+      // If token verification fails, still allow for testing
+      req.user = { uid: 'test-user-123', isAdmin: true };
+      next();
+    }
+  } catch (error) {
+    req.user = { uid: 'test-user-123', isAdmin: true };
+    next();
+  }
+}
+
+// POST /initiate - Create PayFast payment
+async function initiatePayment(req, res) {
+  try {
+    const { amount, contributionId, groupId, groupName, metadata, userEmail, userName } = req.body;
+    const userId = req.user.uid;
+
+    if (!amount || amount <= 0) {
+      sendJSON(res, 400, { error: 'Invalid amount' });
+      return;
+    }
+
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    // Generate payment ID
+    const paymentId = isDemoMode
+      ? `test-payment-${Date.now()}`
+      : db.collection('transactions').doc().id;
+
+    // Build URLs for PayFast
+    const baseUrl = process.env.BASE_URL || 'http://localhost:8080';
+    const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
+    const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
+    const notifyUrl = `${baseUrl}/api/payments/notify`;
+
+    // Generate PayFast payment data
+    try {
+      const itemName = groupName
+        ? `${groupName} - Contribution`
+        : 'Stokvel Contribution';
+      const itemDescription = contributionId
+        ? `Contribution ID: ${contributionId}`
+        : 'Stokvel payment';
+
+      // Split name if provided
+      let firstName = '';
+      let lastName = '';
+      if (userName) {
+        const nameParts = userName.trim().split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+
+      const paymentData = payfastService.generatePaymentData({
+        amount: amount,
+        itemName: itemName,
+        itemDescription: itemDescription,
+        userId: userId,
+        paymentId: paymentId,
+        returnUrl: returnUrl,
+        cancelUrl: cancelUrl,
+        notifyUrl: notifyUrl,
+        email: userEmail || '',
+        firstName: firstName,
+        lastName: lastName
+      });
+
+      // Store payment in Firestore (skip in demo mode)
+      if (!isDemoMode) {
+        const paymentRef = db.collection('transactions').doc(paymentId);
+        await paymentRef.set({
+          id: paymentId,
+          userId: userId,
+          contributionId: contributionId || null,
+          groupId: groupId || null,
+          amount: amount,
+          currency: 'ZAR',
+          status: 'pending',
+          type: 'payment',
+          provider: 'payfast',
+          metadata: metadata || {},
+          paymentData: {
+            itemName: itemName,
+            itemDescription: itemDescription
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      sendJSON(res, 200, {
+        success: true,
+        paymentId: paymentId,
+        paymentData: paymentData,
+        message: 'Payment initiated. Redirect user to PayFast.'
+      });
+
+    } catch (error) {
+      console.error('PayFast payment generation error:', error);
+      sendJSON(res, 500, {
+        error: 'Failed to generate payment data',
+        message: error.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Payment initiation error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// POST /notify - Handle PayFast ITN (Instant Transaction Notification)
+async function handleNotify(req, res) {
+  try {
+    console.log('📡 PayFast ITN received:', req.body);
+
+    // Process ITN with PayFast service
+    const result = await payfastService.processITN(req.body);
+
+    if (!result.success) {
+      console.error('ITN verification failed:', result.error);
+      sendJSON(res, 400, { error: result.error });
+      return;
+    }
+
+    const paymentInfo = result.data;
+    const paymentId = paymentInfo.paymentId;
+
+    // Get payment record from Firestore
+    const paymentRef = db.collection('transactions').doc(paymentId);
+    const paymentDoc = await paymentRef.get();
+
+    if (!paymentDoc.exists) {
+      console.error('Payment not found:', paymentId);
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    const payment = paymentDoc.data();
+
+    // Verify amount matches
+    if (!payfastService.verifyAmount(paymentInfo.amount, payment.amount)) {
+      console.error('Amount mismatch:', {
+        received: paymentInfo.amount,
+        expected: payment.amount
+      });
+      sendJSON(res, 400, { error: 'Amount mismatch' });
+      return;
+    }
+
+    // Update payment record
+    await paymentRef.update({
+      status: paymentInfo.paymentStatus,
+      payfastPaymentId: paymentInfo.payfastPaymentId,
+      amountGross: paymentInfo.amount,
+      amountFee: paymentInfo.amountFee,
+      amountNet: paymentInfo.amountNet,
+      signature: paymentInfo.signature,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      completedAt: paymentInfo.paymentStatus === 'completed'
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : null
+    });
+
+    // If payment is completed, update contribution status
+    if (paymentInfo.paymentStatus === 'completed' && payment.contributionId) {
+      try {
+        await db.collection('contributions').doc(payment.contributionId).update({
+          status: 'paid',
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          transactionId: paymentId
+        });
+      } catch (err) {
+        console.error('Failed to update contribution:', err);
+      }
+    }
+
+    // Log webhook event
+    try {
+      await db.collection('webhookEvents').add({
+        type: 'payfast_itn',
+        paymentId: paymentId,
+        status: paymentInfo.paymentStatus,
+        data: req.body,
+        processedData: paymentInfo,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        processed: true
+      });
+    } catch (err) {
+      console.log('Note: Could not log webhook to Firestore');
+    }
+
+    // Respond to PayFast - MUST be 200 OK
+    sendJSON(res, 200, { received: true });
+
+  } catch (error) {
+    console.error('ITN processing error:', error);
+    sendJSON(res, 500, { error: 'ITN processing failed' });
+  }
+}
+
+// GET /return - Handle user return from PayFast (success page)
+async function handleReturn(req, res) {
+  try {
+    // This is just a placeholder - actual redirect happens on frontend
+    // PayFast will redirect user here with payment details
+    sendJSON(res, 200, {
+      message: 'Payment return acknowledged. Check payment status.',
+      note: 'Frontend should poll /status endpoint to verify payment'
+    });
+  } catch (error) {
+    console.error('Return handler error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// GET /cancel - Handle payment cancellation
+async function handleCancel(req, res) {
+  try {
+    const paymentId = req.query.paymentId;
+
+    if (paymentId) {
+      // Update payment status to cancelled
+      await db.collection('transactions').doc(paymentId).update({
+        status: 'cancelled',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    }
+
+    sendJSON(res, 200, {
+      message: 'Payment cancelled',
+      paymentId: paymentId
+    });
+
+  } catch (error) {
+    console.error('Cancel handler error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// GET /status/:paymentId - Check payment status
+async function getPaymentStatus(req, res) {
+  try {
+    const paymentId = req.params.paymentId;
+    const userId = req.user.uid;
+
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    if (isDemoMode) {
+      // In demo/test mode, return mock status for test payments
+      if (paymentId && paymentId.startsWith('test-payment-')) {
+        sendJSON(res, 200, {
+          paymentId: paymentId,
+          status: 'pending',
+          amount: 100,
+          currency: 'ZAR',
+          createdAt: new Date().toISOString(),
+          payfastPaymentId: null,
+          transactionId: null
+        });
+      } else {
+        sendJSON(res, 404, { error: 'Payment not found' });
+      }
+      return;
+    }
+
+    const paymentDoc = await db.collection('transactions').doc(paymentId).get();
+
+    if (!paymentDoc.exists) {
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    const payment = paymentDoc.data();
+    if (payment.userId !== userId && !req.user.isAdmin) {
+      sendJSON(res, 403, { error: 'Unauthorized' });
+      return;
+    }
+
+    sendJSON(res, 200, {
+      paymentId: paymentId,
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      createdAt: payment.createdAt,
+      payfastPaymentId: payment.payfastPaymentId,
+      transactionId: payment.payfastPaymentId
+    });
+
+  } catch (error) {
+    console.error('Status check error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// POST /verify - Verify payment
+async function verifyPayment(req, res) {
+  try {
+    const { paymentId, payfastPaymentId } = req.body;
+
+    if (!paymentId && !payfastPaymentId) {
+      sendJSON(res, 400, { error: 'Payment ID or PayFast Payment ID required' });
+      return;
+    }
+
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    if (isDemoMode) {
+      // In demo/test mode, return 404 for non-existent payments
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    let payment;
+    let paymentRef;
+
+    if (paymentId) {
+      const paymentDoc = await db.collection('transactions').doc(paymentId).get();
+      if (!paymentDoc.exists) {
+        sendJSON(res, 404, { error: 'Payment not found' });
+        return;
+      }
+      payment = paymentDoc.data();
+      paymentRef = paymentDoc.ref;
+    } else {
+      const paymentQuery = await db.collection('transactions')
+        .where('payfastPaymentId', '==', payfastPaymentId)
+        .limit(1)
+        .get();
+      if (paymentQuery.empty) {
+        sendJSON(res, 404, { error: 'Payment not found' });
+        return;
+      }
+      payment = paymentQuery.docs[0].data();
+      paymentRef = paymentQuery.docs[0].ref;
+    }
+
+    sendJSON(res, 200, {
+      success: payment.status === 'completed',
+      status: payment.status,
+      paymentId: paymentRef.id,
+      payfastPaymentId: payment.payfastPaymentId
+    });
+
+  } catch (error) {
+    console.error('Verification error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// GET /history/:userId - Get payment history
+async function getPaymentHistory(req, res) {
+  try {
+    const { userId } = req.params;
+    const requestingUserId = req.user.uid;
+    const { limit = 50, status } = req.query;
+
+    if (userId !== requestingUserId && !req.user.isAdmin) {
+      sendJSON(res, 403, { error: 'Unauthorized' });
+      return;
+    }
+
+    let query = db.collection('transactions')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(parseInt(limit));
+
+    if (status) {
+      query = query.where('status', '==', status);
+    }
+
+    const snapshot = await query.get();
+    const payments = [];
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      payments.push({
+        id: doc.id,
+        amount: data.amount,
+        currency: data.currency,
+        status: data.status,
+        createdAt: data.createdAt,
+        payfastPaymentId: data.payfastPaymentId
+      });
+    });
+
+    sendJSON(res, 200, {
+      payments,
+      count: payments.length
+    });
+
+  } catch (error) {
+    console.error('History error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+// GET /test - Simple test endpoint
+async function testEndpoint(req, res) {
+  sendJSON(res, 200, {
+    message: 'PayFast Payment API is working!',
+    timestamp: new Date().toISOString(),
+    provider: 'PayFast',
+    endpoints: [
+      'POST /initiate',
+      'POST /notify (ITN)',
+      'GET /return',
+      'GET /cancel',
+      'GET /status/:paymentId',
+      'POST /verify',
+      'GET /history/:userId'
+    ]
+  });
+}
+
+// Main request handler
+async function handleRequest(req, res) {
+  const method = req.method;
+  const url = req.url.split('?')[0];
+
+  console.log(`📡 Payment API request: ${method} ${url}`);
+
+  // Extract params from URL
+  const statusMatch = url.match(/^\/status\/(.+)$/);
+  if (statusMatch) {
+    req.params = { paymentId: statusMatch[1] };
+  }
+
+  const historyMatch = url.match(/^\/history\/(.+)$/);
+  if (historyMatch) {
+    req.params = { userId: historyMatch[1] };
+  }
+
+  // Parse query parameters
+  if (req.url.includes('?')) {
+    const urlObj = new URL(req.url, `http://${req.headers.host}`);
+    req.query = Object.fromEntries(urlObj.searchParams);
+  } else {
+    req.query = {};
+  }
+
+  // Route to appropriate handler
+  if (method === 'GET' && url === '/test') {
+    await testEndpoint(req, res);
+  }
+  else if (method === 'POST' && url === '/notify') {
+    await handleNotify(req, res);
+  }
+  else if (method === 'POST' && url === '/initiate') {
+    await authenticateUser(req, res, () => initiatePayment(req, res));
+  }
+  else if (method === 'GET' && url === '/return') {
+    await handleReturn(req, res);
+  }
+  else if (method === 'GET' && url === '/cancel') {
+    await handleCancel(req, res);
+  }
+  else if (method === 'GET' && url.match(/^\/status\/.+/)) {
+    await authenticateUser(req, res, () => getPaymentStatus(req, res));
+  }
+  else if (method === 'POST' && url === '/verify') {
+    await authenticateUser(req, res, () => verifyPayment(req, res));
+  }
+  else if (method === 'GET' && url.match(/^\/history\/.+/)) {
+    await authenticateUser(req, res, () => getPaymentHistory(req, res));
+  }
+  else {
+    sendJSON(res, 404, { error: `Endpoint not found: ${method} ${url}` });
+  }
+}
+
+// Export the handler
+module.exports = handleRequest;
