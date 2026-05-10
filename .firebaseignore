@@ -1,0 +1,50 @@
+# Logs
+*.log
+npm-debug.log*
+
+# Firebase cache
+.firebase/
+
+# Node modules
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+tests/
+*.test.js
+jest.config.js
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build files
+dist/
+build/
+
+# Git
+.git/
+.gitignore
+
+# Backend (if using Cloud Functions separately)
+backend/node_modules/
+
+# Azure specific files (no longer needed)
+staticwebapp.config.json
+.github/workflows/azure-static-web-apps.yml
