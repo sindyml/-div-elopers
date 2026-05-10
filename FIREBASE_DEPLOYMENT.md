@@ -184,32 +184,60 @@ If you want to avoid Cloud Functions setup, you can:
 firebase deploy --only hosting
 ```
 
-## GitHub Actions Auto-Deploy (Optional)
+## GitHub Actions Auto-Deploy (CI/CD)
 
-Create `.github/workflows/firebase-hosting.yml`:
+✅ **GOOD NEWS:** Firebase has EXCELLENT GitHub Actions support! Auto-deployment works perfectly.
 
-```yaml
-name: Deploy to Firebase Hosting
+I've created two workflow files for you:
+- `.github/workflows/firebase-hosting.yml` - Auto-deploy on push to main
+- `.github/workflows/firebase-hosting-pull-request.yml` - Preview deployments for PRs
 
-on:
-  push:
-    branches:
-      - main
+### Setup GitHub Actions (One-time):
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+**Step 1: Generate Firebase Service Account**
 
-      - name: Deploy to Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          channelId: live
-          projectId: your-project-id
+```bash
+firebase login
+firebase init hosting:github
 ```
+
+This will:
+- Connect your GitHub repo
+- Create the workflow files automatically
+- Add the `FIREBASE_SERVICE_ACCOUNT` secret to GitHub
+
+**Alternative manual setup:**
+
+1. Go to Firebase Console → Project Settings → Service Accounts
+2. Click "Generate New Private Key"
+3. Download the JSON file
+4. Go to GitHub: Settings → Secrets and variables → Actions
+5. Create new secret:
+   - Name: `FIREBASE_SERVICE_ACCOUNT`
+   - Value: Paste the entire JSON content
+
+**Step 2: Update workflow files**
+
+In both `.github/workflows/firebase-hosting*.yml` files:
+- Replace `your-firebase-project-id` with your actual project ID
+
+**Step 3: Push to main**
+
+```bash
+git add .
+git commit -m "Add Firebase auto-deployment"
+git push origin main
+```
+
+✅ **Auto-deployment active!** Every push to `main` = automatic deployment
+
+### Features You Get:
+
+✅ **Auto-deploy on merge** - Push to main → automatic deployment
+✅ **Preview deployments** - Every PR gets a unique preview URL
+✅ **Status checks** - See deployment status in PR
+✅ **Rollback support** - Easy rollback in Firebase Console
+✅ **Deploy history** - View all deployments and their status
 
 ## Troubleshooting
 
