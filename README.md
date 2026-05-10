@@ -2,7 +2,7 @@
 
 > A web-based platform for South African savings groups (stokvels) to manage contributions, payout schedules, group meetings, and financial insights — replacing spreadsheets and chat threads with a transparent, role-aware system.
 
-[![Azure Static Web Apps](https://img.shields.io/badge/hosted-Azure%20Static%20Web%20Apps-0078d4?logo=microsoftazure)](https://azure.microsoft.com/en-us/products/app-service/static)
+[![Vercel](https://img.shields.io/badge/deployed%20on-Vercel-000000?logo=vercel&logoColor=white)](https://vercel.com)
 [![Firebase](https://img.shields.io/badge/backend-Firebase%20%2B%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
 [![Node.js](https://img.shields.io/badge/server-Node.js%20%3E%3D18-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 
@@ -30,7 +30,7 @@ Stokvels are a cornerstone of South African financial culture — informal savin
 - Real-time group and contribution tracking backed by Cloud Firestore
 - Meeting scheduling with agenda and minutes management
 - A live SA financial data widget (SARB prime rate, repo rate, USD/ZAR)
-- Deployed as a public web app on Azure Static Web Apps
+- Deployed as a public web app on **Vercel** (free tier) or Azure Static Web Apps
 
 ---
 
@@ -59,8 +59,8 @@ Stokvels are a cornerstone of South African financial culture — informal savin
 | Payments | PayFast Payment Gateway (ZAR transactions) |
 | Server | Node.js static file server + `/api/getSAData` proxy + `/api/payments` |
 | SA Data | Frankfurter API (live USD/ZAR); SARB static rates as fallback |
-| Hosting | Azure Static Web Apps |
-| CI/CD | GitHub Actions |
+| Hosting | **Vercel** (primary) or Azure Static Web Apps |
+| CI/CD | GitHub Actions + Vercel Auto-Deploy |
 | Testing | Jest |
 
 ---
