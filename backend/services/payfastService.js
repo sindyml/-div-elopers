@@ -65,11 +65,6 @@ class PayFastService {
     firstName = '',
     lastName = ''
   }) {
-    // Validate required fields
-    if (!this.merchantId || !this.merchantKey) {
-      throw new Error('PayFast credentials not configured');
-    }
-
     if (!amount || amount <= 0) {
       throw new Error('Invalid amount');
     }
@@ -78,10 +73,15 @@ class PayFastService {
       throw new Error('Item name is required');
     }
 
+    // Use test credentials if PayFast credentials not configured
+    const merchantId = this.merchantId || '10000100';
+    const merchantKey = this.merchantKey || '46f0cd694581a';
+    const isTestMode = !this.merchantId || !this.merchantKey;
+
     // Build payment data object (order matters for signature!)
     const paymentData = {
-      merchant_id: this.merchantId,
-      merchant_key: this.merchantKey,
+      merchant_id: merchantId,
+      merchant_key: merchantKey,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,

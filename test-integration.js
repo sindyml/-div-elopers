@@ -142,38 +142,38 @@ async function testFrontendPages() {
 
   // Test payment-return.html
   try {
-    const response = await makeRequest('/frontend/payment-return.html');
+    const response = await makeRequest('/payment-return.html');
     logTest(
-      'GET /frontend/payment-return.html',
+      'GET /payment-return.html',
       response.status === 200 && response.headers['content-type'].includes('text/html'),
       'Page loads successfully'
     );
   } catch (error) {
-    logTest('GET /frontend/payment-return.html', false, error.message);
+    logTest('GET /payment-return.html', false, error.message);
   }
 
   // Test payment-cancel.html
   try {
-    const response = await makeRequest('/frontend/payment-cancel.html');
+    const response = await makeRequest('/payment-cancel.html');
     logTest(
-      'GET /frontend/payment-cancel.html',
+      'GET /payment-cancel.html',
       response.status === 200 && response.headers['content-type'].includes('text/html'),
       'Page loads successfully'
     );
   } catch (error) {
-    logTest('GET /frontend/payment-cancel.html', false, error.message);
+    logTest('GET /payment-cancel.html', false, error.message);
   }
 
   // Test payment modal component
   try {
-    const response = await makeRequest('/frontend/components/payment-modal.js');
+    const response = await makeRequest('/components/payment-modal.js');
     logTest(
-      'GET /frontend/components/payment-modal.js',
+      'GET /components/payment-modal.js',
       response.status === 200 && response.headers['content-type'].includes('javascript'),
       'Component loads successfully'
     );
   } catch (error) {
-    logTest('GET /frontend/components/payment-modal.js', false, error.message);
+    logTest('GET /components/payment-modal.js', false, error.message);
   }
 }
 
