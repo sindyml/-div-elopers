@@ -31,9 +31,7 @@
    ============================================================ */
 
 import {
-  initiatePayment,
   getPaymentStatus,
-  simulatePaymentSuccess,
 } from '../js/payment-api-mock.js';
 import {
   validatePaymentContext,
@@ -715,28 +713,61 @@ export class PaymentModal {
     }
 
     this._showScreen('processing');
-    this._updateProcessingStatus('Initiating payment…', 'Please wait. Do not close this window.');
+    this._updateProcessingStatus('Initiating payment…', 'Please wait. Redirecting to PayFast…');
 
     try {
-      const { userId, groupId, contributionId, amount } = this._context;
+      const { userId, groupId, contributionId, amount, groupName } = this._context;
       const base    = parseFloat(amount) || 0;
       const feeRate = this._selectedMethod === 'card' ? CARD_FEE_RATE : 0;
       const total   = base + base * feeRate;
 
-      const result = await initiatePayment({
-        userId,
-        groupId,
-        contributionId,
-        amount: total,
-        currency: 'ZAR',
+      // Get user info from Firebase if available
+      let userEmail = '';
+      let userName = '';
+      try {
+        if (window.firebase && window.firebase.auth && window.firebase.auth()) {
+          const currentUser = window.firebase.auth().currentUser;
+          if (currentUser) {
+            userEmail = currentUser.email || '';
+            userName = currentUser.displayName || '';
+          }
+        }
+      } catch (e) {
+        console.log('Could not get user info:', e);
+      }
+
+      // Call backend API to initiate PayFast payment
+      const response = await fetch('/api/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await this._getAuthToken()}`
+        },
+        body: JSON.stringify({
+          amount: total,
+          contributionId: contributionId,
+          groupId: groupId,
+          groupName: groupName,
+          userEmail: userEmail,
+          userName: userName,
+          metadata: {
+            paymentMethod: this._selectedMethod
+          }
+        })
       });
 
+      if (!response.ok) {
+        throw new Error('Payment initiation failed');
+      }
+
+      const result = await response.json();
       this._paymentId = result.paymentId;
 
-      // Kick off mock completion (replace with real Yoco redirect in production)
-      simulatePaymentSuccess(this._paymentId, 2500);
+      // Store payment ID in localStorage for return handling
+      localStorage.setItem('pendingPaymentId', this._paymentId);
 
-      this._startPolling();
+      // Redirect to PayFast using form submission
+      this._redirectToPayFast(result.paymentData);
 
     } catch (err) {
       // Categorise the error and revert to confirm screen
@@ -746,6 +777,51 @@ export class PaymentModal {
       payBtn.disabled = false;
       payBtn.textContent = 'Pay Now';
     }
+  }
+
+  /**
+   * Get Firebase auth token
+   * @returns {Promise<string>} Auth token
+   */
+  async _getAuthToken() {
+    try {
+      if (window.firebase && window.firebase.auth && window.firebase.auth()) {
+        const currentUser = window.firebase.auth().currentUser;
+        if (currentUser) {
+          return await currentUser.getIdToken();
+        }
+      }
+    } catch (e) {
+      console.log('Could not get auth token:', e);
+    }
+    return '';
+  }
+
+  /**
+   * Redirect to PayFast by creating and submitting a form
+   * @param {Object} paymentData - Payment data from backend
+   */
+  _redirectToPayFast(paymentData) {
+    // Create a hidden form
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = paymentData.paymentUrl;
+    form.style.display = 'none';
+
+    // Add all payment data as hidden inputs
+    for (let key in paymentData) {
+      if (key !== 'paymentUrl') {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = paymentData[key];
+        form.appendChild(input);
+      }
+    }
+
+    // Add form to body and submit
+    document.body.appendChild(form);
+    form.submit();
   }
 
   _handleRetry() {
