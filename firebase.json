@@ -6,24 +6,6 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
-      {
-        "source": "/api/getSAData",
-        "function": "getSAData"
-      },
-      {
-        "source": "/api/getFirebaseConfig",
-        "function": "getFirebaseConfig"
-      },
-      {
-        "source": "/api/payments/**",
-        "function": "payments"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ],
     "headers": [
       {
         "source": "**",
@@ -48,12 +30,8 @@
       }
     ]
   },
-  "functions": {
-    "source": "functions",
-    "runtime": "nodejs18"
-  },
   "firestore": {
-    "rules": "firebase/firestore.rules",
+    "rules": "firestore.rules",
     "indexes": "firebase/firestore.indexes.json"
   }
 }

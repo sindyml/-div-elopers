@@ -22,12 +22,17 @@ module.exports = (req, res) => {
     measurementId:     process.env.FIREBASE_MEASUREMENT_ID     || '',
   };
 
-  // Fail fast if the critical key is missing so misconfiguration
-  // is obvious during development and deployment.
-  if (!config.apiKey) {
+  // Validate all required Firebase config fields
+  const missing = [];
+  if (!config.apiKey) missing.push('FIREBASE_API_KEY');
+  if (!config.authDomain) missing.push('FIREBASE_AUTH_DOMAIN');
+  if (!config.projectId) missing.push('FIREBASE_PROJECT_ID');
+  if (!config.appId) missing.push('FIREBASE_APP_ID');
+
+  if (missing.length > 0) {
     res.setHeader('Content-Type', 'application/json');
     res.status(500).json({
-      error: 'Firebase configuration is not set. Add FIREBASE_* environment variables in Vercel settings.'
+      error: `Firebase configuration is incomplete. Missing: ${missing.join(', ')}. Add FIREBASE_* environment variables in Vercel settings.`
     });
     return;
   }

@@ -24,6 +24,13 @@ function fetchFrankfurter() {
   return new Promise((resolve, reject) => {
     const req = https.get(FRANKFURTER_URL, { timeout: 5000 }, (res) => {
       let body = '';
+
+      // Check status code before processing response
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        reject(new Error(`Frankfurter API returned status ${res.statusCode}`));
+        return;
+      }
+
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
         try {
