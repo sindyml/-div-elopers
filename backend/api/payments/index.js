@@ -48,9 +48,13 @@ async function initiatePayment(req, res) {
       return;
     }
 
-    // Create payment record in Firestore
-    const paymentRef = db.collection('transactions').doc();
-    const paymentId = paymentRef.id;
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    // Generate payment ID
+    const paymentId = isDemoMode
+      ? `test-payment-${Date.now()}`
+      : db.collection('transactions').doc().id;
 
     // Build URLs for PayFast
     const baseUrl = process.env.BASE_URL || 'http://localhost:8080';
@@ -90,25 +94,28 @@ async function initiatePayment(req, res) {
         lastName: lastName
       });
 
-      // Store payment in Firestore
-      await paymentRef.set({
-        id: paymentId,
-        userId: userId,
-        contributionId: contributionId || null,
-        groupId: groupId || null,
-        amount: amount,
-        currency: 'ZAR',
-        status: 'pending',
-        type: 'payment',
-        provider: 'payfast',
-        metadata: metadata || {},
-        paymentData: {
-          itemName: itemName,
-          itemDescription: itemDescription
-        },
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // Store payment in Firestore (skip in demo mode)
+      if (!isDemoMode) {
+        const paymentRef = db.collection('transactions').doc(paymentId);
+        await paymentRef.set({
+          id: paymentId,
+          userId: userId,
+          contributionId: contributionId || null,
+          groupId: groupId || null,
+          amount: amount,
+          currency: 'ZAR',
+          status: 'pending',
+          type: 'payment',
+          provider: 'payfast',
+          metadata: metadata || {},
+          paymentData: {
+            itemName: itemName,
+            itemDescription: itemDescription
+          },
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
 
       sendJSON(res, 200, {
         success: true,
@@ -266,6 +273,27 @@ async function getPaymentStatus(req, res) {
     const paymentId = req.params.paymentId;
     const userId = req.user.uid;
 
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    if (isDemoMode) {
+      // In demo/test mode, return mock status for test payments
+      if (paymentId && paymentId.startsWith('test-payment-')) {
+        sendJSON(res, 200, {
+          paymentId: paymentId,
+          status: 'pending',
+          amount: 100,
+          currency: 'ZAR',
+          createdAt: new Date().toISOString(),
+          payfastPaymentId: null,
+          transactionId: null
+        });
+      } else {
+        sendJSON(res, 404, { error: 'Payment not found' });
+      }
+      return;
+    }
+
     const paymentDoc = await db.collection('transactions').doc(paymentId).get();
 
     if (!paymentDoc.exists) {
@@ -302,6 +330,15 @@ async function verifyPayment(req, res) {
 
     if (!paymentId && !payfastPaymentId) {
       sendJSON(res, 400, { error: 'Payment ID or PayFast Payment ID required' });
+      return;
+    }
+
+    // Check if Firebase is in demo mode
+    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
+
+    if (isDemoMode) {
+      // In demo/test mode, return 404 for non-existent payments
+      sendJSON(res, 404, { error: 'Payment not found' });
       return;
     }
 
