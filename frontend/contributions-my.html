@@ -58,7 +58,7 @@
     <footer id="footer-root"></footer>
 
     <script type="module">
-        import { auth, db } from 'js/firebase-config.js';
+        import { auth, db } from './js/firebase-config.js';
         import { 
             onSnapshot, 
             updateDoc, 
@@ -72,14 +72,14 @@
             getMemberDisputes,
             createDispute,
             listenToNotifications,
-            loadMyPage as loadContributionsPage
-        } from 'js/contributions.js';
-        import { PaymentModal } from 'components/payment-modal.js';
-        import { uploadPaymentProof, validateProofFile } from 'js/payment-upload.js';
+            
+        } from './js/contributions.js';
+        import { PaymentModal } from './components/payment-modal.js';
+        import { uploadPaymentProof, validateProofFile } from './js/payment-upload.js';
 
         // ── Payment modal ────────────────────────────────────────
         const paymentModal = new PaymentModal();
-        paymentModal.onPaymentSuccess = () => loadContributionsPage();
+        paymentModal.onPaymentSuccess = () => loadMyPage(); //Was using non-existent loadContributionPage() and importing from contributions.js
         paymentModal.onProofUploaded = async (file, paymentId) => {
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated.');
@@ -478,6 +478,7 @@
             }
             loadMyPage();
         });
+        
     </script>
 
     <!-- Firebase compat SDK for navbar auth state -->
@@ -485,6 +486,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="js/firebase-compat-init.js"></script>
     <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
+    <script src="components/footer.js"></script> 
 </body>
 </html>
