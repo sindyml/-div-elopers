@@ -12,16 +12,16 @@
   }
 
   try {
-    // TODO: Replace with your actual Firebase project configuration
-    // Get these values from Firebase Console > Project Settings > General
+    // Firebase configuration for stokvel-database project
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "stockpal-app.firebaseapp.com",
-      projectId: "stockpal-app",
-      storageBucket: "stockpal-app.appspot.com",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID",
-      measurementId: "YOUR_MEASUREMENT_ID"
+      apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
+      authDomain: "stokvel-database.firebaseapp.com",
+      databaseURL: "https://stokvel-database-default-rtdb.firebaseio.com",
+      projectId: "stokvel-database",
+      storageBucket: "stokvel-database.firebasestorage.app",
+      messagingSenderId: "997328421094",
+      appId: "1:997328421094:web:9f88bf8ac720b118d97b27",
+      measurementId: "G-XXXXXXXXXX"
     };
 
     firebase.initializeApp(firebaseConfig);
