@@ -11,6 +11,7 @@ import { auth, db } from "./firebase-config.js";
 import { 
   createUserWithEmailAndPassword, 
   sendEmailVerification,
+  updateProfile,
   GoogleAuthProvider, 
   GithubAuthProvider,
   OAuthProvider,
@@ -25,7 +26,6 @@ import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/
 console.log("register is running");
 
 // STEP 4: Helper function that handles ALL OAuth sign-ins (Google, GitHub, Microsoft)
-// Assigns the default "Member" role to new OAuth users to prevent privilege escalation.
 async function handleOAuthSignIn(provider, providerName) {
   try {
     const result = await signInWithPopup(auth, provider);
@@ -35,47 +35,67 @@ async function handleOAuthSignIn(provider, providerName) {
     const userDoc = await getDoc(doc(db, "users", user.uid));
     
     if (!userDoc.exists()) {
-      // First-time OAuth user — create profile with default Member role.
-      // Role assignment via prompt() was removed as it allowed users to
-      // self-assign privileged roles (Admin/Treasurer) — a security risk.
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
-        displayName: user.displayName || "",
-        role: "Member",
-        provider: providerName,
-        createdAt: new Date().toISOString()
-      });
-      window.location.href = "dashboard.html";
+      // Get name from OAuth or ask for it
+      let displayName = user.displayName || "";
+      
+      if (!displayName) {
+        displayName = prompt("Please enter your full name:");
+        if (!displayName) {
+          await user.delete();
+          alert("Name required. Registration cancelled.");
+          return;
+        }
+      }
+      
+      const role = prompt("Select your role: Member, Treasurer, or Admin");
+      
+      if (role && ["Member", "Treasurer", "Admin"].includes(role)) {
+        await setDoc(doc(db, "users", user.uid), {
+          email: user.email,
+          displayName: displayName,
+          role: role,
+          provider: providerName,
+          createdAt: new Date().toISOString()
+        });
+        alert("Account created successfully!");
+        window.location.href = "dashboard.html";
+      } else {
+        await user.delete();
+        alert("Invalid role selection. Registration cancelled.");
+        return;
+      }
     } else {
-      // Returning user — redirect to dashboard
+      // RETURNING USER: Just welcome them back and redirect
+      alert("Welcome back!");
       window.location.href = "dashboard.html";
     }
     
   } catch (error) {
-  console.error(`${providerName} error:`, error);
-  
-  // Case 1: Account already exists with different provider
-  if (error.code === 'auth/account-exists-with-different-credential') {
-    alert('An account already exists with this email. Redirecting you to login...');
-    window.location.href = "login.html";
-  } 
-  // Case 2: Firebase config not found (Azure endpoint missing)
-  else if (error.code === 'auth/configuration-not-found' || error.message.includes('config')) {
-    alert('Firebase configuration error. Please contact support.');
-    console.error('Firebase config issue - check /api/getFirebaseConfig endpoint');
+    console.error(`${providerName} error:`, error);
+    
+    // Case 1: Account already exists with different provider
+    if (error.code === 'auth/account-exists-with-different-credential') {
+      alert('An account already exists with this email. Redirecting you to login...');
+      window.location.href = "login.html";
+    } 
+    // Case 2: Firebase config not found (Azure endpoint missing)
+    else if (error.code === 'auth/configuration-not-found' || error.message.includes('config')) {
+      alert('Firebase configuration error. Please contact support.');
+      console.error('Firebase config issue - check /api/getFirebaseConfig endpoint');
+    }
+    // Case 3: Popup closed by user
+    else if (error.code === 'auth/popup-closed-by-user') {
+      alert('Sign in cancelled. Please try again.');
+    }
+    // Case 4: Everything else
+    else {
+      alert(error.message);
+    }
   }
-  // Case 3: Popup closed by user
-  else if (error.code === 'auth/popup-closed-by-user') {
-    alert('Sign in cancelled. Please try again.');
-  }
-  // Case 4: Everything else
-  else {
-    alert(error.message);
-  }
-}
 }
 
 // STEP 5: EMAIL/PASSWORD REGISTRATION (traditional signup)
+// EMAIL/PASSWORD REGISTRATION
 const form = document.getElementById("registerForm");
 
 if (form) {
@@ -84,17 +104,23 @@ if (form) {
 
     const email = document.getElementById("email").value;
     const password = document.getElementById("password").value;
+    const displayName = document.getElementById("displayName").value;
     const role = document.getElementById("role").value;
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // Update Firebase Auth profile with display name
+      await updateProfile(user, { displayName: displayName });
+
       // Send verification email
       await sendEmailVerification(user);
 
+      // Save to Firestore
       await setDoc(doc(db, "users", user.uid), {
         email: email,
+        displayName: displayName,
         role: role,
         provider: "email",
         emailVerified: false,
