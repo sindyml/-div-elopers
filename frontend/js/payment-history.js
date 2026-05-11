@@ -19,15 +19,64 @@ import {
   where,
   orderBy,
   getDocs,
+  getDoc,
+  doc,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getUserGroups }     from './groupService.js';
 import { showReceiptModal }  from './payment-receipt.js';
 import { initPaymentReminders } from './payment-reminders.js';
+import { PaymentModal }      from '../components/payment-modal.js';
+import { COLLECTIONS }       from './constants.js';
+import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
+import { onTransactionCreate } from './onTransactionCreate.js';
+import { onProofUpload } from './onProofUpload.js';
 
 /* ── Module state ──────────────────────────────────────────── */
 
 let _activeFilter    = 'all';
 let _allTransactions = [];
+
+/* ── Modal initialisation ──────────────────────────────────── */
+
+const modal = new PaymentModal();
+
+modal.onPaymentSuccess = async (receipt) => {
+  // Handle payment success
+  if (receipt.contributionId) {
+    try {
+      // Get the contribution to find userId and groupId
+      const contribDoc = await getDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, receipt.contributionId));
+      if (contribDoc.exists()) {
+        const contribData = contribDoc.data();
+        await onTransactionCreate(contribData.userId, contribData.groupId);
+      }
+    } catch (err) {
+      console.warn('[payment-history.js] Could not update payment evidence:', err.message);
+    }
+  }
+  // Reload transactions list
+  const user = auth.currentUser;
+  if (user) loadTransactions(user.uid);
+};
+
+modal.onProofUploaded = async (file, paymentId) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not authenticated.');
+
+  const validationError = validateProofFile(file);
+  if (validationError) throw new Error(validationError);
+
+  // Upload the proof file (returns fileUrl)
+  const { fileUrl, proofId } = await uploadPaymentProof(file, paymentId, user.uid);
+
+  // Get the transaction to find userId and groupId
+  const txDoc = await getDoc(doc(db, 'transactions', paymentId));
+  if (txDoc.exists()) {
+    const txData = txDoc.data();
+    // Pass the fileUrl to onProofUpload
+    await onProofUpload(txData.userId, txData.groupId, fileUrl);
+  }
+};
 
 /* ── Auth gate ─────────────────────────────────────────────── */
 
@@ -35,7 +84,63 @@ onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   initPaymentReminders(user.uid);
   loadTransactions(user.uid);
+
+  // Wire up "Make a Payment" button in header to open first pending contribution
+  const makePaymentBtn = document.getElementById('make-payment-btn');
+  if (makePaymentBtn) {
+    makePaymentBtn.addEventListener('click', () => {
+      openFirstPendingContribution(user.uid);
+    });
+  }
 });
+
+/* ── Make a Payment Button Handler ─────────────────────────── */
+
+async function openFirstPendingContribution(userId) {
+  try {
+    const groups = await getUserGroups(userId);
+    if (!groups.length) {
+      showError('You are not a member of any groups yet.');
+      return;
+    }
+
+    const contribSnap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.CONTRIBUTIONS),
+        where('userId', '==', userId),
+        orderBy('date', 'desc')
+      )
+    );
+
+    const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pending = allContribs.filter(
+      c => c.status === 'pending' || c.status === 'missed'
+    );
+
+    if (pending.length === 0) {
+      showError('You have no pending contributions to pay.');
+      return;
+    }
+
+    // Get the first pending contribution
+    const contrib = pending[0];
+    const groupMap = {};
+    groups.forEach(g => { groupMap[g.id] = g.name; });
+    const groupName = groupMap[contrib.groupId] || contrib.groupId || 'Unknown Group';
+    const amount = parseFloat(contrib.amount) || 0;
+
+    // Open the payment modal
+    modal.open({
+      userId: userId,
+      groupId: contrib.groupId,
+      contributionId: contrib.id,
+      amount: amount,
+      groupName: groupName,
+    });
+  } catch (err) {
+    showError('Failed to load contributions: ' + (err.message || 'Unknown error'));
+  }
+}
 
 /* ── Data loading ──────────────────────────────────────────── */
 

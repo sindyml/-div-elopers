@@ -29,7 +29,7 @@
         <h1 class="page-header__title">🧾 Payment History</h1>
         <p class="page-header__sub">A full record of your stokvel payment transactions.</p>
       </hgroup>
-      <a href="payment.html" class="btn btn--primary btn--sm">+ Make a Payment</a>
+      <button id="make-payment-btn" class="btn btn--primary btn--sm">+ Make a Payment</button>
     </header>
 
     <!-- ── Global error ─────────────────────────────── -->
@@ -119,6 +119,9 @@
     </div>
 
   </main>
+
+  <!-- ── Payment modal mount point (injected by PaymentModal) ── -->
+  <div id="payment-modal-root"></div>
 
   <footer id="footer-root"></footer>
 
