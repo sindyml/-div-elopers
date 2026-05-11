@@ -1,9 +1,24 @@
 // js/dashboard.js
 import { auth, db } from "./firebase-config.js";
-import { getUserGroups } from "./groupService.js";
+import { getUserGroups } from "./dashboardService.js";
+
+import {
+  sendInvite,
+  acceptInvite,
+  declineInvite,
+  resendInvite
+} from "./groupService.js";
+
+import {
+  getPendingInvites
+} from "./auth.js";
+
 import { SA_DATA_DEFAULTS } from "./constants.js";
 
 (function () {
+  
+  let selectedGroupId = null;
+  let selectedGroupName = null;
   // SA Data config
   const SA_STATIC = SA_DATA_DEFAULTS;
 
@@ -173,6 +188,258 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     refreshButtonWired = true;
   }
 
+    // ── Load user groups ───────────────────────────────────
+  async function loadUserGroups(user) {
+
+    const grouplist = document.getElementById("grouplist");
+
+    if (!grouplist) return;
+
+    grouplist.innerHTML = "";
+
+    try {
+
+      const groups = await getUserGroups();
+
+      if (groups.length === 0) {
+        grouplist.innerHTML = "<li>No groups yet</li>";
+        return;
+      }
+
+      groups.forEach(group => {
+
+        const li = document.createElement("li");
+
+        li.textContent = group.name || "Unnamed Group";
+
+        // IMPORTANT
+        li.dataset.groupId = group.id;
+
+        li.onclick = async () => {
+
+          selectedGroupId = group.id;
+          selectedGroupName = group.name;
+
+          // highlight selected
+          document.querySelectorAll("#grouplist li")
+            .forEach(el => el.classList.remove("active"));
+
+          li.classList.add("active");
+
+          // reload dashboard data
+          const balance =
+            await loadDashboardData(user, group.id);
+
+          await renderSAWidget(balance);
+        };
+
+        grouplist.appendChild(li);
+      });
+
+    } catch (err) {
+
+      console.warn(
+        "[Dashboard] Failed loading groups:",
+        err.message
+      );
+    }
+  }
+
+    // ── Load pending invites ───────────────────────────────
+  async function loadInvites(user) {
+
+    const inviteSection =
+      document.getElementById("inviteSection");
+
+    if (!inviteSection) return;
+
+    inviteSection.innerHTML = `
+      <h3 class="members-widget__heading">
+        Pending Invites
+      </h3>
+    `;
+
+    try {
+
+      const invites =
+        await getPendingInvites(user);
+
+      if (invites.length === 0) {
+
+        inviteSection.innerHTML += `
+          <p>No pending invites</p>
+        `;
+
+        return;
+      }
+
+      invites.forEach(invite => {
+
+        const wrapper =
+          document.createElement("section");
+
+        const text =
+          document.createElement("p");
+
+        text.textContent =
+          `Invite to join group ${invite.groupId}`;
+
+        wrapper.appendChild(text);
+
+        // expiration
+        if (invite.expiresAt) {
+
+          const expiry =
+            document.createElement("small");
+
+          const expiryDate =
+            new Date(invite.expiresAt.seconds * 1000);
+
+          expiry.textContent =
+            `Expires: ${expiryDate.toLocaleDateString()}`;
+
+          wrapper.appendChild(expiry);
+        }
+
+        // ACCEPT
+        const acceptBtn =
+          document.createElement("button");
+
+        acceptBtn.textContent = "Accept";
+
+        acceptBtn.onclick = async () => {
+
+          try {
+
+            await acceptInvite(invite, user);
+
+            location.reload();
+
+          } catch (err) {
+
+            console.error(err);
+
+            alert("Error accepting invite");
+          }
+        };
+
+        wrapper.appendChild(acceptBtn);
+
+        // DECLINE
+        const declineBtn =
+          document.createElement("button");
+
+        declineBtn.textContent = "Decline";
+
+        declineBtn.onclick = async () => {
+
+          try {
+
+            await declineInvite(invite.id);
+
+            location.reload();
+
+          } catch (err) {
+
+            console.error(err);
+
+            alert("Error declining invite");
+          }
+        };
+
+        wrapper.appendChild(declineBtn);
+
+        // RESEND (expired only)
+        if (invite.status === "expired") {
+
+          const resendBtn =
+            document.createElement("button");
+
+          resendBtn.textContent = "Resend";
+
+          resendBtn.onclick = async () => {
+
+            try {
+
+              await resendInvite(
+                invite.email,
+                invite.groupId
+              );
+
+              location.reload();
+
+            } catch (err) {
+
+              console.error(err);
+
+              alert("Error resending invite");
+            }
+          };
+
+          wrapper.appendChild(resendBtn);
+        }
+
+        inviteSection.appendChild(wrapper);
+
+      });
+
+    } catch (err) {
+
+      console.warn(
+        "[Dashboard] Failed loading invites:",
+        err.message
+      );
+    }
+  }
+
+    // ── Invite member form ─────────────────────────────────
+  function wireInviteForm() {
+
+    const form =
+      document.getElementById("invite-form");
+
+    if (!form) return;
+
+    form.addEventListener("submit", async (e) => {
+
+      e.preventDefault();
+
+      const inviteMessage =
+        document.getElementById("inviteMessage");
+
+      const email =
+        document.getElementById("inviteEmail").value;
+
+      if (!selectedGroupId) {
+
+        inviteMessage.textContent =
+          "Please select a group first";
+
+        return;
+      }
+
+      try {
+
+        await sendInvite(
+          email,
+          selectedGroupId
+        );
+
+        inviteMessage.textContent =
+          " Invite sent successfully";
+
+        form.reset();
+
+      } catch (err) {
+
+        console.error(err);
+
+        inviteMessage.textContent =
+          " Error sending invite";
+      }
+    });
+  }
+
   // ── Load user & group data from Firestore ────────────────
   async function loadDashboardData(user, groupId = null) {
     // Set display name
@@ -204,7 +471,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
           groupBalance = group.totalBalance || 0;
 
           const badgeEl = document.getElementById('group-name-badge');
-          if (badgeEl) badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
+          if (badgeEl) badgeEl.textContent = ' ' + (group.name || 'My Stokvel');
 
           const balanceEl = document.getElementById('stat-balance');
           if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
@@ -217,7 +484,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
         } else {
           // Handle non-existent group (stale membership)
           const badgeEl = document.getElementById('group-name-badge');
-          if (badgeEl) badgeEl.textContent = '🌿 No group yet';
+          if (badgeEl) badgeEl.textContent = ' No group yet';
 
           const balanceEl = document.getElementById('stat-balance');
           if (balanceEl) balanceEl.textContent = 'R 0';
@@ -227,7 +494,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
         }
       } else {
         const badgeEl = document.getElementById('group-name-badge');
-        if (badgeEl) badgeEl.textContent = '🌿 No group yet';
+        if (badgeEl) badgeEl.textContent = ' No group yet';
       }
     } catch (err) {
       console.warn('[Dashboard] Could not load group data:', err.message);
@@ -247,9 +514,22 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
         window.location.href = 'login.html';
         return;
       }
-      const groupBalance = await loadDashboardData(user);
+            // load groups
+      await loadUserGroups(user);
+
+      // load invites
+      await loadInvites(user);
+
+      // load dashboard
+      const groupBalance =
+        await loadDashboardData(user);
+
       await renderSAWidget(groupBalance);
+
       wireRefreshButton(groupBalance);
+
+      // wire invite form
+      wireInviteForm();
     });
   }
 
