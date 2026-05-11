@@ -16,7 +16,7 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebas
      return await response.json();
 }
 
-const firebaseConfig = await fetchConfig();
+//const firebaseConfig = await fetchConfig();
 // Firebase configuration for stokvel-database project
 const firebaseConfig = {
   apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
