@@ -96,9 +96,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
 
       // Only Admins and Treasurers can create/update payouts
+      // Also allow group creators to create payouts for their groups
       allow write: if request.auth != null && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer'
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Treasurer' ||
+        (request.resource.data.groupId != null &&
+         get(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.createdBy == request.auth.uid)
       );
     }
 
@@ -141,9 +144,13 @@ service cloud.firestore {
       allow read: if request.auth != null && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
 
       // Admins can add members, or users can be added via invite acceptance
+      // Also allow group creator to add themselves as first admin member
       allow create: if request.auth != null && (
-        get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin' ||
-        (request.resource.data.uid == request.auth.uid && request.resource.data.role == 'member')
+        (exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin') ||
+        (request.resource.data.uid == request.auth.uid && request.resource.data.role == 'member') ||
+        (get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid &&
+         request.resource.data.uid == request.auth.uid && request.resource.data.role == 'admin')
       );
 
       // Admins can update member roles
