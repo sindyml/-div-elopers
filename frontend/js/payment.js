@@ -122,8 +122,8 @@ async function openFirstPendingContribution(userId) {
     const groupName = groupMap[contrib.groupId] || contrib.groupId || 'Unknown Group';
     const amount = parseFloat(contrib.amount) || 0;
 
-    // Open the payment modal
-    modal.open({
+    // Redirect directly to PayFast payment gateway
+    await redirectToPayFast({
       userId: userId,
       groupId: contrib.groupId,
       contributionId: contrib.id,
@@ -132,6 +132,80 @@ async function openFirstPendingContribution(userId) {
     });
   } catch (err) {
     showError('Failed to load contributions: ' + (err.message || 'Unknown error'));
+  }
+}
+
+/**
+ * Redirect directly to PayFast payment gateway
+ * @param {Object} params - Payment parameters
+ */
+async function redirectToPayFast({ userId, groupId, contributionId, amount, groupName }) {
+  try {
+    // Get user details
+    let userEmail = '';
+    let userName = '';
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      userEmail = currentUser.email || '';
+      userName = currentUser.displayName || '';
+    }
+
+    // Get auth token
+    const authToken = currentUser ? await currentUser.getIdToken() : '';
+
+    // Call backend API to initiate PayFast payment
+    const response = await fetch('/api/payments/initiate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        amount: amount,
+        contributionId: contributionId,
+        groupId: groupId,
+        groupName: groupName,
+        userEmail: userEmail,
+        userName: userName,
+        metadata: {
+          paymentMethod: 'card'
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Payment initiation failed');
+    }
+
+    const result = await response.json();
+    const paymentId = result.paymentId;
+
+    // Store payment ID in localStorage for return handling
+    localStorage.setItem('pendingPaymentId', paymentId);
+
+    // Create and submit form to redirect to PayFast
+    const paymentData = result.paymentData;
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = paymentData.paymentUrl;
+    form.style.display = 'none';
+
+    // Add all payment data as hidden inputs
+    for (let key in paymentData) {
+      if (key !== 'paymentUrl') {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = paymentData[key];
+        form.appendChild(input);
+      }
+    }
+
+    // Add form to body and submit
+    document.body.appendChild(form);
+    form.submit();
+  } catch (err) {
+    showError('Failed to initiate payment: ' + (err.message || 'Unknown error'));
   }
 }
 
