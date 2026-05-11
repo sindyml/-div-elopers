@@ -27,7 +27,7 @@
       </hgroup>
       <div class="page-header__actions">
         <small id="group-name-badge" class="group-badge">Loading group…</small>
-        <button id="make-payment-btn" class="btn btn--primary btn--sm">💳 Make a Payment</button>
+        <a href="payment.html" class="btn btn--primary btn--sm">💳 Make a Payment</a>
       </div>
     </header>
 
@@ -308,14 +308,6 @@
       // slight delay so dashboard.js can populate group list first
       setTimeout(() => renderHealthScore(user.uid), 1200);
       refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
-
-      // Wire up make payment button
-      const makePaymentBtn = document.getElementById('make-payment-btn');
-      if (makePaymentBtn) {
-        makePaymentBtn.addEventListener('click', () => {
-          openFirstPendingContribution(user.uid);
-        });
-      }
     });
   </script>
 </html>
