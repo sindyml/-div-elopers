@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Edit Group</title>
+  <link rel="stylesheet" href="../styles/theme.css">
+  <link rel="stylesheet" href="../styles/app.css">
+  <link rel="stylesheet" href="../styles/forms.css">
+</head>
+<body>
+
+<main>
+  <h2>Edit Group</h2>
+
+  <form id="editForm">
+    <input type="text" id="name" placeholder="Group Name" required />
+    <input type="number" id="amount" placeholder="Contribution Amount" required />
+    <input type="text" id="payout" placeholder="Payout Order (comma separated UIDs)" />
+
+    <select id="frequency">
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+
+    <button type="submit">Update Group</button>
+  </form>
+
+  <p id="message"></p>
+
+  <a href="dashboard.html">← Back to Dashboard</a>
+</main>
+
+<script type="module">
+import { db, auth } from "../src/firebase.js";
+import { doc, getDoc } from "firebase/firestore";
+import { updateGroup } from "../src/groupService.js";
+import { listenForAuth } from "../src/auth.js";
+
+const form = document.getElementById("editForm");
+const message = document.getElementById("message");
+
+// Getting the groupId from URL
+const params = new URLSearchParams(window.location.search);
+const groupId = params.get("groupId");
+
+let userRole = null;
+
+//Wait for authentication before loading data
+listenForAuth(async (user) => {
+  if (!user) {
+    message.textContent = "You must be logged in";
+    return;
+  }
+
+  if (!groupId) {
+    message.textContent = "No group selected";
+    return;
+  }
+
+  try {
+    //Load group data
+    const groupSnap = await getDoc(doc(db, "groups", groupId));
+
+    if (!groupSnap.exists()) {
+      message.textContent = "Group not found";
+      return;
+    }
+
+    const data = groupSnap.data();
+
+    // Pre-fill form
+    document.getElementById("name").value = data.name;
+    document.getElementById("amount").value = data.contributionAmount;
+    document.getElementById("payout").value = (data.payoutOrder || []).join(", ");
+    document.getElementById("frequency").value = data.meetingFrequency;
+
+    //Get user role
+    const roleSnap = await getDoc(
+      doc(db, "groups", groupId, "members", user.uid)
+    );
+
+    if (roleSnap.exists()) {
+      userRole = roleSnap.data().role;
+    }
+
+  } catch (err) {
+    console.error(err);
+    message.textContent = "Error loading group";
+  }
+});
+
+//Submit update
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (userRole !== "admin") {
+    message.textContent = "Only admin can edit this group";
+    return;
+  }
+
+  const name = document.getElementById("name").value;
+  const amount = document.getElementById("amount").value;
+  const payout = document.getElementById("payout").value;
+  const frequency = document.getElementById("frequency").value;
+
+  const payoutOrder = payout
+    ? payout.split(",").map(p => p.trim())
+    : [];
+
+  message.textContent = "⏳ Updating group...";
+
+  try {
+    await updateGroup(groupId, {
+      name,
+      contributionAmount: Number(amount),
+      payoutOrder,
+      meetingFrequency: frequency
+    });
+
+    message.textContent = "Group updated successfully!";
+  } catch (err) {
+    console.error(err);
+    message.textContent = "Error: " + err.message;
+  }
+});
+</script>
+
+</body>
+</html>
