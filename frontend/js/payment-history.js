@@ -19,16 +19,11 @@ import {
   where,
   orderBy,
   getDocs,
-  getDoc,
-  doc,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getUserGroups }     from './groupService.js';
 import { showReceiptModal }  from './payment-receipt.js';
 import { initPaymentReminders } from './payment-reminders.js';
 import { COLLECTIONS }       from './constants.js';
-import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
-import { onTransactionCreate } from './onTransactionCreate.js';
-import { onProofUpload } from './onProofUpload.js';
 
 /* ── Module state ──────────────────────────────────────────── */
 
