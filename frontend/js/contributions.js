@@ -1,7 +1,8 @@
 // contributions/contributions.js
-import { auth, db } from '../js/firebase-config.js';
+import { auth, db } from './firebase-config.js';
 import {
     collection,
+    collectionGroup,
     doc,
     getDoc,
     getDocs,
@@ -10,119 +11,355 @@ import {
     orderBy,
     onSnapshot,
     updateDoc,
-    serverTimestamp,
+    addDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getUserGroups as fetchUserGroups } from '../js/groupService.js';
-import { getUserProfile } from '../js/userService.js';
-import { COLLECTIONS } from '../js/constants.js';
+
+// ============================================================
+// MOCK MODE SWITCH
+// ============================================================
+const USE_MOCK = false;
+
+import { mockData } from './mock-data.js';
+
+// Store active callbacks for mock mode to trigger re-renders
+let mockMemberCallbacks = [];
+let mockGroupCallbacks = [];
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
 function getCurrentUserId() {
-    return auth.currentUser ? auth.currentUser.uid : null;
+    // Hardcoded for testing 
+    //return "5SNBHi5mFqOtAZZKC8st15sKZd62";
+    //return "qCHCRZa8l2TQegqztNlSGSY5cD32";
+    //return "vZhTbL2mrWU5RGUeGMLj6Mbn1kp2";
+    //return "zlBV3VCnFIa7bOdmIbmhxBNr90F2";
+    
+     if (USE_MOCK) {
+         return mockData.currentUserId;
+     }
+     const currentUser = auth.currentUser;
+     return currentUser ? currentUser.uid : null;
 }
 
 async function getCurrentUserRole() {
-    const uid = getCurrentUserId();
-    if (!uid) return null;
-    const profile = await getUserProfile(uid);
-    return profile ? profile.role : null;
+    if (USE_MOCK) {
+        return mockData.currentUserRole;
+    }
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return null;
+    const userDocument = await getDoc(doc(db, 'users', currentUserId));
+    if (!userDocument.exists()) return null;
+    return userDocument.data().role;
 }
 
+// ============================================================
+// GROUPS FUNCTIONS (using Person 3's schema)
+// ============================================================
+
 async function getUserGroups(userId) {
-    return await fetchUserGroups(userId);
+    if (USE_MOCK) {
+        const memberRecords = mockData.members.filter(m => m.uid === userId);
+        const groupIds = memberRecords.map(m => m.groupId);
+        return mockData.groups.filter(group => groupIds.includes(group.id));
+    }
+
+    const membersSnapshot = await getDocs(
+        query(collectionGroup(db, 'members'), where('uid', '==', userId))
+    );
+
+    const groupIds = [...new Set(membersSnapshot.docs.map(d => d.ref.parent.parent.id))];
+
+    const groupDocs = await Promise.all(
+        groupIds.map(groupId => getDoc(doc(db, 'groups', groupId)))
+    );
+    return groupDocs
+        .filter(groupDoc => groupDoc.exists())
+        .map(groupDoc => ({
+            id: groupDoc.id,
+            name: groupDoc.data().name,
+            ...groupDoc.data()
+        }));
 }
 
 async function getTreasurerGroups(userId) {
-    const groups = await fetchUserGroups(userId);
-    const result = [];
-    for (const group of groups) {
-      const memberDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, group.id, 'members', userId));
-      if (memberDoc.exists()) {
-        const role = memberDoc.data().role;
-        if (role === 'treasurer' || role === 'admin') {
-          result.push(group);
-        }
-      }
+    if (USE_MOCK) {
+        const memberRecords = mockData.members.filter(m =>
+            m.uid === userId && (m.role === 'treasurer' || m.role === 'admin')
+        );
+        const groupIds = memberRecords.map(m => m.groupId);
+        return mockData.groups.filter(group => groupIds.includes(group.id));
     }
-    return result;
+
+    const membersSnapshot = await getDocs(
+        query(
+            collectionGroup(db, 'members'),
+            where('uid', '==', userId),
+            where('role', 'in', ['treasurer', 'admin'])
+        )
+    );
+
+    const groupIds = [...new Set(membersSnapshot.docs.map(d => d.ref.parent.parent.id))];
+
+    const groupDocs = await Promise.all(
+        groupIds.map(groupId => getDoc(doc(db, 'groups', groupId)))
+    );
+    return groupDocs
+        .filter(groupDoc => groupDoc.exists())
+        .map(groupDoc => ({
+            id: groupDoc.id,
+            name: groupDoc.data().name,
+            ...groupDoc.data()
+        }));
 }
 
 async function getGroupById(groupId) {
-    const groupDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, groupId));
-    return groupDoc.exists() ? { id: groupDoc.id, ...groupDoc.data() } : null;
+    if (USE_MOCK) {
+        const group = mockData.groups.find(g => g.id === groupId);
+        return group || null;
+    }
+    const groupDocument = await getDoc(doc(db, 'groups', groupId));
+    if (!groupDocument.exists()) return null;
+    return {
+        id: groupDocument.id,
+        name: groupDocument.data().name,
+        ...groupDocument.data()
+    };
 }
 
 async function getMemberName(userId) {
-    const profile = await getUserProfile(userId);
-    return profile ? (profile.displayName || profile.email) : userId;
+    if (USE_MOCK) {
+        return mockData.memberNames[userId] || userId;
+    }
+    const userDocument = await getDoc(doc(db, 'users', userId));
+    if (!userDocument.exists()) return userId;
+    return userDocument.data().name || userDocument.data().displayName || userDocument.data().email || userId;
 }
 
-async function getContributionsByMember(userId) {
-    const q = query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('userId', '==', userId), orderBy('date', 'desc'));
+// ============================================================
+// USER DISPLAY NAME
+// ============================================================
+
+async function getUserDisplayName(userId) {
+    if (USE_MOCK) {
+        return mockData.memberNames[userId] || 'Member';
+    }
+    const userDocument = await getDoc(doc(db, 'users', userId));
+    if (!userDocument.exists()) return 'Member';
+    return userDocument.data().displayName || userDocument.data().name || userDocument.data().email || 'Member';
+}
+
+// ============================================================
+// DISPUTES FUNCTIONS
+// ============================================================
+
+async function getMemberDisputes(userId) {
+    const q = query(
+        collection(db, 'disputes'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+    );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString().split('T')[0] : data.createdAt
+        };
+    });
+}
+
+async function createDispute(contributionId, userId, groupId, groupName, amount, deadlineDate, reason) {
+    await addDoc(collection(db, 'disputes'), {
+        contributionId: contributionId,
+        userId: userId,
+        groupId: groupId,
+        groupName: groupName,
+        amount: amount,
+        deadlineDate: deadlineDate,
+        reason: reason,
+        status: 'pending',
+        rejectionReason: null,
+        createdAt: new Date(),
+        resolvedAt: null,
+        resolvedBy: null
+    });
+}
+
+async function getPendingDisputes() {
+    const q = query(
+        collection(db, 'disputes'),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
+}
+
+async function approveDispute(disputeId, contributionId) {
+    await updateDoc(doc(db, 'disputes', disputeId), {
+        status: 'approved',
+        resolvedAt: new Date(),
+        resolvedBy: getCurrentUserId()
+    });
+    
+    await updateDoc(doc(db, 'contributions', contributionId), {
+        status: 'confirmed',
+        confirmedAt: new Date()
+    });
+}
+
+async function rejectDispute(disputeId, rejectionReason) {
+    await updateDoc(doc(db, 'disputes', disputeId), {
+        status: 'rejected',
+        rejectionReason: rejectionReason,
+        resolvedAt: new Date(),
+        resolvedBy: getCurrentUserId()
+    });
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+function listenToNotifications(userId, onNotificationCallback) {
+    const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc')
+    );
+    
+    return onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach(change => {
+            if (change.type === 'added') {
+                const notification = change.doc.data();
+                const notificationId = change.doc.id;
+                onNotificationCallback(notification.message, notificationId);
+            }
+        });
+    });
+}
+
+// ============================================================
+// CONTRIBUTIONS FUNCTIONS
+// ============================================================
+
+async function getContributionsByMember(userId) {
+    if (USE_MOCK) {
+        return mockData.contributions.filter(c => c.userId === userId);
+    }
+    const contributionsSnapshot = await getDocs(
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc'))
+    );
+    return contributionsSnapshot.docs.map(document => ({
+        id: document.id,
+        ...document.data()
+    }));
 }
 
 async function getContributionsByGroup(groupId) {
-    const q = query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('groupId', '==', groupId), orderBy('date', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (USE_MOCK) {
+        return mockData.contributions.filter(c => c.groupId === groupId);
+    }
+    const contributionsSnapshot = await getDocs(
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc'))
+    );
+    return contributionsSnapshot.docs.map(document => ({
+        id: document.id,
+        ...document.data()
+    }));
 }
 
 async function updateContributionStatus(contributionId, newStatus) {
-    await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
+    if (USE_MOCK) {
+        const contribution = mockData.contributions.find(c => c.id === contributionId);
+        if (contribution) {
+            contribution.status = newStatus;
+            mockGroupCallbacks.forEach(callback => callback());
+            mockMemberCallbacks.forEach(callback => callback());
+        }
+        return;
+    }
+    await updateDoc(doc(db, 'contributions', contributionId), {
         status: newStatus,
         confirmedAt: new Date()
     });
 }
 
-/**
- * Mark a contribution as paid after a successful payment transaction.
- * Sets status → 'confirmed', records the transactionId, and timestamps the payment.
- *
- * @param {string} contributionId  Firestore document ID of the contribution.
- * @param {string} transactionId   Payment transaction ID (from Yoco or mock).
- */
-async function markContributionAsPaid(contributionId, transactionId) {
-    await updateDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, contributionId), {
-        status: 'confirmed',
-        transactionId,
-        paidAt: serverTimestamp(),
-        confirmedAt: serverTimestamp(),
-    });
-}
-
 function listenToMemberContributions(userId, onUpdateCallback) {
-    return onSnapshot(
-        query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('userId', '==', userId), orderBy('date', 'desc')),
+    if (USE_MOCK) {
+        const wrappedCallback = () => {
+            const filtered = mockData.contributions.filter(c => c.userId === userId);
+            onUpdateCallback(filtered);
+        };
+        mockMemberCallbacks.push(wrappedCallback);
+        wrappedCallback();
+        return () => {
+            const index = mockMemberCallbacks.indexOf(wrappedCallback);
+            if (index > -1) mockMemberCallbacks.splice(index, 1);
+        };
+    }
+    const unsubscribe = onSnapshot(
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc')),
         (snapshot) => {
-            const contributions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const contributions = snapshot.docs.map(document => ({
+                id: document.id,
+                ...document.data()
+            }));
             onUpdateCallback(contributions);
         }
     );
+    return unsubscribe;
 }
 
 function listenToGroupContributions(groupId, onUpdateCallback) {
-    return onSnapshot(
-        query(collection(db, COLLECTIONS.CONTRIBUTIONS), where('groupId', '==', groupId), orderBy('date', 'desc')),
+    if (USE_MOCK) {
+        const wrappedCallback = () => {
+            const filtered = mockData.contributions.filter(c => c.groupId === groupId);
+            onUpdateCallback(filtered);
+        };
+        mockGroupCallbacks.push(wrappedCallback);
+        wrappedCallback();
+        return () => {
+            const index = mockGroupCallbacks.indexOf(wrappedCallback);
+            if (index > -1) mockGroupCallbacks.splice(index, 1);
+        };
+    }
+    const unsubscribe = onSnapshot(
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc')),
         (snapshot) => {
-            const contributions = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const contributions = snapshot.docs.map(document => ({
+                id: document.id,
+                ...document.data()
+            }));
             onUpdateCallback(contributions);
         }
     );
+    return unsubscribe;
 }
 
 async function getPayoutSchedule(groupId) {
-    const q = query(collection(db, COLLECTIONS.PAYOUTS), where('groupId', '==', groupId), orderBy('order', 'asc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => {
-        const data = d.data();
-        // Convert Firestore Timestamp to ISO date string for display and comparison
-        if (data.payoutDate && typeof data.payoutDate.toDate === 'function') {
-            data.payoutDate = data.payoutDate.toDate().toISOString().slice(0, 10);
-        }
-        return { id: d.id, ...data };
-    });
+    if (USE_MOCK) {
+        return mockData.payouts.filter(p => p.groupId === groupId);
+    }
+    const payoutsSnapshot = await getDocs(
+        query(collection(db, 'payouts'), where('groupId', '==', groupId), orderBy('order', 'asc'))
+    );
+    return payoutsSnapshot.docs.map(document => ({
+        id: document.id,
+        ...document.data()
+    }));
 }
+
+// ============================================================
+// EXPORTS
+// ============================================================
 
 export {
     getCurrentUserId,
@@ -131,10 +368,16 @@ export {
     getTreasurerGroups,
     getGroupById,
     getMemberName,
+    getUserDisplayName,
+    getMemberDisputes,
+    createDispute,
+    getPendingDisputes,
+    approveDispute,
+    rejectDispute,
+    listenToNotifications,
     getContributionsByMember,
     getContributionsByGroup,
     updateContributionStatus,
-    markContributionAsPaid,
     getPayoutSchedule,
     listenToMemberContributions,
     listenToGroupContributions

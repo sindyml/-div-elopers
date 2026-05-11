@@ -192,6 +192,272 @@ button.danger {
 }
 
 /* ============================================================
+   NEW BUTTON STYLES (Sprint 3)
+   ============================================================ */
+
+/* Base button styles (already exists, adding missing variants) */
+.btn {
+    background: linear-gradient(135deg, #1A7A5E 0%, #0F5C46 100%);
+    border: none;
+    color: #FFFFFF;
+    padding: 0.6rem 1.2rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    background: linear-gradient(135deg, #238F6E 0%, #157050 100%);
+}
+
+/* Primary button */
+.btn--primary {
+    background: linear-gradient(135deg, #1A7A5E 0%, #0F5C46 100%);
+}
+
+.btn--primary:hover {
+    background: linear-gradient(135deg, #238F6E 0%, #157050 100%);
+}
+
+/* Secondary button (outline) */
+.btn--secondary {
+    background: transparent;
+    border: 2px solid #1A7A5E;
+    color: #1A7A5E;
+    box-shadow: none;
+}
+
+.btn--secondary:hover {
+    background: #1A7A5E;
+    color: #FFFFFF;
+    transform: translateY(-2px);
+}
+
+/* Success button (Approve dispute) */
+.btn--success {
+    background: linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%);
+}
+
+.btn--success:hover {
+    background: linear-gradient(135deg, #388E3C 0%, #2E7D32 100%);
+}
+
+/* Danger button (Reject dispute) */
+.btn--danger {
+    background: linear-gradient(135deg, #C62828 0%, #B71C1C 100%);
+}
+
+.btn--danger:hover {
+    background: linear-gradient(135deg, #D32F2F 0%, #C62828 100%);
+}
+
+/* Outline button (View Proof) */
+.btn--outline {
+    background: transparent;
+    border: 2px solid #1A7A5E;
+    color: #1A7A5E;
+    box-shadow: none;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+}
+
+.btn--outline:hover {
+    background: #1A7A5E;
+    color: #FFFFFF;
+}
+
+/* Small button */
+.btn--sm {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.75rem;
+}
+
+/* ============================================================
+   DISPUTE MODAL STYLES
+   ============================================================ */
+
+.dispute-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dispute-modal-content {
+    background-color: white;
+    border-radius: 12px;
+    padding: 20px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.dispute-modal-content h3 {
+    color: #0F4C3A;
+    margin-bottom: 1rem;
+    border-left: none;
+    padding-left: 0;
+}
+
+.dispute-modal-content p {
+    background: none;
+    padding: 0;
+    text-align: left;
+    box-shadow: none;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.dispute-modal-content label {
+    display: block;
+    margin: 1rem 0 0.5rem;
+    font-weight: 600;
+    color: #1A2E1F;
+}
+
+.dispute-modal-content textarea {
+    width: 100%;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.dispute-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.dispute-modal-actions button {
+    margin-right: 0;
+}
+
+/* ============================================================
+   NOTIFICATION BANNER STYLES
+   ============================================================ */
+
+.notification-banner {
+    background-color: #ff9800;
+    color: white;
+    padding: 12px 20px;
+    margin: 10px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.notification-banner p {
+    background: none;
+    padding: 0;
+    margin: 0;
+    color: white;
+    text-align: left;
+    box-shadow: none;
+}
+
+.notification-dismiss {
+    background: white;
+    color: #ff9800;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 0;
+    box-shadow: none;
+}
+
+.notification-dismiss:hover {
+    background: #f0f0f0;
+    transform: none;
+}
+
+/* ============================================================
+   GROUP LIST STYLES (already exists, adding specific classes)
+   ============================================================ */
+
+.group-list {
+    list-style: none;
+    padding: 0;
+}
+
+.group-list-item {
+    background-color: #FFFFFF;
+    margin-bottom: 1rem;
+    padding: 1.2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(26, 122, 94, 0.2);
+}
+
+.group-list-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    border-color: #1A7A5E;
+}
+
+/* ============================================================
+   DISPUTES SECTION STYLES
+   ============================================================ */
+
+#disputes-section,
+#pending-disputes-section {
+    margin-bottom: 2rem;
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#disputes-section h2,
+#pending-disputes-section h2 {
+    border-left: 5px solid #1A7A5E;
+    padding-left: 1rem;
+    margin-top: 0;
+}
+
+#myDisputesContainer table,
+#pendingDisputesContainer table {
+    margin-top: 1rem;
+}
+
+/* ============================================================
+   USER GREETING STYLES
+   ============================================================ */
+
+#user-greeting {
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+}
+
+#user-greeting p {
+    background: none;
+    padding: 0;
+    text-align: left;
+    box-shadow: none;
+    font-size: 1.1rem;
+    color: #0F4C3A;
+}
+
+/* ============================================================
    GROUP LIST CARDS
    ============================================================ */
 
@@ -333,6 +599,20 @@ h3 {
     nav {
         flex-wrap: wrap;
         justify-content: center;
+    }
+    
+    .dispute-modal-content {
+        width: 95%;
+        padding: 15px;
+    }
+    
+    .dispute-modal-actions {
+        flex-direction: column;
+    }
+    
+    .dispute-modal-actions button {
+        width: 100%;
+        margin-bottom: 0.5rem;
     }
 }
 
