@@ -224,9 +224,11 @@ service cloud.firestore {
       // Only the system can manage payment queues
       allow write: if false;
     }
-  }
-}
 
-match /notifications/{docId} {
-  allow read: if request.auth.uid == resource.data.userId;
+    // Notifications collection
+    match /notifications/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create, update, delete: if false;
+    }
+  }
 }

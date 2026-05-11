@@ -1,17 +1,17 @@
 // proxy-server.js
-// Run with: node proxy-server.js
-// Requires: npm install express cors node-fetch dotenv
+// Run with: npm run proxy
+// Requires: npm install express cors dotenv
 
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
 
 dotenv.config();
 
 const app  = express();
 const PORT = 3001;
 
-app.use(cors({ origin: ['http://localhost:8082', 'http://127.0.0.1:8082'] }));
+app.use(cors({ origin: ['http://localhost:8080', 'http://127.0.0.1:8080', 'http://localhost:8082', 'http://127.0.0.1:8082'] }));
 app.use(express.json());
 
 app.post('/api/chat', async (req, res) => {

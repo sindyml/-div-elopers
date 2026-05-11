@@ -291,15 +291,25 @@
         const g = docSnap.data();
         const item = document.createElement('div');
         item.className = 'group-result-item';
-        item.innerHTML = `
-          <div>
-            <span class="group-result-item__name">${g.name}</span>
-            <span class="group-result-item__freq">${g.meetingFrequency || ''}</span>
-          </div>
-          <button class="btn-join" data-group-id="${docSnap.id}" data-group-name="${g.name}">
-            Request to Join
-          </button>
-        `;
+
+        const groupInfo = document.createElement('div');
+        const nameEl = document.createElement('span');
+        nameEl.className = 'group-result-item__name';
+        nameEl.textContent = g.name || '';
+        const freqEl = document.createElement('span');
+        freqEl.className = 'group-result-item__freq';
+        freqEl.textContent = g.meetingFrequency || '';
+        groupInfo.appendChild(nameEl);
+        groupInfo.appendChild(freqEl);
+
+        const joinButton = document.createElement('button');
+        joinButton.className = 'btn-join';
+        joinButton.dataset.groupId = docSnap.id;
+        joinButton.dataset.groupName = g.name || '';
+        joinButton.textContent = 'Request to Join';
+
+        item.appendChild(groupInfo);
+        item.appendChild(joinButton);
         resultsEl.appendChild(item);
       });
 
@@ -401,7 +411,7 @@
         {
           uid: currentUser.uid,
           displayName: currentUser.displayName || currentUser.email,
-          role: ROLES.ADMIN,
+          role: 'admin',
           joinedAt: serverTimestamp()
         }
       );
@@ -412,7 +422,7 @@
         {
           uid: currentUser.uid,
           groupId,
-          role: ROLES.ADMIN
+          role: 'admin'
         }
       );
 

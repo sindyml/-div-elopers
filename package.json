@@ -9,7 +9,7 @@
     "start": "node backend/server.js",
     "dev": "node backend/server.js",
     "test": "jest",
-    "proxy": "node proxy-server.js"
+    "proxy": "node frontend/js/proxy-server.js"
   },
   "engines": {
     "node": ">=18.0.0"

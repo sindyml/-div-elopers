@@ -11,29 +11,43 @@ function sendJSON(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-// Authentication middleware (simplified for testing)
+// Authentication middleware
 async function authenticateUser(req, res, next) {
+  const isTestEnv = process.env.NODE_ENV === 'test';
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // For testing, create a mock user
-      req.user = { uid: 'test-user-123', isAdmin: true };
-      return next();
+      if (isTestEnv) {
+        req.user = { uid: 'test-user-123', isAdmin: false };
+        return next();
+      }
+      sendJSON(res, 401, { error: 'Authentication required' });
+      return;
     }
 
     const token = authHeader.split('Bearer ')[1];
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
-      req.user = decodedToken;
+      req.user = {
+        uid: decodedToken.uid,
+        isAdmin: decodedToken.isAdmin === true || decodedToken.admin === true
+      };
       next();
     } catch (error) {
-      // If token verification fails, still allow for testing
-      req.user = { uid: 'test-user-123', isAdmin: true };
-      next();
+      if (isTestEnv) {
+        req.user = { uid: 'test-user-123', isAdmin: false };
+        next();
+        return;
+      }
+      sendJSON(res, 401, { error: 'Invalid authentication token' });
     }
   } catch (error) {
-    req.user = { uid: 'test-user-123', isAdmin: true };
-    next();
+    if (isTestEnv) {
+      req.user = { uid: 'test-user-123', isAdmin: false };
+      next();
+      return;
+    }
+    sendJSON(res, 401, { error: 'Authentication failed' });
   }
 }
 
@@ -53,7 +67,14 @@ async function initiatePayment(req, res) {
     const paymentId = paymentRef.id;
 
     // Build URLs for PayFast
-    const baseUrl = process.env.BASE_URL || 'http://localhost:8080';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol = process.env.BASE_URL
+      ? null
+      : ((typeof forwardedProto === 'string' && forwardedProto.split(',')[0]) || (req.socket && req.socket.encrypted ? 'https' : 'http'));
+    const host = process.env.BASE_URL
+      ? null
+      : (req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080');
+    const baseUrl = process.env.BASE_URL || `${protocol}://${host}`;
     const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
     const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
     const notifyUrl = `${baseUrl}/api/payments/notify`;
@@ -188,7 +209,7 @@ async function handleNotify(req, res) {
     if (paymentInfo.paymentStatus === 'completed' && payment.contributionId) {
       try {
         await db.collection('contributions').doc(payment.contributionId).update({
-          status: 'paid',
+          status: 'confirmed',
           paidAt: admin.firestore.FieldValue.serverTimestamp(),
           transactionId: paymentId
         });
@@ -241,13 +262,34 @@ async function handleCancel(req, res) {
   try {
     const paymentId = req.query.paymentId;
 
-    if (paymentId) {
-      // Update payment status to cancelled
-      await db.collection('transactions').doc(paymentId).update({
-        status: 'cancelled',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+    if (!paymentId) {
+      sendJSON(res, 400, { error: 'paymentId query parameter is required' });
+      return;
     }
+
+    const paymentRef = db.collection('transactions').doc(paymentId);
+    const paymentDoc = await paymentRef.get();
+
+    if (!paymentDoc.exists) {
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    const payment = paymentDoc.data();
+    if (payment.userId !== req.user.uid && !req.user.isAdmin) {
+      sendJSON(res, 403, { error: 'Unauthorized' });
+      return;
+    }
+
+    if (payment.status !== 'pending') {
+      sendJSON(res, 409, { error: 'Only pending payments can be cancelled' });
+      return;
+    }
+
+    await paymentRef.update({
+      status: 'cancelled',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     sendJSON(res, 200, {
       message: 'Payment cancelled',
@@ -447,7 +489,7 @@ async function handleRequest(req, res) {
     await handleReturn(req, res);
   }
   else if (method === 'GET' && url === '/cancel') {
-    await handleCancel(req, res);
+    await authenticateUser(req, res, () => handleCancel(req, res));
   }
   else if (method === 'GET' && url.match(/^\/status\/.+/)) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));

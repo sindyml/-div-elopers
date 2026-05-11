@@ -7,7 +7,7 @@ const admin = require('firebase-admin');
 
 require('dotenv').config();
 
-const PORT = process.env.PORT || 8082;
+const PORT = process.env.PORT || 8080;
 
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 if (!admin.apps.length) {

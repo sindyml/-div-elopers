@@ -67,7 +67,8 @@ export async function checkAndAcceptInvites(user) {
 
     await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
       uid: user.uid,
-      groupId: groupId
+      groupId: groupId,
+      role: 'member'
     });
 
     await updateDoc(docSnap.ref, { status: 'invite accepted' });
@@ -153,7 +154,8 @@ export async function acceptInvite(inviteId, user) {
 
   await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
     uid: user.uid,
-    groupId: groupId
+    groupId: groupId,
+    role: 'member'
   });
 
   await updateDoc(inviteRef, { status: 'invite accepted' });
