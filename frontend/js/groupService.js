@@ -13,6 +13,10 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { COLLECTIONS } from './constants.js';
+// ============================================================
+// ADDED: Import handleMemberJoin from onGroupCreate.js
+// ============================================================
+import { handleMemberJoin } from './onGroupCreate.js';
 
 export async function getUserGroups(uid) {
   const q = query(collection(db, COLLECTIONS.MEMBERSHIPS), where('uid', '==', uid));
@@ -69,6 +73,12 @@ export async function checkAndAcceptInvites(user) {
       uid: user.uid,
       groupId: groupId
     });
+
+    // ============================================================
+    // ADDED: Call handleMemberJoin to create contributions and update payouts for new member
+    // ============================================================
+    await handleMemberJoin(groupId, user.uid);
+    // ============================================================
 
     // Mark the invite as accepted
     await updateDoc(docSnap.ref, { status: 'invite accepted' });

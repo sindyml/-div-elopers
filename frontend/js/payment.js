@@ -26,19 +26,26 @@ import { getUserGroups }           from './groupService.js';
 import { PaymentModal }            from '../components/payment-modal.js';
 import { COLLECTIONS }             from './constants.js';
 import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
-import { markContributionAsPaid }  from './contributions.js';
-
+//Added imports
+import { onTransactionCreate } from './onTransactionCreate.js';
+import { onProofUpload } from './onProofUpload.js';
+import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 /* ── Modal initialisation ──────────────────────────────────── */
 
 const modal = new PaymentModal();
 
 modal.onPaymentSuccess = async (receipt) => {
-  // Mark the contribution as paid in Firestore
+  // Only set payment evidence, NOT status (Treasurer must confirm)
   if (receipt.contributionId) {
     try {
-      await markContributionAsPaid(receipt.contributionId, receipt.transactionId || receipt.paymentId);
+      // Get the contribution to find userId and groupId
+      const contribDoc = await getDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, receipt.contributionId));
+      if (contribDoc.exists()) {
+        const contribData = contribDoc.data();
+        await onTransactionCreate(contribData.userId, contribData.groupId);
+      }
     } catch (err) {
-      console.warn('[payment.js] Could not mark contribution as paid:', err.message);
+      console.warn('[payment.js] Could not update payment evidence:', err.message);
     }
   }
   // Reload pending list
@@ -53,7 +60,16 @@ modal.onProofUploaded = async (file, paymentId) => {
   const validationError = validateProofFile(file);
   if (validationError) throw new Error(validationError);
 
-  await uploadPaymentProof(file, paymentId, user.uid);
+  // Upload the proof file (returns fileUrl)
+  const { fileUrl, proofId } = await uploadPaymentProof(file, paymentId, user.uid);
+  
+  // Get the transaction to find userId and groupId
+  const txDoc = await getDoc(doc(db, 'transactions', paymentId));
+  if (txDoc.exists()) {
+    const txData = txDoc.data();
+    // Pass the fileUrl to onProofUpload
+    await onProofUpload(txData.userId, txData.groupId, fileUrl);
+  }
 };
 
 /* ── Auth gate ─────────────────────────────────────────────── */
