@@ -10,140 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/register.css" />
-
-  <style>
-    /* ── ROLE MODAL ──────────────────────────────────────────
-       Scoped styles for the role-selection dialog.
-       Uses aria-hidden to drive visibility so screen readers
-       track state correctly. All other styles live in
-       register.css / theme.css as usual.
-    ───────────────────────────────────────────────────────── */
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      z-index: 200;
-      /* Hidden by default — shown when aria-hidden="false" */
-      visibility: hidden;
-      opacity: 0;
-      transition: opacity 0.2s ease, visibility 0.2s ease;
-    }
-
-    .modal-overlay[aria-hidden="false"] {
-      visibility: visible;
-      opacity: 1;
-    }
-
-    .modal-box {
-      background: var(--color-surface, #ffffff);
-      border-radius: var(--radius-lg, 12px);
-      padding: 2rem;
-      width: 100%;
-      max-width: 440px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
-      transform: translateY(12px);
-      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .modal-overlay[aria-hidden="false"] .modal-box {
-      transform: translateY(0);
-    }
-
-    .modal-box__header {
-      margin-bottom: 1.5rem;
-    }
-
-    .modal-box__title {
-      font-size: 1.4rem;
-      font-weight: 600;
-      margin-bottom: 0.35rem;
-    }
-
-    .modal-box__desc {
-      font-size: 0.875rem;
-      opacity: 0.65;
-    }
-
-    /* ── ROLE FIELDSET ─────────────────────────────────────── */
-    .role-fieldset {
-      border: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-
-    .role-fieldset__legend {
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      opacity: 0.55;
-      margin-bottom: 0.75rem;
-      float: left;
-      width: 100%;
-    }
-
-    /* Hide the native radio — label acts as the control */
-    .role-option input[type="radio"] {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .role-option__label {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.85rem;
-      padding: 0.85rem 1rem;
-      border: 1.5px solid var(--color-border, #e2e8f0);
-      border-radius: var(--radius-md, 8px);
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-    }
-
-    .role-option input:focus-visible + .role-option__label {
-      outline: 2px solid var(--color-primary, #2563eb);
-      outline-offset: 2px;
-    }
-
-    .role-option input:checked + .role-option__label {
-      border-color: var(--color-primary, #2563eb);
-      background: var(--color-primary-subtle, #eff6ff);
-    }
-
-    .role-option__icon {
-      font-size: 1.2rem;
-      line-height: 1;
-      margin-top: 0.1rem;
-      flex-shrink: 0;
-    }
-
-    .role-option__text strong {
-      display: block;
-      font-size: 0.9rem;
-      font-weight: 600;
-      margin-bottom: 0.15rem;
-    }
-
-    .role-option__text span {
-      font-size: 0.8rem;
-      opacity: 0.6;
-    }
-
-    .modal-box__footer {
-      margin-top: 1.5rem;
-    }
-  </style>
 </head>
-
 <body>
   <main class="register-page">
     <article class="register-card">
@@ -154,12 +21,7 @@
       </header>
 
       <section class="register-card__body">
-        <aside
-          id="alertMessage"
-          class="alert alert--hidden"
-          role="alert"
-          aria-live="assertive"
-        ></aside>
+        <aside id="alertMessage" class="alert alert--hidden" aria-live="polite"></aside>
 
         <!-- OAuth buttons — primary sign-in method -->
         <section class="oauth-buttons" aria-label="Sign in with social accounts">
@@ -177,37 +39,23 @@
         <hr class="divider" aria-label="or sign in with email" />
 
         <!-- Email/password fallback for users who registered with email -->
-        <form id="loginForm" novalidate>
+        <form id="loginForm">
           <div class="form-group">
             <label class="form-label" for="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              class="form-input"
-              placeholder="you@example.com"
-              autocomplete="email"
-              required
-            />
+            <input type="email" id="email" class="form-input" placeholder="you@example.com" required>
           </div>
+
           <div class="form-group">
             <label class="form-label" for="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              class="form-input"
-              placeholder="Enter your password"
-              autocomplete="current-password"
-              required
-            />
+            <input type="password" id="password" class="form-input" placeholder="Enter your password" required>
           </div>
+
           <button type="submit" class="btn btn--primary btn--full">Sign in</button>
         </form>
       </section>
 
       <p class="forgot-password">
-        <a href="forgot-password.html" class="forgot-password-link">Forgot password?</a>
+             <a href="forgot-password.html" class="forgot-password-link">Forgot password?</a>
       </p>
 
       <footer class="register-card__footer">
@@ -215,78 +63,6 @@
       </footer>
     </article>
   </main>
-
-
-  <!-- ─────────────────────────────────────────────────────────
-    ROLE SELECTION MODAL
-    Only shown for first-time OAuth users before their
-    Firestore profile is written. Toggled via aria-hidden
-    so assistive tech tracks open/closed state correctly.
-  ──────────────────────────────────────────────────────────── -->
-  <div
-    id="roleModal"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="roleModalTitle"
-    aria-describedby="roleModalDesc"
-    aria-hidden="true"
-    class="modal-overlay"
-  >
-    <div class="modal-box">
-      <header class="modal-box__header">
-        <h2 id="roleModalTitle" class="modal-box__title">One last step</h2>
-        <p id="roleModalDesc" class="modal-box__desc">
-          Choose the role that best describes you. This sets the right permissions for your account.
-        </p>
-      </header>
-
-      <form id="roleForm" class="modal-box__body">
-        <fieldset class="role-fieldset">
-          <legend class="role-fieldset__legend">Select your role</legend>
-
-          <div class="role-option">
-            <input type="radio" name="role" id="roleMember" value="Member" checked />
-            <label for="roleMember" class="role-option__label">
-              <span class="role-option__icon" aria-hidden="true">👤</span>
-              <span class="role-option__text">
-                <strong>Member</strong>
-                <span>Track your own contributions and view group activity.</span>
-              </span>
-            </label>
-          </div>
-
-          <div class="role-option">
-            <input type="radio" name="role" id="roleTreasurer" value="Treasurer" />
-            <label for="roleTreasurer" class="role-option__label">
-              <span class="role-option__icon" aria-hidden="true">💰</span>
-              <span class="role-option__text">
-                <strong>Treasurer</strong>
-                <span>Manage contributions, confirm payments, and handle payouts.</span>
-              </span>
-            </label>
-          </div>
-
-          <div class="role-option">
-            <input type="radio" name="role" id="roleAdmin" value="Admin" />
-            <label for="roleAdmin" class="role-option__label">
-              <span class="role-option__icon" aria-hidden="true">🛡️</span>
-              <span class="role-option__text">
-                <strong>Admin</strong>
-                <span>Full access — create groups, manage members, and configure settings.</span>
-              </span>
-            </label>
-          </div>
-        </fieldset>
-
-        <footer class="modal-box__footer">
-          <button type="submit" id="confirmRoleBtn" class="btn btn--primary btn--full">
-            Confirm &amp; continue
-          </button>
-        </footer>
-      </form>
-    </div>
-  </div>
-
 
   <script type="module" src="js/login.js"></script>
 </body>
