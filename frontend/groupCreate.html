@@ -171,6 +171,14 @@
           await batch.commit();
         }
 
+        // ============================================================
+        // ADDED: Call handleGroupCreation to create contributions and correct payouts
+        // ============================================================
+        // Import the function dynamically
+        const { handleGroupCreation } = await import('./js/onGroupCreate.js');
+        await handleGroupCreation(groupRef.id);
+        // ============================================================
+
         showMsg('Group created successfully!', 'success');
         form.reset();
       } catch (err) {

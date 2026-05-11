@@ -14,6 +14,13 @@
   gap: var(--space-4);
 }
 
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .group-badge {
   background: var(--color-primary-light);
   color: var(--color-primary);

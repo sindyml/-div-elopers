@@ -28,13 +28,13 @@
     <footer id="footer-root"></footer>
 
     <script type="module">
-        import { auth } from 'js/firebase-config.js';
+        import { auth } from './js/firebase-config.js';
         import { 
             getPayoutSchedule,
             getGroupById,
             getCurrentUserId,
             getUserGroups
-        } from 'js/contributions.js';
+        } from './js/contributions.js';
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -176,6 +176,7 @@
             }
             loadPayoutPage();
         });
+        
     </script>
 
     <!-- Firebase compat SDK for navbar auth state -->
@@ -183,6 +184,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="js/firebase-compat-init.js"></script>
     <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
+    <script src="components/footer.js"></script> 
 </body>
 </html>
