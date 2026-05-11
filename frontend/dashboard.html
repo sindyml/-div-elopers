@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/app.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/payment.css" />
 </head>
 <body class="app-layout">
 
@@ -26,7 +27,7 @@
       </hgroup>
       <div class="page-header__actions">
         <small id="group-name-badge" class="group-badge">Loading group…</small>
-        <a href="payment.html" class="btn btn--primary btn--sm">💳 Make a Payment</a>
+        <button id="make-payment-btn" class="btn btn--primary btn--sm">💳 Make a Payment</button>
       </div>
     </header>
 
@@ -171,6 +172,9 @@
 
   <output id="notification-root" aria-live="polite" aria-atomic="true"></output>
 
+  <!-- Payment modal mount point -->
+  <div id="payment-modal-root"></div>
+
   <footer id="footer-root"></footer>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -184,12 +188,107 @@
   <script type="module">
     import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
     import { getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getFirestore, collection, query, where, orderBy, getDocs, getDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    import { PaymentModal } from './components/payment-modal.js';
+    import { uploadPaymentProof, validateProofFile } from './js/payment-upload.js';
+    import { getUserGroups } from './js/groupService.js';
+    import { COLLECTIONS } from './js/constants.js';
+    import { onTransactionCreate } from './js/onTransactionCreate.js';
+    import { onProofUpload } from './js/onProofUpload.js';
     import { computeAndStoreHealthScore, buildHealthScoreHTML } from './js/financial-health.js';
     import { initPaymentReminders } from './js/payment-reminders.js';
 
     const auth = getAuth(getApp());
+    const db = getFirestore(getApp());
     const container = document.getElementById('health-score-container');
     const refreshBtn = document.getElementById('health-refresh-btn');
+
+    // Initialize payment modal
+    const paymentModal = new PaymentModal();
+
+    paymentModal.onPaymentSuccess = async (receipt) => {
+      // Only set payment evidence, NOT status (Treasurer must confirm)
+      if (receipt.contributionId) {
+        try {
+          // Get the contribution to find userId and groupId
+          const contribDoc = await getDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, receipt.contributionId));
+          if (contribDoc.exists()) {
+            const contribData = contribDoc.data();
+            await onTransactionCreate(contribData.userId, contribData.groupId);
+          }
+        } catch (err) {
+          console.warn('[dashboard] Could not update payment evidence:', err.message);
+        }
+      }
+      // Reload dashboard to reflect changes
+      window.location.reload();
+    };
+
+    paymentModal.onProofUploaded = async (file, paymentId) => {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not authenticated.');
+
+      const validationError = validateProofFile(file);
+      if (validationError) throw new Error(validationError);
+
+      // Upload the proof file (returns fileUrl)
+      const { fileUrl, proofId } = await uploadPaymentProof(file, paymentId, user.uid);
+
+      // Get the transaction to find userId and groupId
+      const txDoc = await getDoc(doc(db, 'transactions', paymentId));
+      if (txDoc.exists()) {
+        const txData = txDoc.data();
+        // Pass the fileUrl to onProofUpload
+        await onProofUpload(txData.userId, txData.groupId, fileUrl);
+      }
+    };
+
+    // Wire up make payment button
+    async function openFirstPendingContribution(userId) {
+      try {
+        const groups = await getUserGroups(userId);
+        if (!groups.length) {
+          alert('You are not a member of any groups yet.');
+          return;
+        }
+
+        const contribSnap = await getDocs(
+          query(
+            collection(db, COLLECTIONS.CONTRIBUTIONS),
+            where('userId', '==', userId),
+            orderBy('date', 'desc')
+          )
+        );
+
+        const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const pending = allContribs.filter(
+          c => c.status === 'pending' || c.status === 'missed'
+        );
+
+        if (pending.length === 0) {
+          alert('You have no pending contributions to pay.');
+          return;
+        }
+
+        // Get the first pending contribution
+        const contrib = pending[0];
+        const groupMap = {};
+        groups.forEach(g => { groupMap[g.id] = g.name; });
+        const groupName = groupMap[contrib.groupId] || contrib.groupId || 'Unknown Group';
+        const amount = parseFloat(contrib.amount) || 0;
+
+        // Open the payment modal
+        paymentModal.open({
+          userId: userId,
+          groupId: contrib.groupId,
+          contributionId: contrib.id,
+          amount: amount,
+          groupName: groupName,
+        });
+      } catch (err) {
+        alert('Failed to load contributions: ' + (err.message || 'Unknown error'));
+      }
+    }
 
     async function renderHealthScore(uid) {
       container.innerHTML = '<div class="health-loading"><div class="health-spinner" aria-hidden="true"></div><span>Calculating…</span></div>';
@@ -209,6 +308,14 @@
       // slight delay so dashboard.js can populate group list first
       setTimeout(() => renderHealthScore(user.uid), 1200);
       refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
+
+      // Wire up make payment button
+      const makePaymentBtn = document.getElementById('make-payment-btn');
+      if (makePaymentBtn) {
+        makePaymentBtn.addEventListener('click', () => {
+          openFirstPendingContribution(user.uid);
+        });
+      }
     });
   </script>
 </html>
