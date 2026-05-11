@@ -753,11 +753,19 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(staticPath);
   if (!ext) staticPath += '.html';
 
-  const filePath = path.join(FRONTEND_DIR, staticPath);
+  const frontendRoot = path.resolve(FRONTEND_DIR);
+  const relativeStaticPath = staticPath.replace(/^\/+/, '');
+  const filePath = path.resolve(frontendRoot, relativeStaticPath);
+
+  if (filePath !== frontendRoot && !filePath.startsWith(frontendRoot + path.sep)) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('400 Bad Request');
+    return;
+  }
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      fs.readFile(path.join(FRONTEND_DIR, 'index.html'), (err2, fallback) => {
+      fs.readFile(path.resolve(frontendRoot, 'index.html'), (err2, fallback) => {
         if (err2) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404 Not Found'); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(fallback);
