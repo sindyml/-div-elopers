@@ -71,7 +71,7 @@ export async function checkAndAcceptInvites(user) {
     });
 
     // Mark the invite as accepted
-    await updateDoc(docSnap.ref, { status: 'invite accepted' });
+    await updateDoc(docSnap.ref, { status: 'accepted' }); //maybe add "invite"
   }
 }
 
@@ -84,3 +84,35 @@ export async function sendInvite(groupId, inviteeEmail, invitedByUid) {
     createdAt: serverTimestamp()
   });
 }
+
+export const resendInvite = async (
+  email,
+  groupId
+) => {
+
+  const q = query(
+    collection(db, "invites"),
+    where("email", "==", email),
+    where("groupId", "==", groupId)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    throw new Error("Invite not found");
+  }
+
+  const inviteDoc = snapshot.docs[0];
+
+  const newExpiry = Timestamp.fromDate(
+    new Date(
+      Date.now() +
+      7 * 24 * 60 * 60 * 1000
+    )
+  );
+
+  await updateDoc(inviteDoc.ref, {
+    status: "pending",
+    expiresAt: newExpiry
+  });
+};
