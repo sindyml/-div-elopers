@@ -1,70 +1,32 @@
-import {auth, db} from "./firebase";
-import {onAuthStateChanged} from "firebase/auth";
-import {collection, query, where, getDocs} from "firebase/firestore"
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  updateDoc,
-  Timestamp
-} from "firebase/firestore";
+// js/auth.js
+import { auth } from "./firebase-config.js";
+import { getUserProfile } from "./userService.js";
 
-//Listen for authentication state changes
-export const listenForAuth = (callback) => {
-    onAuthStateChanged(auth, async (user) => {
-        if (user){
-            console.log("User logged in: ",user.email);
+// FUNCTION 1: Check if user is logged in
+export function isAuthenticated() {
+  return auth.currentUser !== null;
+}
 
-            //fetch the invites that are pending
-            const invites = await getPendingInvites(user);
+// FUNCTION 2: Get current user's role from Firestore
+export async function getCurrentUserRole() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const profile = await getUserProfile(user.uid);
+  return profile ? profile.role : null;
+}
 
-            //pass user and invite to the UI
-            if (callback){
-                callback(user,invites);
-            }
-        } else{
-            console.log("User logged out")
-        }
-    });
-};
-
-//getting all pending invites for logged-in user
-export const getPendingInvites = async (user) => {
-
-  const now = Timestamp.now();
-
-  const q = query(
-    collection(db, "invites"),
-    where("email", "==", user.email)
-  );
-
-  const snapshot = await getDocs(q);
-
-  const validInvites = [];
-
-  for (const docSnap of snapshot.docs) {
-
-    const invite = docSnap.data();
-
-    // expire old invites
-    if (
-      invite.expiresAt &&
-      invite.expiresAt.toMillis() < now.toMillis()
-    ) {
-
-      await updateDoc(docSnap.ref, {
-        status: "expired"
-      });
-
-      invite.status = "expired";
-    }
-
-    validInvites.push({
-      id: docSnap.id,
-      ...invite
-    });
+// FUNCTION 3: Protect pages
+export function privateRoute() {
+  if (!isAuthenticated()) {
+    window.location.href = "login.html";
   }
+}
 
-  return validInvites;
-};
+// FUNCTION 4: Role-based guard
+export async function roleGuard(requiredRole) {
+  const role = await getCurrentUserRole();
+  if (role !== requiredRole) {
+    alert("403: Access denied");
+    window.location.href = "dashboard.html";
+  }
+}
