@@ -1,191 +1,90 @@
 // js/login.js
+
+// Import Firebase services
 import { auth, db } from "./firebase-config.js";
+
+// Import auth functions for sign-in
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   GithubAuthProvider,
   OAuthProvider,
-  signInWithPopup,
+  signInWithPopup
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import {
-  doc,
-  setDoc,
-  getDoc,
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// Import Firestore functions
+import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 console.log("login.js is running");
 
-
-// ─────────────────────────────────────────────────
-// PENDING OAUTH STATE
-// Holds the authenticated user temporarily while
-// waiting for them to pick a role in the modal.
-// ─────────────────────────────────────────────────
-let pendingOAuthUser     = null;
-let pendingProviderName  = null;
-
-
-// ─────────────────────────────────────────────────
-// ALERT HELPER
-// ─────────────────────────────────────────────────
+// Helper: show alert messages in the UI
 function showAlert(message, type = "error") {
   const alertEl = document.getElementById("alertMessage");
   if (!alertEl) return;
   alertEl.textContent = message;
-  // Remove both classes first, then apply the right one
-  alertEl.className = "";
-  alertEl.classList.add(type === "success" ? "alert--success" : "alert--error");
+  alertEl.className = type === "success" ? "alert alert--success" : "alert alert--error";
 }
 
-function clearAlert() {
-  const alertEl = document.getElementById("alertMessage");
-  if (!alertEl) return;
-  alertEl.textContent = "";
-  alertEl.className = "";
-}
-
-
-// ─────────────────────────────────────────────────
-// ROLE MODAL HELPERS
-// Uses aria-hidden to show/hide — keeps focus
-// management accessible.
-// ─────────────────────────────────────────────────
-const roleModal       = document.getElementById("roleModal");
-const confirmRoleBtn  = document.getElementById("confirmRoleBtn");
-
-function openRoleModal() {
-  roleModal.setAttribute("aria-hidden", "false");
-  // Move focus to the modal so screen readers announce it
-  confirmRoleBtn.focus();
-}
-
-function closeRoleModal() {
-  roleModal.setAttribute("aria-hidden", "true");
-}
-
-// Close modal on backdrop click
-roleModal.addEventListener("click", (e) => {
-  if (e.target === roleModal) closeRoleModal();
-});
-
-// Close modal on Escape key
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && roleModal.getAttribute("aria-hidden") === "false") {
-    closeRoleModal();
-  }
-});
-
-
-// ─────────────────────────────────────────────────
-// OAUTH SIGN-IN HANDLER
-// Authenticates with the provider, then:
-//   • Returning user  → straight to dashboard
-//   • First-time user → show role modal, save after
-// ─────────────────────────────────────────────────
+// Helper: handle OAuth sign-in for all providers (Google, GitHub, LinkedIn)
+// If user has no Firestore doc yet (first-time OAuth), creates one with default "Member" role
 async function handleOAuthSignIn(provider, providerName) {
-  clearAlert();
   try {
     const result = await signInWithPopup(auth, provider);
-    const user   = result.user;
+    const user = result.user;
 
+    // Check if this user already has a profile in Firestore
     const userDoc = await getDoc(doc(db, "users", user.uid));
 
-    if (userDoc.exists()) {
-      // Returning user — profile already set up
-      window.location.href = "dashboard.html";
-      return;
+    if (!userDoc.exists()) {
+      // First-time OAuth user — create their Firestore profile
+      // displayName comes automatically from the OAuth provider (Google, GitHub, etc.)
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        displayName: user.displayName || "",
+        role: "Member",
+        provider: providerName,
+        createdAt: new Date().toISOString()
+      });
     }
 
-    // First-time user — hold state and ask for role
-    pendingOAuthUser    = user;
-    pendingProviderName = providerName;
-    openRoleModal();
+    // Redirect to dashboard
+    window.location.href = "dashboard.html";
 
   } catch (error) {
-    console.error(`${providerName} sign-in error:`, error);
+    console.error(`${providerName} login error:`, error);
     showAlert(error.message);
   }
 }
 
-
-// ─────────────────────────────────────────────────
-// ROLE FORM SUBMISSION
-// Reads the selected radio, writes to Firestore,
-// then redirects to the dashboard.
-// ─────────────────────────────────────────────────
-const roleForm = document.getElementById("roleForm");
-
-roleForm.addEventListener("submit", async (e) => {
+// EMAIL/PASSWORD LOGIN
+const form = document.getElementById("loginForm");
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  if (!pendingOAuthUser) return;
-
-  // Read the selected role from the radio group
-  const selectedRole = roleForm.elements["role"].value;
-
-  confirmRoleBtn.disabled    = true;
-  confirmRoleBtn.textContent = "Saving…";
-
-  try {
-    await setDoc(doc(db, "users", pendingOAuthUser.uid), {
-      email:       pendingOAuthUser.email,
-      displayName: pendingOAuthUser.displayName || "",
-      role:        selectedRole,
-      provider:    pendingProviderName,
-      createdAt:   new Date().toISOString(),
-    });
-
-    // Clear pending state before navigating
-    pendingOAuthUser    = null;
-    pendingProviderName = null;
-
-    window.location.href = "dashboard.html";
-
-  } catch (error) {
-    console.error("Error saving user profile:", error);
-    showAlert("Failed to save your profile. Please try again.");
-    confirmRoleBtn.disabled    = false;
-    confirmRoleBtn.textContent = "Confirm & continue";
-  }
-});
-
-
-// ─────────────────────────────────────────────────
-// EMAIL / PASSWORD LOGIN
-// ─────────────────────────────────────────────────
-const loginForm = document.getElementById("loginForm");
-
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearAlert();
-
-  const email    = document.getElementById("email").value.trim();
+  const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user           = userCredential.user;
+    const user = userCredential.user;
 
+    // Check if email is verified
     if (!user.emailVerified) {
-      showAlert(
-        "Please verify your email before signing in. Check your inbox for the verification link."
-      );
+      alert("Please verify your email before logging in. Check your inbox for the verification link.");
       await auth.signOut();
       return;
     }
 
+    // If verified, proceed
     window.location.href = "dashboard.html";
 
   } catch (error) {
-    console.error("Email login error:", error);
-    showAlert(error.message);
+    alert(error.message);
   }
 });
 
 
-// ─────────────────────────────────────────────────
-// OAUTH BUTTON BINDINGS
-// ─────────────────────────────────────────────────
+// GOOGLE OAUTH
 const googleBtn = document.getElementById("googleLoginBtn");
 if (googleBtn) {
   googleBtn.addEventListener("click", () => {
@@ -193,6 +92,7 @@ if (googleBtn) {
   });
 }
 
+// GITHUB OAUTH
 const githubBtn = document.getElementById("githubLoginBtn");
 if (githubBtn) {
   githubBtn.addEventListener("click", () => {
@@ -200,6 +100,7 @@ if (githubBtn) {
   });
 }
 
+// MICROSOFT OAUTH
 const microsoftBtn = document.getElementById("microsoftLoginBtn");
 if (microsoftBtn) {
   microsoftBtn.addEventListener("click", () => {
