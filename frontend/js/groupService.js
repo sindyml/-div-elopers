@@ -1,56 +1,20 @@
-import { db, auth } from './firebase-config.js';
+// js/groupService.js
+import { db } from './firebase-config.js';
 import {
   collection,
-  addDoc,
-  setDoc,
   doc,
   getDoc,
   getDocs,
   query,
   where,
+  setDoc,
+  addDoc,
   updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  Timestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { COLLECTIONS } from './constants.js';
-import { handleMemberJoin } from './onGroupCreate.js';
 
-export async function createGroup({
-  name,
-  contributionAmount,
-  payoutOrder,
-  meetingFrequency
-}) {
-  const user = auth.currentUser;
-  if (!user) throw new Error('User not authenticated');
-
-  const groupRef = await addDoc(collection(db, COLLECTIONS.GROUPS), {
-    name,
-    contributionAmount: Number(contributionAmount),
-    payoutOrder,
-    meetingFrequency,
-    creatorUid: user.uid,
-    createdAt: serverTimestamp()
-  });
-
-  await setDoc(doc(db, COLLECTIONS.GROUPS, groupRef.id, 'members', user.uid), {
-    uid: user.uid,
-    role: 'admin',
-    joinedAt: serverTimestamp()
-  });
-
-  await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, `${user.uid}_${groupRef.id}`), {
-    uid: user.uid,
-    groupId: groupRef.id
-  });
-
-  return groupRef.id;
-}
-
-export async function getUserGroups(uid = auth.currentUser?.uid) {
-  if (!uid) return [];
-
+export async function getUserGroups(uid) {
   const q = query(collection(db, COLLECTIONS.MEMBERSHIPS), where('uid', '==', uid));
   const snapshot = await getDocs(q);
 
@@ -63,18 +27,15 @@ export async function getUserGroups(uid = auth.currentUser?.uid) {
     })
   );
 
-  return groups.filter(Boolean);
+  return groups.filter((group) => group !== null);
 }
 
 export async function getGroupDetails(groupId) {
   const groupDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, groupId));
-  if (!groupDoc.exists()) return null;
-  return { id: groupId, ...groupDoc.data() };
-}
-
-export async function getGroupMembers(groupId) {
-  const snapshot = await getDocs(collection(db, COLLECTIONS.GROUPS, groupId, 'members'));
-  return snapshot.docs.map((memberDoc) => ({ id: memberDoc.id, ...memberDoc.data() }));
+  if (groupDoc.exists()) {
+    return { id: groupId, ...groupDoc.data() };
+  }
+  return null;
 }
 
 export async function getUserRoleInGroup(groupId, uid) {
@@ -82,25 +43,9 @@ export async function getUserRoleInGroup(groupId, uid) {
   return memberDoc.exists() ? memberDoc.data().role : null;
 }
 
-export async function acceptInvite(invite, user) {
-  await setDoc(doc(db, COLLECTIONS.GROUPS, invite.groupId, 'members', user.uid), {
-    uid: user.uid,
-    role: 'member',
-    joinedAt: serverTimestamp()
-  });
-
-  await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, `${user.uid}_${invite.groupId}`), {
-    uid: user.uid,
-    groupId: invite.groupId
-  });
-
-  await updateDoc(doc(db, COLLECTIONS.INVITES, invite.id), { status: 'accepted' });
-}
-
-export async function declineInvite(inviteId) {
-  await updateDoc(doc(db, COLLECTIONS.INVITES, inviteId), { status: 'declined' });
-}
-
+// Only auto-accepts invites that came in before the user registered
+// (i.e. invited by email before they had an account).
+// Manual invites shown as notifications are handled by acceptInvite().
 export async function checkAndAcceptInvites(user) {
   const q = query(
     collection(db, COLLECTIONS.INVITES),
@@ -109,60 +54,123 @@ export async function checkAndAcceptInvites(user) {
   );
   const snapshot = await getDocs(q);
 
-  for (const inviteDoc of snapshot.docs) {
-    const invite = { id: inviteDoc.id, ...inviteDoc.data() };
-    await acceptInvite(invite, user);
-    await handleMemberJoin(invite.groupId, user.uid);
+  for (const docSnap of snapshot.docs) {
+    const invite = docSnap.data();
+    const groupId = invite.groupId;
+
+    await setDoc(doc(db, COLLECTIONS.GROUPS, groupId, 'members', user.uid), {
+      uid: user.uid,
+      displayName: user.displayName || user.email,
+      role: 'member',
+      joinedAt: serverTimestamp()
+    });
+
+    await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
+      uid: user.uid,
+      groupId: groupId,
+      role: 'member'
+    });
+
+    await updateDoc(docSnap.ref, { status: 'invite accepted' });
   }
 }
 
-export async function sendInvite(a, b, c) {
-  const user = auth.currentUser;
-
-  const usingLegacySignature = typeof c === 'undefined';
-  const groupId = usingLegacySignature ? b : a;
-  const email = usingLegacySignature ? a : b;
-  const invitedBy = usingLegacySignature ? user?.uid : c;
-
-  if (!groupId || !email || !invitedBy) {
-    throw new Error('User not authenticated');
-  }
-
-  const expiryDate = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-
-  await addDoc(collection(db, COLLECTIONS.INVITES), {
-    email,
-    groupId,
-    invitedBy,
-    status: 'pending',
-    createdAt: serverTimestamp(),
-    expiresAt: expiryDate
-  });
-}
-
-export async function resendInvite(email, groupId) {
+// Returns pending invites for a user — used to show Accept/Decline notifications
+export async function checkPendingInvites(user) {
   const q = query(
     collection(db, COLLECTIONS.INVITES),
-    where('email', '==', email),
-    where('groupId', '==', groupId)
+    where('email', '==', user.email),
+    where('status', '==', 'pending')
   );
 
   const snapshot = await getDocs(q);
-  if (snapshot.empty) throw new Error('Invite not found');
 
-  const inviteDoc = snapshot.docs[0];
-  const newExpiry = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  // Enrich each invite with group name
+  const invites = await Promise.all(
+    snapshot.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      let groupName = data.groupName || null;
 
-  await updateDoc(inviteDoc.ref, {
+      if (!groupName && data.groupId) {
+        const groupDoc = await getDoc(doc(db, COLLECTIONS.GROUPS, data.groupId));
+        if (groupDoc.exists()) {
+          groupName = groupDoc.data().name;
+        }
+      }
+
+      return { id: docSnap.id, ...data, groupName };
+    })
+  );
+
+  return invites;
+}
+
+// Sends an invite and returns inviteId + targetUserId (if the invitee already has an account)
+export async function sendInvite(groupId, inviteeEmail, invitedByUid) {
+  // Check if a user with this email already exists
+  let targetUserId = null;
+
+  const usersSnap = await getDocs(
+    query(collection(db, COLLECTIONS.USERS || 'users'), where('email', '==', inviteeEmail))
+  );
+
+  if (!usersSnap.empty) {
+    targetUserId = usersSnap.docs[0].id;
+  }
+
+  const inviteRef = await addDoc(collection(db, COLLECTIONS.INVITES), {
+    email: inviteeEmail,
+    groupId: groupId,
+    invitedBy: invitedByUid,
     status: 'pending',
-    expiresAt: newExpiry
+    createdAt: serverTimestamp()
   });
+
+  return {
+    inviteId: inviteRef.id,
+    targetUserId // null if user doesn't have an account yet
+  };
 }
 
-export async function updateGroup(groupId, data) {
-  await updateDoc(doc(db, COLLECTIONS.GROUPS, groupId), data);
+// Accepts a specific invite by ID — called when user clicks Accept on a notification
+export async function acceptInvite(inviteId, user) {
+  const inviteRef = doc(db, COLLECTIONS.INVITES, inviteId);
+  const inviteSnap = await getDoc(inviteRef);
+
+  if (!inviteSnap.exists()) throw new Error('Invite not found');
+
+  const invite = inviteSnap.data();
+
+  if (invite.status !== 'pending') throw new Error('Invite is no longer pending');
+
+  const groupId = invite.groupId;
+
+  await setDoc(doc(db, COLLECTIONS.GROUPS, groupId, 'members', user.uid), {
+    uid: user.uid,
+    displayName: user.displayName || user.email,
+    role: 'member',
+    joinedAt: serverTimestamp()
+  });
+
+  await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
+    uid: user.uid,
+    groupId: groupId,
+    role: 'member'
+  });
+
+  await updateDoc(inviteRef, { status: 'invite accepted' });
 }
 
-export async function deleteGroup(groupId) {
-  await deleteDoc(doc(db, COLLECTIONS.GROUPS, groupId));
+// Declines a specific invite by ID — called when user clicks Decline on a notification
+export async function declineInvite(inviteId) {
+  const inviteRef = doc(db, COLLECTIONS.INVITES, inviteId);
+  const inviteSnap = await getDoc(inviteRef);
+
+  if (!inviteSnap.exists()) throw new Error('Invite not found');
+
+  const invite = inviteSnap.data();
+
+  if (invite.status !== 'pending') throw new Error('Invite is no longer pending');
+
+  await updateDoc(inviteRef, { status: 'declined' });
 }

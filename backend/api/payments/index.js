@@ -11,29 +11,43 @@ function sendJSON(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-// Authentication middleware (simplified for testing)
+// Authentication middleware
 async function authenticateUser(req, res, next) {
+  const isTestEnv = process.env.NODE_ENV === 'test';
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // For testing, create a mock user
-      req.user = { uid: 'test-user-123', isAdmin: true };
-      return next();
+      if (isTestEnv) {
+        req.user = { uid: 'test-user-123', isAdmin: false };
+        return next();
+      }
+      sendJSON(res, 401, { error: 'Authentication required' });
+      return;
     }
 
     const token = authHeader.split('Bearer ')[1];
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
-      req.user = decodedToken;
+      req.user = {
+        uid: decodedToken.uid,
+        isAdmin: decodedToken.isAdmin === true || decodedToken.admin === true
+      };
       next();
     } catch (error) {
-      // If token verification fails, still allow for testing
-      req.user = { uid: 'test-user-123', isAdmin: true };
-      next();
+      if (isTestEnv) {
+        req.user = { uid: 'test-user-123', isAdmin: false };
+        next();
+        return;
+      }
+      sendJSON(res, 401, { error: 'Invalid authentication token' });
     }
   } catch (error) {
-    req.user = { uid: 'test-user-123', isAdmin: true };
-    next();
+    if (isTestEnv) {
+      req.user = { uid: 'test-user-123', isAdmin: false };
+      next();
+      return;
+    }
+    sendJSON(res, 401, { error: 'Authentication failed' });
   }
 }
 
@@ -48,16 +62,19 @@ async function initiatePayment(req, res) {
       return;
     }
 
-    // Check if Firebase is in demo mode
-    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
-
-    // Generate payment ID
-    const paymentId = isDemoMode
-      ? `test-payment-${Date.now()}`
-      : db.collection('transactions').doc().id;
+    // Create payment record in Firestore
+    const paymentRef = db.collection('transactions').doc();
+    const paymentId = paymentRef.id;
 
     // Build URLs for PayFast
-    const baseUrl = process.env.BASE_URL || 'http://localhost:8080';
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol = process.env.BASE_URL
+      ? null
+      : ((typeof forwardedProto === 'string' && forwardedProto.split(',')[0]) || (req.socket && req.socket.encrypted ? 'https' : 'http'));
+    const host = process.env.BASE_URL
+      ? null
+      : (req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080');
+    const baseUrl = process.env.BASE_URL || `${protocol}://${host}`;
     const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
     const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
     const notifyUrl = `${baseUrl}/api/payments/notify`;
@@ -94,28 +111,25 @@ async function initiatePayment(req, res) {
         lastName: lastName
       });
 
-      // Store payment in Firestore (skip in demo mode)
-      if (!isDemoMode) {
-        const paymentRef = db.collection('transactions').doc(paymentId);
-        await paymentRef.set({
-          id: paymentId,
-          userId: userId,
-          contributionId: contributionId || null,
-          groupId: groupId || null,
-          amount: amount,
-          currency: 'ZAR',
-          status: 'pending',
-          type: 'payment',
-          provider: 'payfast',
-          metadata: metadata || {},
-          paymentData: {
-            itemName: itemName,
-            itemDescription: itemDescription
-          },
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
+      // Store payment in Firestore
+      await paymentRef.set({
+        id: paymentId,
+        userId: userId,
+        contributionId: contributionId || null,
+        groupId: groupId || null,
+        amount: amount,
+        currency: 'ZAR',
+        status: 'pending',
+        type: 'payment',
+        provider: 'payfast',
+        metadata: metadata || {},
+        paymentData: {
+          itemName: itemName,
+          itemDescription: itemDescription
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
 
       sendJSON(res, 200, {
         success: true,
@@ -195,7 +209,7 @@ async function handleNotify(req, res) {
     if (paymentInfo.paymentStatus === 'completed' && payment.contributionId) {
       try {
         await db.collection('contributions').doc(payment.contributionId).update({
-          status: 'paid',
+          status: 'confirmed',
           paidAt: admin.firestore.FieldValue.serverTimestamp(),
           transactionId: paymentId
         });
@@ -248,13 +262,34 @@ async function handleCancel(req, res) {
   try {
     const paymentId = req.query.paymentId;
 
-    if (paymentId) {
-      // Update payment status to cancelled
-      await db.collection('transactions').doc(paymentId).update({
-        status: 'cancelled',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+    if (!paymentId) {
+      sendJSON(res, 400, { error: 'paymentId query parameter is required' });
+      return;
     }
+
+    const paymentRef = db.collection('transactions').doc(paymentId);
+    const paymentDoc = await paymentRef.get();
+
+    if (!paymentDoc.exists) {
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    const payment = paymentDoc.data();
+    if (payment.userId !== req.user.uid && !req.user.isAdmin) {
+      sendJSON(res, 403, { error: 'Unauthorized' });
+      return;
+    }
+
+    if (payment.status !== 'pending') {
+      sendJSON(res, 409, { error: 'Only pending payments can be cancelled' });
+      return;
+    }
+
+    await paymentRef.update({
+      status: 'cancelled',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     sendJSON(res, 200, {
       message: 'Payment cancelled',
@@ -272,27 +307,6 @@ async function getPaymentStatus(req, res) {
   try {
     const paymentId = req.params.paymentId;
     const userId = req.user.uid;
-
-    // Check if Firebase is in demo mode
-    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
-
-    if (isDemoMode) {
-      // In demo/test mode, return mock status for test payments
-      if (paymentId && paymentId.startsWith('test-payment-')) {
-        sendJSON(res, 200, {
-          paymentId: paymentId,
-          status: 'pending',
-          amount: 100,
-          currency: 'ZAR',
-          createdAt: new Date().toISOString(),
-          payfastPaymentId: null,
-          transactionId: null
-        });
-      } else {
-        sendJSON(res, 404, { error: 'Payment not found' });
-      }
-      return;
-    }
 
     const paymentDoc = await db.collection('transactions').doc(paymentId).get();
 
@@ -330,15 +344,6 @@ async function verifyPayment(req, res) {
 
     if (!paymentId && !payfastPaymentId) {
       sendJSON(res, 400, { error: 'Payment ID or PayFast Payment ID required' });
-      return;
-    }
-
-    // Check if Firebase is in demo mode
-    const isDemoMode = !process.env.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID === 'demo-project';
-
-    if (isDemoMode) {
-      // In demo/test mode, return 404 for non-existent payments
-      sendJSON(res, 404, { error: 'Payment not found' });
       return;
     }
 
@@ -484,7 +489,7 @@ async function handleRequest(req, res) {
     await handleReturn(req, res);
   }
   else if (method === 'GET' && url === '/cancel') {
-    await handleCancel(req, res);
+    await authenticateUser(req, res, () => handleCancel(req, res));
   }
   else if (method === 'GET' && url.match(/^\/status\/.+/)) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));

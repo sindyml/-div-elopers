@@ -1,32 +1,28 @@
 // js/dashboard.js
 import { auth, db } from "./firebase-config.js";
-import { getUserGroups } from "./dashboardService.js";
+import { SA_DATA_DEFAULTS, COLLECTIONS } from "./constants.js";
+import { mountNotificationsWidget } from './dashboard-widgets.js';
 
 import {
-  sendInvite,
-  acceptInvite,
-  declineInvite,
-  resendInvite
-} from "./groupService.js";
-
-import {
-  getPendingInvites
-} from "./auth.js";
-
-import { SA_DATA_DEFAULTS } from "./constants.js";
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 (function () {
-  
-  let selectedGroupId = null;
-  let selectedGroupName = null;
-  // SA Data config
   const SA_STATIC = SA_DATA_DEFAULTS;
 
   const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
   const AZURE_FALLBACK  = '/api/getSAData';
-  const CACHE_KEY        = 'stokpal_usd_zar';
-  const CACHE_DURATION   = 4 * 60 * 60 * 1000; // 4 hours
+  const CACHE_KEY       = 'stokpal_usd_zar';
+  const CACHE_DURATION  = 4 * 60 * 60 * 1000; // 4 hours
 
+  /* ══════════════════════════════════════════════════════════
+     UTILITIES
+     ══════════════════════════════════════════════════════════ */
   function fmt(num, decimals = 2) {
     return 'R ' + Number(num).toLocaleString('en-ZA', {
       minimumFractionDigits: decimals,
@@ -50,6 +46,9 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     } catch { /* ignore */ }
   }
 
+  /* ══════════════════════════════════════════════════════════
+     EXCHANGE RATE FETCH
+     ══════════════════════════════════════════════════════════ */
   async function fetchUSDZAR() {
     const cached = readCache();
     if (cached) return { zarPerUsd: cached.value, fromCache: true, live: false };
@@ -57,7 +56,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      const res  = await fetch(FRANKFURTER_URL, { signal: controller.signal });
+      const res = await fetch(FRANKFURTER_URL, { signal: controller.signal });
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -65,7 +64,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
       writeCache(zarPerUsd);
       return { zarPerUsd, fromCache: false, live: true };
     } catch (err) {
-      console.warn('[SA Data] Frankfurter API failed:', err.message);
+      console.warn('[SA Data] Frankfurter failed:', err.message);
     }
 
     try {
@@ -85,6 +84,9 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     return { zarPerUsd: 18.50, fromCache: false, live: false };
   }
 
+  /* ══════════════════════════════════════════════════════════
+     SA WIDGET RENDER
+     ══════════════════════════════════════════════════════════ */
   async function renderSAWidget(groupBalance = 0, forceRefresh = false) {
     const container = document.getElementById('sa-widget-container');
     if (!container) return;
@@ -93,6 +95,7 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
       try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
     }
 
+    // Show skeleton while loading
     container.innerHTML = `
       <div class="sa-widget-skeleton">
         <div class="skeleton-block skeleton-block--wide"></div>
@@ -173,11 +176,13 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
       </div>`;
   }
 
+  /* ══════════════════════════════════════════════════════════
+     REFRESH BUTTON
+     ══════════════════════════════════════════════════════════ */
   let refreshButtonWired = false;
   function wireRefreshButton(groupBalance) {
     const btn = document.getElementById('sa-refresh-btn');
     if (!btn || refreshButtonWired) return;
-
     btn.onclick = async () => {
       btn.classList.add('spinning');
       btn.disabled = true;
@@ -188,348 +193,105 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     refreshButtonWired = true;
   }
 
-    // ── Load user groups ───────────────────────────────────
-  async function loadUserGroups(user) {
-
-    const grouplist = document.getElementById("grouplist");
-
-    if (!grouplist) return;
-
-    grouplist.innerHTML = "";
-
-    try {
-
-      const groups = await getUserGroups();
-
-      if (groups.length === 0) {
-        grouplist.innerHTML = "<li>No groups yet</li>";
-        return;
-      }
-
-      groups.forEach(group => {
-
-        const li = document.createElement("li");
-
-        li.textContent = group.name || "Unnamed Group";
-
-        // IMPORTANT
-        li.dataset.groupId = group.id;
-
-        li.onclick = async () => {
-
-          selectedGroupId = group.id;
-          selectedGroupName = group.name;
-
-          // highlight selected
-          document.querySelectorAll("#grouplist li")
-            .forEach(el => el.classList.remove("active"));
-
-          li.classList.add("active");
-
-          // reload dashboard data
-          const balance =
-            await loadDashboardData(user, group.id);
-
-          await renderSAWidget(balance);
-        };
-
-        grouplist.appendChild(li);
-      });
-
-    } catch (err) {
-
-      console.warn(
-        "[Dashboard] Failed loading groups:",
-        err.message
-      );
-    }
-  }
-
-    // ── Load pending invites ───────────────────────────────
-  async function loadInvites(user) {
-
-    const inviteSection =
-      document.getElementById("inviteSection");
-
-    if (!inviteSection) return;
-
-    inviteSection.innerHTML = `
-      <h3 class="members-widget__heading">
-        Pending Invites
-      </h3>
-    `;
-
-    try {
-
-      const invites =
-        await getPendingInvites(user);
-
-      if (invites.length === 0) {
-
-        inviteSection.innerHTML += `
-          <p>No pending invites</p>
-        `;
-
-        return;
-      }
-
-      invites.forEach(invite => {
-
-        const wrapper =
-          document.createElement("section");
-
-        const text =
-          document.createElement("p");
-
-        text.textContent =
-          `Invite to join group ${invite.groupId}`;
-
-        wrapper.appendChild(text);
-
-        // expiration
-        if (invite.expiresAt) {
-
-          const expiry =
-            document.createElement("small");
-
-          const expiryDate =
-            new Date(invite.expiresAt.seconds * 1000);
-
-          expiry.textContent =
-            `Expires: ${expiryDate.toLocaleDateString()}`;
-
-          wrapper.appendChild(expiry);
-        }
-
-        // ACCEPT
-        const acceptBtn =
-          document.createElement("button");
-
-        acceptBtn.textContent = "Accept";
-
-        acceptBtn.onclick = async () => {
-
-          try {
-
-            await acceptInvite(invite, user);
-
-            location.reload();
-
-          } catch (err) {
-
-            console.error(err);
-
-            alert("Error accepting invite");
-          }
-        };
-
-        wrapper.appendChild(acceptBtn);
-
-        // DECLINE
-        const declineBtn =
-          document.createElement("button");
-
-        declineBtn.textContent = "Decline";
-
-        declineBtn.onclick = async () => {
-
-          try {
-
-            await declineInvite(invite.id);
-
-            location.reload();
-
-          } catch (err) {
-
-            console.error(err);
-
-            alert("Error declining invite");
-          }
-        };
-
-        wrapper.appendChild(declineBtn);
-
-        // RESEND (expired only)
-        if (invite.status === "expired") {
-
-          const resendBtn =
-            document.createElement("button");
-
-          resendBtn.textContent = "Resend";
-
-          resendBtn.onclick = async () => {
-
-            try {
-
-              await resendInvite(
-                invite.email,
-                invite.groupId
-              );
-
-              location.reload();
-
-            } catch (err) {
-
-              console.error(err);
-
-              alert("Error resending invite");
-            }
-          };
-
-          wrapper.appendChild(resendBtn);
-        }
-
-        inviteSection.appendChild(wrapper);
-
-      });
-
-    } catch (err) {
-
-      console.warn(
-        "[Dashboard] Failed loading invites:",
-        err.message
-      );
-    }
-  }
-
-    // ── Invite member form ─────────────────────────────────
-  function wireInviteForm() {
-
-    const form =
-      document.getElementById("invite-form");
-
-    if (!form) return;
-
-    form.addEventListener("submit", async (e) => {
-
-      e.preventDefault();
-
-      const inviteMessage =
-        document.getElementById("inviteMessage");
-
-      const email =
-        document.getElementById("inviteEmail").value;
-
-      if (!selectedGroupId) {
-
-        inviteMessage.textContent =
-          "Please select a group first";
-
-        return;
-      }
-
-      try {
-
-        await sendInvite(
-          email,
-          selectedGroupId
-        );
-
-        inviteMessage.textContent =
-          " Invite sent successfully";
-
-        form.reset();
-
-      } catch (err) {
-
-        console.error(err);
-
-        inviteMessage.textContent =
-          " Error sending invite";
-      }
-    });
-  }
-
-  // ── Load user & group data from Firestore ────────────────
-  async function loadDashboardData(user, groupId = null) {
+  /* ══════════════════════════════════════════════════════════
+     DASHBOARD DATA LOADER — modular Firestore only
+     ══════════════════════════════════════════════════════════ */
+  async function loadDashboardData(user, specificGroupId = null) {
     // Set display name
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) {
-      nameEl.textContent = user.displayName ? user.displayName.split(' ')[0] : user.email;
+      nameEl.textContent = user.displayName
+        ? user.displayName.split(' ')[0]
+        : user.email;
     }
 
     let groupBalance = 0;
-    try {
-      let targetGroupId = groupId;
 
-      if (!targetGroupId) {
-        const membershipSnap = await db
-          .collection('memberships')
-          .where('uid', '==', user.uid)
-          .limit(1)
-          .get();
-        if (!membershipSnap.empty) {
-          targetGroupId = membershipSnap.docs[0].data().groupId;
-        }
+    try {
+      // ✅ Modular: collection() + query() + where() + getDocs()
+      const membershipsRef = collection(db, COLLECTIONS.MEMBERSHIPS);
+      const qMemberships   = query(membershipsRef, where('uid', '==', user.uid));
+      const membershipsSnap = await getDocs(qMemberships);
+
+      if (membershipsSnap.empty) {
+        window.location.href = 'onboarding.html';
+        return groupBalance;
       }
 
-      if (targetGroupId) {
-        const groupDoc = await db.collection('groups').doc(targetGroupId).get();
+      let groupId;
+      let userRole = 'member';
 
-        if (groupDoc.exists) {
-          const group = groupDoc.data();
-          groupBalance = group.totalBalance || 0;
+      if (specificGroupId) {
+        groupId = specificGroupId;
+        const membershipDoc = membershipsSnap.docs.find(d => d.data().groupId === groupId);
+        userRole = membershipDoc?.data().role || 'member';
+      } else {
+        groupId  = membershipsSnap.docs[0].data().groupId;
+        userRole = membershipsSnap.docs[0].data().role;
+      }
 
-          const badgeEl = document.getElementById('group-name-badge');
-          if (badgeEl) badgeEl.textContent = ' ' + (group.name || 'My Stokvel');
+      // ✅ Modular: doc() + getDoc()
+      const groupRef  = doc(db, COLLECTIONS.GROUPS, groupId);
+      const groupSnap = await getDoc(groupRef);
 
-          const balanceEl = document.getElementById('stat-balance');
-          if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
+      if (groupSnap.exists()) {
+        const group = groupSnap.data();
+        groupBalance = group.totalBalance || 0;
 
-          const membersEl = document.getElementById('stat-members');
-          if (membersEl) {
-            const membersSnap = await db.collection('groups').doc(groupDoc.id).collection('members').get();
-            membersEl.textContent = membersSnap.size ?? '—';
+        const badgeEl = document.getElementById('group-name-badge');
+        if (badgeEl) {
+          badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
+          if (userRole === 'Admin') {
+            badgeEl.innerHTML += ' <span style="font-size:0.7rem;background:#dcfce7;color:#166534;padding:0.1rem 0.5rem;border-radius:999px;font-weight:600;">Admin</span>';
           }
-        } else {
-          // Handle non-existent group (stale membership)
-          const badgeEl = document.getElementById('group-name-badge');
-          if (badgeEl) badgeEl.textContent = ' No group yet';
+        }
 
-          const balanceEl = document.getElementById('stat-balance');
-          if (balanceEl) balanceEl.textContent = 'R 0';
+        const balanceEl = document.getElementById('stat-balance');
+        if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
 
-          const membersEl = document.getElementById('stat-members');
-          if (membersEl) membersEl.textContent = '—';
+        const membersEl = document.getElementById('stat-members');
+        if (membersEl) {
+          // ✅ Modular: collection() + getDocs() for subcollection
+          const membersRef  = collection(db, `groups/${groupId}/members`);
+          const membersSnap = await getDocs(membersRef);
+          membersEl.textContent = membersSnap.size ?? '—';
         }
       } else {
         const badgeEl = document.getElementById('group-name-badge');
-        if (badgeEl) badgeEl.textContent = ' No group yet';
+        if (badgeEl) badgeEl.textContent = '🌿 No group yet';
       }
     } catch (err) {
       console.warn('[Dashboard] Could not load group data:', err.message);
     }
+
     return groupBalance;
   }
 
-  // Expose to window so other scripts can trigger a refresh
+  /* ══════════════════════════════════════════════════════════
+     EXPOSE TO WINDOW (for dashboard-widgets.js callbacks)
+     ══════════════════════════════════════════════════════════ */
   window.loadDashboardData = loadDashboardData;
-  window.renderSAWidget     = renderSAWidget;
+  window.renderSAWidget    = renderSAWidget;
   window.wireRefreshButton = wireRefreshButton;
 
-  // ── Auth guard + init ─────────────────────────────────────
+  /* ══════════════════════════════════════════════════════════
+     INIT
+     ══════════════════════════════════════════════════════════ */
   function init() {
     auth.onAuthStateChanged(async (user) => {
       if (!user) {
         window.location.href = 'login.html';
         return;
       }
-            // load groups
-      await loadUserGroups(user);
 
-      // load invites
-      await loadInvites(user);
+      // Mount notifications widget
+      const notifContainer = document.getElementById('notifications-container');
+      if (notifContainer) mountNotificationsWidget(notifContainer, user.uid);
 
-      // load dashboard
-      const groupBalance =
-        await loadDashboardData(user);
-
+      // Load dashboard data and render SA widget
+      const groupBalance = await loadDashboardData(user);
       await renderSAWidget(groupBalance);
-
       wireRefreshButton(groupBalance);
-
-      // wire invite form
-      wireInviteForm();
     });
   }
 
@@ -539,3 +301,16 @@ import { SA_DATA_DEFAULTS } from "./constants.js";
     init();
   }
 })();
+ 
+
+
+
+
+
+
+
+
+
+
+
+

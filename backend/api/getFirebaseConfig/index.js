@@ -22,13 +22,13 @@ module.exports = async function (context) {
     measurementId:     process.env.FIREBASE_MEASUREMENT_ID     || '',
   };
 
-  // Fail fast if the critical key is missing so misconfiguration
-  // is obvious during development and deployment.
-  if (!config.apiKey) {
+  const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+  const missingKeys = requiredKeys.filter((key) => !config[key]);
+  if (missingKeys.length > 0) {
     context.res = {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: { error: 'Firebase configuration is not set. Add FIREBASE_* Application Settings in Azure portal.' },
+      body: { error: `Firebase configuration is not set. Missing: ${missingKeys.join(', ')}` },
     };
     return;
   }

@@ -306,7 +306,7 @@ cp .env.example .env
 # Edit .env with:
 #   - Firebase values from Firebase Console → Project Settings → General
 #   - PayFast credentials from PayFast Dashboard → Settings → Integration
-#   - Or use sandbox credentials for testing (already in .env.example)
+#   - Optional: use PayFast sandbox credentials for testing
 
 # 4. Start the local server
 npm start
@@ -315,7 +315,7 @@ npm start
 
 > **Firebase config:** Firebase credentials are **not** stored in source code. They are loaded at runtime from environment variables via the `/api/getFirebaseConfig` Azure Function. See `.env.example` for the required variables and the [Secrets & Key Vault](#secrets--azure-key-vault) section below for production setup.
 
-> **PayFast config:** For local testing, use the sandbox credentials provided in `.env.example`. For production, get your credentials from the [PayFast Dashboard](https://www.payfast.co.za/login). See [docs/payfast-integration-guide.md](docs/payfast-integration-guide.md) for detailed setup instructions.
+> **PayFast config:** For local testing, use your PayFast sandbox credentials in `.env`. For production, use live credentials from the [PayFast Dashboard](https://www.payfast.co.za/login). See [docs/payfast-integration-guide.md](docs/payfast-integration-guide.md) for detailed setup instructions.
 
 ### Running Tests
 

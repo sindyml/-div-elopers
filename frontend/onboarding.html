@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokPal — Welcome</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+
+  <style>
+    .onboarding-wrapper {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--color-bg, #f5f7f5);
+      padding: 2rem;
+    }
+
+    .onboarding-card {
+      background: #fff;
+      border-radius: 1.25rem;
+      padding: 2.5rem 2rem;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    .onboarding-card__logo {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.75rem;
+      color: var(--color-primary, #1a4a3a);
+      margin-bottom: 0.25rem;
+    }
+
+    .onboarding-card__sub {
+      color: var(--color-text-muted, #6b7280);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+
+    .onboarding-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.75rem;
+      border-bottom: 2px solid #e5e7eb;
+    }
+
+    .onboarding-tab {
+      flex: 1;
+      padding: 0.65rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      cursor: pointer;
+      color: var(--color-text-muted, #6b7280);
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .onboarding-tab.active {
+      color: var(--color-primary, #1a4a3a);
+      border-bottom-color: var(--color-primary, #1a4a3a);
+    }
+
+    .onboarding-panel { display: none; }
+    .onboarding-panel.active { display: block; }
+
+    .form-group {
+      margin-bottom: 1.1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 0.35rem;
+      color: var(--color-text, #1f2937);
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid #d1d5db;
+      border-radius: 0.6rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--color-primary, #1a4a3a);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.8rem;
+      background: var(--color-primary, #1a4a3a);
+      color: #fff;
+      border: none;
+      border-radius: 0.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: opacity 0.15s;
+    }
+
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .onboarding-msg {
+      margin-top: 0.85rem;
+      font-size: 0.88rem;
+      min-height: 1.2rem;
+      text-align: center;
+    }
+
+    .onboarding-msg--error { color: #dc2626; }
+    .onboarding-msg--success { color: #16a34a; }
+
+    .group-search-results {
+      margin-top: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .group-result-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 0.6rem;
+      font-size: 0.9rem;
+    }
+
+    .group-result-item__name { font-weight: 500; }
+    .group-result-item__freq { color: var(--color-text-muted, #6b7280); font-size: 0.8rem; }
+
+    .btn-join {
+      padding: 0.4rem 0.9rem;
+      background: var(--color-primary, #1a4a3a);
+      color: #fff;
+      border: none;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn-join:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .role-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 600;
+      margin-left: 0.4rem;
+    }
+  </style>
+</head>
+
+<body>
+<div class="onboarding-wrapper">
+  <div class="onboarding-card">
+
+    <h1 class="onboarding-card__logo">🌿 StokPal</h1>
+    <p class="onboarding-card__sub">Welcome! Let's get you set up with a stokvel group.</p>
+
+    <div class="onboarding-tabs">
+      <button class="onboarding-tab active" data-tab="join">Join a Group</button>
+      <button class="onboarding-tab" data-tab="create">Create a Group</button>
+    </div>
+
+    <!-- JOIN PANEL -->
+    <div class="onboarding-panel active" id="panel-join">
+      <div class="form-group">
+        <label for="search-group-name">Search by group name</label>
+        <input type="text" id="search-group-name" placeholder="e.g. Kasi lovers" />
+      </div>
+      <button class="btn-primary" id="btn-search-group">Search</button>
+      <div class="group-search-results" id="group-search-results"></div>
+      <p class="onboarding-msg" id="join-msg"></p>
+    </div>
+
+    <!-- CREATE PANEL -->
+    <div class="onboarding-panel" id="panel-create">
+      <div class="form-group">
+        <label for="new-group-name">Group Name</label>
+        <input type="text" id="new-group-name" placeholder="e.g. Friday Stokvel" required />
+      </div>
+      <div class="form-group">
+        <label for="new-group-freq">Meeting Frequency</label>
+        <select id="new-group-freq">
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Bi-weekly</option>
+          <option value="quarterly">Quarterly</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="new-group-amount">Contribution Amount (R)</label>
+        <input type="number" id="new-group-amount" placeholder="e.g. 500" min="1" required />
+      </div>
+      <button class="btn-primary" id="btn-create-group">Create Group &amp; Continue</button>
+      <p class="onboarding-msg" id="create-msg"></p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase compat (for auth state) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="js/firebase-compat-init.js"></script>
+
+<script type="module">
+  import { auth, db } from './js/firebase-config.js';
+  import {
+    collection, query, where, getDocs, addDoc, setDoc, doc, serverTimestamp
+  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { COLLECTIONS, ROLES } from './js/constants.js';
+
+  let currentUser = null;
+
+  // Guard — redirect to login if not signed in
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) { window.location.href = 'login.html'; return; }
+    currentUser = user;
+
+    // If user already has a membership, skip onboarding
+    const memSnap = await getDocs(
+      query(collection(db, COLLECTIONS.MEMBERSHIPS), where('uid', '==', user.uid))
+    );
+    if (!memSnap.empty) {
+      window.location.href = 'dashboard.html';
+    }
+  });
+
+  // ── TABS ──────────────────────────────────────────────────
+  document.querySelectorAll('.onboarding-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.onboarding-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.onboarding-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── JOIN: SEARCH ──────────────────────────────────────────
+  document.getElementById('btn-search-group').addEventListener('click', async () => {
+    const name = document.getElementById('search-group-name').value.trim();
+    const resultsEl = document.getElementById('group-search-results');
+    const msgEl = document.getElementById('join-msg');
+
+    if (!name) { msgEl.textContent = 'Please enter a group name.'; return; }
+
+    msgEl.textContent = 'Searching...';
+    resultsEl.innerHTML = '';
+
+    try {
+      // Search groups where name matches (case-sensitive Firestore)
+      const snap = await getDocs(
+        query(collection(db, COLLECTIONS.GROUPS), where('name', '==', name))
+      );
+
+      if (snap.empty) {
+        msgEl.textContent = 'No group found with that name. Try a different spelling or create a new group.';
+        return;
+      }
+
+      msgEl.textContent = '';
+
+      snap.forEach(docSnap => {
+        const g = docSnap.data();
+        const item = document.createElement('div');
+        item.className = 'group-result-item';
+
+        const groupInfo = document.createElement('div');
+        const nameEl = document.createElement('span');
+        nameEl.className = 'group-result-item__name';
+        nameEl.textContent = g.name || '';
+        const freqEl = document.createElement('span');
+        freqEl.className = 'group-result-item__freq';
+        freqEl.textContent = g.meetingFrequency || '';
+        groupInfo.appendChild(nameEl);
+        groupInfo.appendChild(freqEl);
+
+        const joinButton = document.createElement('button');
+        joinButton.className = 'btn-join';
+        joinButton.dataset.groupId = docSnap.id;
+        joinButton.dataset.groupName = g.name || '';
+        joinButton.textContent = 'Request to Join';
+
+        item.appendChild(groupInfo);
+        item.appendChild(joinButton);
+        resultsEl.appendChild(item);
+      });
+
+      // Wire join buttons
+      resultsEl.querySelectorAll('.btn-join').forEach(btn => {
+        btn.addEventListener('click', () => requestToJoin(btn.dataset.groupId, btn.dataset.groupName, btn));
+      });
+
+    } catch (err) {
+      console.error(err);
+      msgEl.textContent = '❌ Search failed. Please try again.';
+    }
+  });
+
+  // Send an invite request — creates an invite doc with status "requested"
+  // Admin of the group will need to approve (or you can auto-add if you prefer)
+  async function requestToJoin(groupId, groupName, btn) {
+    if (!currentUser) return;
+    const msgEl = document.getElementById('join-msg');
+
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msgEl.textContent = '';
+
+    try {
+      // Check not already a member
+      const existing = await getDocs(
+        query(
+          collection(db, COLLECTIONS.MEMBERSHIPS),
+          where('uid', '==', currentUser.uid),
+          where('groupId', '==', groupId)
+        )
+      );
+
+      if (!existing.empty) {
+        msgEl.className = 'onboarding-msg onboarding-msg--error';
+        msgEl.textContent = 'You are already a member of this group.';
+        btn.disabled = false;
+        btn.textContent = 'Request to Join';
+        return;
+      }
+
+      // Create invite/request doc
+      await addDoc(collection(db, COLLECTIONS.INVITES), {
+        email: currentUser.email,
+        uid: currentUser.uid,
+        groupId,
+        groupName,
+        invitedBy: null,
+        status: 'requested',     // admin will approve
+        createdAt: serverTimestamp()
+      });
+
+      msgEl.className = 'onboarding-msg onboarding-msg--success';
+      msgEl.textContent = `✅ Request sent to join "${groupName}". The admin will approve your request.`;
+      btn.textContent = 'Requested ✓';
+
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = 'Request to Join';
+      msgEl.className = 'onboarding-msg onboarding-msg--error';
+      msgEl.textContent = '❌ Failed to send request. Try again.';
+    }
+  }
+
+  // ── CREATE GROUP ──────────────────────────────────────────
+  document.getElementById('btn-create-group').addEventListener('click', async () => {
+    const name   = document.getElementById('new-group-name').value.trim();
+    const freq   = document.getElementById('new-group-freq').value;
+    const amount = parseFloat(document.getElementById('new-group-amount').value);
+    const msgEl  = document.getElementById('create-msg');
+    const btn    = document.getElementById('btn-create-group');
+
+    if (!name)          { msgEl.className = 'onboarding-msg onboarding-msg--error'; msgEl.textContent = 'Please enter a group name.'; return; }
+    if (!amount || amount < 1) { msgEl.className = 'onboarding-msg onboarding-msg--error'; msgEl.textContent = 'Please enter a valid contribution amount.'; return; }
+    if (!currentUser)   { msgEl.textContent = 'Not signed in.'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    msgEl.textContent = '';
+
+    try {
+      // Create the group
+      const groupRef = await addDoc(collection(db, COLLECTIONS.GROUPS), {
+        name,
+        meetingFrequency: freq,
+        contributionAmount: amount,
+        totalBalance: 0,
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      const groupId = groupRef.id;
+
+      // Add creator as Admin in members sub-collection
+      await setDoc(
+        doc(db, COLLECTIONS.GROUPS, groupId, 'members', currentUser.uid),
+        {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || currentUser.email,
+          role: 'admin',
+          joinedAt: serverTimestamp()
+        }
+      );
+
+      // Create membership record
+      await setDoc(
+        doc(db, COLLECTIONS.MEMBERSHIPS, currentUser.uid + '_' + groupId),
+        {
+          uid: currentUser.uid,
+          groupId,
+          role: 'admin'
+        }
+      );
+
+      msgEl.className = 'onboarding-msg onboarding-msg--success';
+      msgEl.textContent = '✅ Group created! Taking you to your dashboard...';
+
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 1200);
+
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = 'Create Group & Continue';
+      msgEl.className = 'onboarding-msg onboarding-msg--error';
+      msgEl.textContent = '❌ Failed to create group. Please try again.';
+    }
+  });
+</script>
+
+</body>
+</html>
