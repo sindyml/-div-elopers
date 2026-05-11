@@ -1,5 +1,6 @@
 // js/firebase-compat-init.js
-(async function () {
+// CLIENT-SIDE FIREBASE INITIALIZATION (No API call required)
+(function () {
   /* global firebase */
   if (typeof firebase === 'undefined' || typeof firebase.initializeApp !== 'function') {
     console.error('[firebase-compat-init] Firebase compat SDK not loaded.');
@@ -11,18 +12,20 @@
   }
 
   try {
-    const response = await fetch('/api/getFirebaseConfig', {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' }
-    });
+    // Firebase configuration for stokvel-database project
+    const firebaseConfig = {
+      apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
+      authDomain: "stokvel-database.firebaseapp.com",
+      databaseURL: "https://stokvel-database-default-rtdb.firebaseio.com",
+      projectId: "stokvel-database",
+      storageBucket: "stokvel-database.firebasestorage.app",
+      messagingSenderId: "997328421094",
+      appId: "1:997328421094:web:9f88bf8ac720b118d97b27",
+      measurementId: "G-XXXXXXXXXX"
+    };
 
-    if (!response.ok) {
-      console.error('[firebase-compat-init] Could not fetch /api/getFirebaseConfig — status', response.status);
-      return;
-    }
-
-    const config = await response.json();
-    firebase.initializeApp(config);
+    firebase.initializeApp(firebaseConfig);
+    console.log('[firebase-compat-init] Firebase initialized successfully');
   } catch (e) {
     console.error('[firebase-compat-init] Failed to initialize Firebase:', e);
   }
