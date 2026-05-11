@@ -17,6 +17,12 @@ jobs:
       run: npm ci
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
+      - name: Debug file structure
+  run: |
+    echo "== Root ==" && ls -la
+    echo "== Looking for E2E ==" && ls -la E2E || echo "E2E folder NOT FOUND"
+    echo "== package.json scripts ==" && cat package.json | grep -A5 '"scripts"'
+    echo "== http-server check ==" && cat package.json | grep http-server || echo "http-server NOT in package.json"
     - name: Run Playwright tests
       run: npx playwright test
     - uses: actions/upload-artifact@v4
