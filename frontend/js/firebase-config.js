@@ -7,7 +7,7 @@ import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebas
 
 const response = await fetch('/api/getFirebaseConfig');
 if (!response.ok) {
-    throw new Error('Firebase configuration is not available');
+    throw new Error(`Firebase configuration is not available (HTTP ${response.status})`);
 }
 
 const firebaseConfig = await response.json();
