@@ -1,29 +1,35 @@
 // js/dashboard.js
 import { auth, db } from "./firebase-config.js";
-import { SA_DATA_DEFAULTS } from "./constants.js";
+import { SA_DATA_DEFAULTS, COLLECTIONS } from "./constants.js";
 import { mountNotificationsWidget } from './dashboard-widgets.js';
- 
+
 import {
-  collection, query, where, getDocs
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
- 
-import { COLLECTIONS } from "./constants.js";
- 
+
 (function () {
   const SA_STATIC = SA_DATA_DEFAULTS;
- 
+
   const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
   const AZURE_FALLBACK  = '/api/getSAData';
   const CACHE_KEY       = 'stokpal_usd_zar';
-  const CACHE_DURATION  = 4 * 60 * 60 * 1000;
- 
+  const CACHE_DURATION  = 4 * 60 * 60 * 1000; // 4 hours
+
+  /* ══════════════════════════════════════════════════════════
+     UTILITIES
+     ══════════════════════════════════════════════════════════ */
   function fmt(num, decimals = 2) {
     return 'R ' + Number(num).toLocaleString('en-ZA', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     });
   }
- 
+
   function readCache() {
     try {
       const raw = localStorage.getItem(CACHE_KEY);
@@ -33,17 +39,20 @@ import { COLLECTIONS } from "./constants.js";
     } catch { /* ignore */ }
     return null;
   }
- 
+
   function writeCache(value) {
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ value, timestamp: Date.now() }));
     } catch { /* ignore */ }
   }
- 
+
+  /* ══════════════════════════════════════════════════════════
+     EXCHANGE RATE FETCH
+     ══════════════════════════════════════════════════════════ */
   async function fetchUSDZAR() {
     const cached = readCache();
     if (cached) return { zarPerUsd: cached.value, fromCache: true, live: false };
- 
+
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
@@ -57,7 +66,7 @@ import { COLLECTIONS } from "./constants.js";
     } catch (err) {
       console.warn('[SA Data] Frankfurter failed:', err.message);
     }
- 
+
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
@@ -71,18 +80,22 @@ import { COLLECTIONS } from "./constants.js";
     } catch (err) {
       console.warn('[SA Data] Azure proxy failed:', err.message);
     }
- 
+
     return { zarPerUsd: 18.50, fromCache: false, live: false };
   }
- 
+
+  /* ══════════════════════════════════════════════════════════
+     SA WIDGET RENDER
+     ══════════════════════════════════════════════════════════ */
   async function renderSAWidget(groupBalance = 0, forceRefresh = false) {
     const container = document.getElementById('sa-widget-container');
     if (!container) return;
- 
+
     if (forceRefresh) {
       try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
     }
- 
+
+    // Show skeleton while loading
     container.innerHTML = `
       <div class="sa-widget-skeleton">
         <div class="skeleton-block skeleton-block--wide"></div>
@@ -93,22 +106,22 @@ import { COLLECTIONS } from "./constants.js";
         </div>
         <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
       </div>`;
- 
+
     const start = Date.now();
     const { zarPerUsd, fromCache, live } = await fetchUSDZAR();
     const elapsed = Date.now() - start;
- 
+
     const monthlyInterest = groupBalance * (SA_STATIC.primeRate / 100) / 12;
     const annualGrowth    = groupBalance * (SA_STATIC.primeRate / 100);
     const projectedYear   = groupBalance + annualGrowth;
- 
+
     let sourceLabel;
     if (live)           sourceLabel = `Live · Frankfurter API · ${elapsed}ms`;
     else if (fromCache) sourceLabel = `Cached · Frankfurter API`;
     else                sourceLabel = `⚠️ Offline — showing last known values`;
- 
+
     const isFallback = !live && !fromCache;
- 
+
     container.innerHTML = `
       <div class="sa-widget">
         ${isFallback ? `<div class="sa-widget--fallback">⚠️ Could not reach exchange rate API — showing static values.</div>` : ''}
@@ -162,7 +175,10 @@ import { COLLECTIONS } from "./constants.js";
         </p>
       </div>`;
   }
- 
+
+  /* ══════════════════════════════════════════════════════════
+     REFRESH BUTTON
+     ══════════════════════════════════════════════════════════ */
   let refreshButtonWired = false;
   function wireRefreshButton(groupBalance) {
     const btn = document.getElementById('sa-refresh-btn');
@@ -176,8 +192,11 @@ import { COLLECTIONS } from "./constants.js";
     };
     refreshButtonWired = true;
   }
- 
-  async function loadDashboardData(user) {
+
+  /* ══════════════════════════════════════════════════════════
+     DASHBOARD DATA LOADER — modular Firestore only
+     ══════════════════════════════════════════════════════════ */
+  async function loadDashboardData(user, specificGroupId = null) {
     // Set display name
     const nameEl = document.getElementById('user-display-name');
     if (nameEl) {
@@ -185,98 +204,97 @@ import { COLLECTIONS } from "./constants.js";
         ? user.displayName.split(' ')[0]
         : user.email;
     }
- 
+
     let groupBalance = 0;
- 
+
     try {
-      // Look up membership
-      const memSnap = await getDocs(
-        query(
-          collection(db, COLLECTIONS.MEMBERSHIPS),
-          where('uid', '==', user.uid)
-        )
-      );
- 
-      if (memSnap.empty) {
-        // No membership — send to onboarding
+      // ✅ Modular: collection() + query() + where() + getDocs()
+      const membershipsRef = collection(db, COLLECTIONS.MEMBERSHIPS);
+      const qMemberships   = query(membershipsRef, where('uid', '==', user.uid));
+      const membershipsSnap = await getDocs(qMemberships);
+
+      if (membershipsSnap.empty) {
         window.location.href = 'onboarding.html';
         return groupBalance;
       }
- 
-      const groupId = memSnap.docs[0].data().groupId;
-      const userRole = memSnap.docs[0].data().role;
- 
-      // Load group doc directly from groups collection
-      const groupSnap = await getDocs(
-        query(
-          collection(db, COLLECTIONS.GROUPS),
-          where('__name__', '==', groupId)
-        )
-      );
- 
-      // Use compat SDK path since dashboard.js mixes compat + modular
-      const groupDoc = await db.collection('groups').doc(groupId).get();
- 
-      if (groupDoc.exists) {
-        const group = groupDoc.data();
+
+      let groupId;
+      let userRole = 'member';
+
+      if (specificGroupId) {
+        groupId = specificGroupId;
+        const membershipDoc = membershipsSnap.docs.find(d => d.data().groupId === groupId);
+        userRole = membershipDoc?.data().role || 'member';
+      } else {
+        groupId  = membershipsSnap.docs[0].data().groupId;
+        userRole = membershipsSnap.docs[0].data().role;
+      }
+
+      // ✅ Modular: doc() + getDoc()
+      const groupRef  = doc(db, COLLECTIONS.GROUPS, groupId);
+      const groupSnap = await getDoc(groupRef);
+
+      if (groupSnap.exists()) {
+        const group = groupSnap.data();
         groupBalance = group.totalBalance || 0;
- 
+
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) {
           badgeEl.textContent = '🌿 ' + (group.name || 'My Stokvel');
-          // Show admin badge if applicable
           if (userRole === 'Admin') {
             badgeEl.innerHTML += ' <span style="font-size:0.7rem;background:#dcfce7;color:#166534;padding:0.1rem 0.5rem;border-radius:999px;font-weight:600;">Admin</span>';
           }
         }
- 
+
         const balanceEl = document.getElementById('stat-balance');
         if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
- 
+
         const membersEl = document.getElementById('stat-members');
         if (membersEl) {
-          const membersSnap = await db
-            .collection('groups')
-            .doc(groupId)
-            .collection('members')
-            .get();
+          // ✅ Modular: collection() + getDocs() for subcollection
+          const membersRef  = collection(db, `groups/${groupId}/members`);
+          const membersSnap = await getDocs(membersRef);
           membersEl.textContent = membersSnap.size ?? '—';
         }
       } else {
-        // Stale membership — group was deleted
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) badgeEl.textContent = '🌿 No group yet';
       }
- 
     } catch (err) {
       console.warn('[Dashboard] Could not load group data:', err.message);
     }
- 
+
     return groupBalance;
   }
- 
-  window.loadDashboardData  = loadDashboardData;
-  window.renderSAWidget     = renderSAWidget;
-  window.wireRefreshButton  = wireRefreshButton;
- 
+
+  /* ══════════════════════════════════════════════════════════
+     EXPOSE TO WINDOW (for dashboard-widgets.js callbacks)
+     ══════════════════════════════════════════════════════════ */
+  window.loadDashboardData = loadDashboardData;
+  window.renderSAWidget    = renderSAWidget;
+  window.wireRefreshButton = wireRefreshButton;
+
+  /* ══════════════════════════════════════════════════════════
+     INIT
+     ══════════════════════════════════════════════════════════ */
   function init() {
     auth.onAuthStateChanged(async (user) => {
       if (!user) {
         window.location.href = 'login.html';
         return;
       }
- 
+
       // Mount notifications widget
       const notifContainer = document.getElementById('notifications-container');
       if (notifContainer) mountNotificationsWidget(notifContainer, user.uid);
- 
-      // loadDashboardData handles the onboarding redirect if no membership
+
+      // Load dashboard data and render SA widget
       const groupBalance = await loadDashboardData(user);
       await renderSAWidget(groupBalance);
       wireRefreshButton(groupBalance);
     });
   }
- 
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

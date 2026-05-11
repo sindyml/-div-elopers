@@ -1,6 +1,3 @@
-# Complete Rewritten Dashboard (Merged Version)
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,12 +7,14 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/app.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <!-- dashboard-additions.css adds group admin badge + chat widget styles -->
+  <link rel="stylesheet" href="css/dashboard-additions.css" />
+  <!-- chatbot-widget.css REMOVED — chat styles are now injected by dashboard-widgets.js -->
 </head>
 
 <body class="app-layout">
@@ -30,15 +29,11 @@
         <h1 class="page-header__title">
           Good morning, <span id="user-display-name">Member</span> 👋
         </h1>
-
         <p class="page-header__sub">
           Here's what's happening with your stokvel today.
         </p>
       </hgroup>
-
-      <small id="group-name-badge" class="group-badge">
-        Loading group...
-      </small>
+      <small id="group-name-badge" class="group-badge">Loading group...</small>
     </header>
 
 
@@ -75,11 +70,16 @@
     <!-- DASHBOARD CONTENT -->
     <div class="dashboard-content">
 
-      <!-- MAIN COLUMN -->
+      <!-- ── MAIN COLUMN ─────────────────────────────────── -->
       <div class="dashboard-col dashboard-col--main">
 
         <!-- NOTIFICATIONS -->
         <article class="card widget-section" aria-labelledby="notifications-heading">
+          <header class="widget-section__header">
+            <h2 id="notifications-heading" class="widget-section__title">
+              🔔 Notifications
+            </h2>
+          </header>
           <div id="notifications-container"></div>
         </article>
 
@@ -91,32 +91,23 @@
             <h2 id="sa-widget-heading" class="widget-section__title">
               📈 SA Financial Snapshot
             </h2>
-
             <button
               class="widget-refresh-btn"
               id="sa-refresh-btn"
               aria-label="Refresh financial data"
               title="Refresh"
-            >
-              ↻
-            </button>
+            >↻</button>
           </header>
 
-
           <div id="sa-widget-container" class="sa-widget-container">
-
             <div class="sa-widget-skeleton" aria-hidden="true">
-
               <div class="skeleton-block skeleton-block--wide"></div>
-
               <div class="skeleton-row">
                 <div class="skeleton-block skeleton-block--stat"></div>
                 <div class="skeleton-block skeleton-block--stat"></div>
                 <div class="skeleton-block skeleton-block--stat"></div>
               </div>
-
               <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
-
             </div>
           </div>
         </article>
@@ -129,29 +120,28 @@
             <h2 id="contributions-heading" class="widget-section__title">
               💰 Recent Contributions
             </h2>
-
-            <a href="contributions-my.html" class="widget-section__link">
-              View all →
-            </a>
+            <a href="contributions-my.html" class="widget-section__link">View all →</a>
           </header>
 
-
           <section id="contributions-container" aria-live="polite">
-
             <div class="contributions-widget-loading" aria-hidden="true">
               <div class="skeleton-block skeleton-block--wide"></div>
               <div class="skeleton-block skeleton-block--wide"></div>
               <div class="skeleton-block skeleton-block--wide"></div>
             </div>
-
           </section>
         </article>
 
       </div>
 
 
-      <!-- SIDE COLUMN -->
+      <!-- ── SIDE COLUMN ─────────────────────────────────── -->
       <aside class="dashboard-col dashboard-col--side">
+
+        <!-- AI STOKVEL ASSISTANT card REMOVED from sidebar.
+             The chat is now a floating FAB panel (bottom-right corner),
+             mounted automatically by dashboard-widgets.js after auth. -->
+
 
         <!-- UPCOMING MEETINGS -->
         <article class="card widget-section" aria-labelledby="meetings-heading">
@@ -160,20 +150,14 @@
             <h2 id="meetings-heading" class="widget-section__title">
               📅 Upcoming Meetings
             </h2>
-
-            <a href="meetings.html" class="widget-section__link">
-              View all →
-            </a>
+            <a href="meetings.html" class="widget-section__link">View all →</a>
           </header>
 
-
           <section id="meetings-container" aria-live="polite">
-
             <div class="meetings-widget-loading" aria-hidden="true">
               <div class="skeleton-block skeleton-block--wide"></div>
               <div class="skeleton-block skeleton-block--wide"></div>
             </div>
-
           </section>
         </article>
 
@@ -185,12 +169,8 @@
             <h2 id="members-heading" class="widget-section__title">
               👥 Group Members
             </h2>
-
-            <a href="groupCreate.html" class="widget-section__link">
-              Manage →
-            </a>
+            <a href="groupCreate.html" class="widget-section__link">Manage →</a>
           </header>
-
 
           <section id="members-container" class="members-widget" aria-live="polite">
 
@@ -199,22 +179,16 @@
               <ul id="grouplist" class="members-widget__list"></ul>
             </div>
 
-
             <div id="members-list-block" class="members-widget__block" style="display:none;">
               <h3 class="members-widget__heading">
                 Members in <span id="current-group-name"></span>
               </h3>
-
               <ul id="memberlist" class="members-widget__list"></ul>
             </div>
 
-
             <div class="members-widget__block">
-
               <h3 class="members-widget__heading">Invite Member</h3>
-
               <form id="invite-form" class="members-widget__invite-form">
-
                 <input
                   type="email"
                   id="inviteEmail"
@@ -222,16 +196,12 @@
                   placeholder="Enter email address"
                   required
                 />
-
                 <button type="submit" id="inviteBtn" class="btn btn--primary btn--sm">
                   Invite
                 </button>
-
               </form>
-
               <p id="inviteMessage"></p>
             </div>
-
 
             <div class="members-widget__block">
               <a href="groupCreate.html" class="btn btn--outline btn--sm">
@@ -250,20 +220,16 @@
             <h2 id="payout-heading" class="widget-section__title">
               📊 Payout Schedule
             </h2>
-
-            <a href="contributions-payout.html" class="widget-section__link">
+            <a href="contributions-payout.html" id="payout-view-all" class="widget-section__link">
               View all →
             </a>
           </header>
 
-
           <section id="payout-container" aria-live="polite">
-
             <div class="payout-widget-loading" aria-hidden="true">
               <div class="skeleton-block skeleton-block--wide"></div>
               <div class="skeleton-block skeleton-block--wide"></div>
             </div>
-
           </section>
         </article>
 
@@ -275,25 +241,19 @@
             <h2 id="health-heading" class="widget-section__title">
               🏥 Financial Health
             </h2>
-
             <button
               id="health-refresh-btn"
               class="widget-refresh-btn"
               aria-label="Recalculate financial health score"
               title="Recalculate"
-            >
-              ↻
-            </button>
+            >↻</button>
           </header>
 
-
           <div id="health-score-container" aria-live="polite">
-
             <div class="health-loading">
               <div class="health-spinner"></div>
               <span>Calculating score...</span>
             </div>
-
           </div>
         </article>
 
@@ -304,9 +264,8 @@
   </main>
 
 
-  <!-- TOASTS -->
+  <!-- TOASTS & ALERTS -->
   <div id="toast-root" aria-live="polite" aria-atomic="false"></div>
-
   <output id="notification-root" aria-live="polite" aria-atomic="true"></output>
 
 
@@ -314,23 +273,25 @@
   <footer id="footer-root"></footer>
 
 
-  <!-- FIREBASE -->
+  <!-- ── FIREBASE COMPAT (for navbar/footer/legacy components) ── -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-
-
-  <!-- APP SCRIPTS -->
   <script src="js/firebase-compat-init.js"></script>
+
+  <!-- ── SHARED COMPONENTS ── -->
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
 
+  <!-- ── MAIN DASHBOARD MODULES ── -->
+  <!-- dashboard-widgets.js mounts the floating chat FAB automatically after auth -->
   <script type="module" src="js/dashboard-widgets.js"></script>
   <script type="module" src="js/dashboard.js"></script>
 
+  <!-- chatbot-widget.js REMOVED — no longer needed, chat is in dashboard-widgets.js -->
 
-  <!-- HEALTH SCORE -->
+
+  <!-- ── FINANCIAL HEALTH + PAYMENT REMINDERS ── -->
   <script type="module">
-
     import {
       getAuth,
       onAuthStateChanged
@@ -349,65 +310,40 @@
       initPaymentReminders
     } from './js/payment-reminders.js';
 
-
-    const auth = getAuth(getApp());
-
-    const container = document.getElementById('health-score-container');
-
+    const auth       = getAuth(getApp());
+    const container  = document.getElementById('health-score-container');
     const refreshBtn = document.getElementById('health-refresh-btn');
 
-
     async function renderHealthScore(uid) {
-
       container.innerHTML = `
         <div class="health-loading">
           <div class="health-spinner"></div>
           <span>Calculating...</span>
-        </div>
-      `;
+        </div>`;
 
       try {
-
         const groupId =
           document.getElementById('grouplist')
-          ?.querySelector('[data-group-id]')
-          ?.dataset.groupId || 'default';
-
+            ?.querySelector('[data-group-id]')
+            ?.dataset.groupId || 'default';
 
         const result = await computeAndStoreHealthScore(uid, groupId);
-
         container.innerHTML = buildHealthScoreHTML(result);
-
       } catch (err) {
-
         container.innerHTML = `
-          <p style="padding:var(--space-4); color:var(--color-text-muted); font-size:0.85rem;">
+          <p style="padding:var(--space-4);color:var(--color-text-muted);font-size:0.85rem;">
             Unable to calculate score — check back after your next contribution.
-          </p>
-        `;
+          </p>`;
       }
     }
 
-
     onAuthStateChanged(auth, user => {
-
       if (!user) return;
-
       initPaymentReminders(user.uid);
-
-      setTimeout(() => {
-        renderHealthScore(user.uid);
-      }, 1200);
-
-
-      refreshBtn.addEventListener('click', () => {
-        renderHealthScore(user.uid);
-      });
+      setTimeout(() => renderHealthScore(user.uid), 1200);
+      refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
     });
-
   </script>
 
 </body>
 </html>
-```
-
