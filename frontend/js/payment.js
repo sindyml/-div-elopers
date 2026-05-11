@@ -77,7 +77,63 @@ modal.onProofUploaded = async (file, paymentId) => {
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   loadPendingContributions(user.uid);
+
+  // Wire up "Make a Payment" button in header to open first pending contribution
+  const makePaymentBtn = document.getElementById('make-payment-btn');
+  if (makePaymentBtn) {
+    makePaymentBtn.addEventListener('click', () => {
+      openFirstPendingContribution(user.uid);
+    });
+  }
 });
+
+/* ── Make a Payment Button Handler ─────────────────────────── */
+
+async function openFirstPendingContribution(userId) {
+  try {
+    const groups = await getUserGroups(userId);
+    if (!groups.length) {
+      showError('You are not a member of any groups yet.');
+      return;
+    }
+
+    const contribSnap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.CONTRIBUTIONS),
+        where('userId', '==', userId),
+        orderBy('date', 'desc')
+      )
+    );
+
+    const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const pending = allContribs.filter(
+      c => c.status === 'pending' || c.status === 'missed'
+    );
+
+    if (pending.length === 0) {
+      showError('You have no pending contributions to pay.');
+      return;
+    }
+
+    // Get the first pending contribution
+    const contrib = pending[0];
+    const groupMap = {};
+    groups.forEach(g => { groupMap[g.id] = g.name; });
+    const groupName = groupMap[contrib.groupId] || contrib.groupId || 'Unknown Group';
+    const amount = parseFloat(contrib.amount) || 0;
+
+    // Open the payment modal
+    modal.open({
+      userId: userId,
+      groupId: contrib.groupId,
+      contributionId: contrib.id,
+      amount: amount,
+      groupName: groupName,
+    });
+  } catch (err) {
+    showError('Failed to load contributions: ' + (err.message || 'Unknown error'));
+  }
+}
 
 /* ── Data loading ──────────────────────────────────────────── */
 
