@@ -172,8 +172,13 @@ async function fetchSAData() {
  *
  * @param {HTMLElement} container — element to render into
  * @param {number} groupBalance   — current group balance in ZAR
+ * @param {boolean} forceRefresh  — whether to bypass cache (optional, default false)
  */
-async function renderSADataWidget(container, groupBalance = 0) {
+async function renderSADataWidget(container, groupBalance = 0, forceRefresh = false) {
+  // Clear cache if forceRefresh requested
+  if (forceRefresh) {
+    try { localStorage.removeItem(SA_DATA_CONFIG.cacheKey); } catch { /* ignore */ }
+  }
   // Show loading state
   container.innerHTML = `
     <div class="sa-widget">
@@ -309,3 +314,6 @@ function injectWidgetStyles() {
   `;
   document.head.appendChild(style);
 }
+
+// Export public API
+export { fetchSAData, renderSADataWidget };

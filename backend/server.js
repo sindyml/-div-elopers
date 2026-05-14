@@ -483,24 +483,6 @@ async function resolveToolCalls(functionCalls) {
 /* ══════════════════════════════════════════════════════════════════════════════
    HELPERS
    ══════════════════════════════════════════════════════════════════════════════ */
-function sendFallbackSAData(res, saStatic) {
-  const payload = {
-    primeRate:     saStatic.primeRate,
-    inflationRate: saStatic.inflationRate,
-    repoRate:      saStatic.repoRate,
-    usdZar:        18.50,
-    source:        'Static fallback (server proxy)',
-    lastUpdated:   saStatic.lastUpdated,
-    isFallback:    true,
-  };
-  res.writeHead(200, {
-    'Content-Type':                'application/json',
-    'Cache-Control':               'no-store',
-    'Access-Control-Allow-Origin': '*',
-  });
-  res.end(JSON.stringify(payload));
-}
-
 function parseJSONBody(req, callback) {
   let body = '';
   req.on('data', chunk => { body += chunk; });
@@ -695,52 +677,6 @@ const server = http.createServer((req, res) => {
       'Cache-Control': 'public, max-age=3600',
     });
     res.end(JSON.stringify(config));
-    return;
-  }
-
-  /* ────────────────────────────────────────────────────────────────────────────
-     /api/getSAData
-     ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath === '/api/getSAData' && req.method === 'GET') {
-    const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
-    const SA_STATIC = {
-      primeRate:     10.25,
-      inflationRate: 4.0,
-      repoRate:      6.75,
-      lastUpdated:   'March 2026',
-    };
-
-    const apiReq = https.get(FRANKFURTER_URL, { timeout: 5000 }, (apiRes) => {
-      let body = '';
-      apiRes.on('data', chunk => { body += chunk; });
-      apiRes.on('end', () => {
-        try {
-          const data   = JSON.parse(body);
-          const usdZar = data.rates?.ZAR ?? 18.50;
-          res.writeHead(200, {
-            'Content-Type':                'application/json',
-            'Cache-Control':               'public, max-age=3600',
-            'Access-Control-Allow-Origin': '*',
-          });
-          res.end(JSON.stringify({
-            primeRate:     SA_STATIC.primeRate,
-            inflationRate: SA_STATIC.inflationRate,
-            repoRate:      SA_STATIC.repoRate,
-            usdZar,
-            rates:         data.rates,
-            date:          data.date,
-            source:        'Frankfurter API via server proxy',
-            lastUpdated:   SA_STATIC.lastUpdated,
-            isFallback:    false,
-          }));
-        } catch {
-          sendFallbackSAData(res, SA_STATIC);
-        }
-      });
-    });
-
-    apiReq.on('error',   ()  => sendFallbackSAData(res, SA_STATIC));
-    apiReq.on('timeout', ()  => { apiReq.destroy(); sendFallbackSAData(res, SA_STATIC); });
     return;
   }
 

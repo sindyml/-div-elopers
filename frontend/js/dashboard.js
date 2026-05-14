@@ -2,6 +2,8 @@
 import { auth, db } from "./firebase-config.js";
 import { SA_DATA_DEFAULTS, COLLECTIONS } from "./constants.js";
 import { mountNotificationsWidget } from './dashboard-widgets.js';
+// Import SA data rendering from the dedicated module
+import { renderSADataWidget } from './sa-data.js';
 
 import {
   collection,
@@ -15,11 +17,6 @@ import {
 (function () {
   const SA_STATIC = SA_DATA_DEFAULTS;
 
-  const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
-  const AZURE_FALLBACK  = '/api/getSAData';
-  const CACHE_KEY       = 'stokpal_usd_zar';
-  const CACHE_DURATION  = 4 * 60 * 60 * 1000; // 4 hours
-
   /* ══════════════════════════════════════════════════════════
      UTILITIES
      ══════════════════════════════════════════════════════════ */
@@ -30,154 +27,8 @@ import {
     });
   }
 
-  function readCache() {
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      if (!raw) return null;
-      const { value, timestamp } = JSON.parse(raw);
-      if (Date.now() - timestamp < CACHE_DURATION) return { value, fromCache: true };
-    } catch { /* ignore */ }
-    return null;
-  }
-
-  function writeCache(value) {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ value, timestamp: Date.now() }));
-    } catch { /* ignore */ }
-  }
-
   /* ══════════════════════════════════════════════════════════
-     EXCHANGE RATE FETCH
-     ══════════════════════════════════════════════════════════ */
-  async function fetchUSDZAR() {
-    const cached = readCache();
-    if (cached) return { zarPerUsd: cached.value, fromCache: true, live: false };
-
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(FRANKFURTER_URL, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const zarPerUsd = data.rates?.ZAR ?? 18.5;
-      writeCache(zarPerUsd);
-      return { zarPerUsd, fromCache: false, live: true };
-    } catch (err) {
-      console.warn('[SA Data] Frankfurter failed:', err.message);
-    }
-
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await fetch(AZURE_FALLBACK, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-      const data = await res.json();
-      const zarPerUsd = data.usdZar ?? data.rates?.ZAR ?? 18.5;
-      writeCache(zarPerUsd);
-      return { zarPerUsd, fromCache: false, live: true };
-    } catch (err) {
-      console.warn('[SA Data] Azure proxy failed:', err.message);
-    }
-
-    return { zarPerUsd: 18.50, fromCache: false, live: false };
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     SA WIDGET RENDER
-     ══════════════════════════════════════════════════════════ */
-  async function renderSAWidget(groupBalance = 0, forceRefresh = false) {
-    const container = document.getElementById('sa-widget-container');
-    if (!container) return;
-
-    if (forceRefresh) {
-      try { localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
-    }
-
-    // Show skeleton while loading
-    container.innerHTML = `
-      <div class="sa-widget-skeleton">
-        <div class="skeleton-block skeleton-block--wide"></div>
-        <div class="skeleton-row">
-          <div class="skeleton-block skeleton-block--stat"></div>
-          <div class="skeleton-block skeleton-block--stat"></div>
-          <div class="skeleton-block skeleton-block--stat"></div>
-        </div>
-        <div class="skeleton-block skeleton-block--wide skeleton-block--short"></div>
-      </div>`;
-
-    const start = Date.now();
-    const { zarPerUsd, fromCache, live } = await fetchUSDZAR();
-    const elapsed = Date.now() - start;
-
-    const monthlyInterest = groupBalance * (SA_STATIC.primeRate / 100) / 12;
-    const annualGrowth    = groupBalance * (SA_STATIC.primeRate / 100);
-    const projectedYear   = groupBalance + annualGrowth;
-
-    let sourceLabel;
-    if (live)           sourceLabel = `Live · Frankfurter API · ${elapsed}ms`;
-    else if (fromCache) sourceLabel = `Cached · Frankfurter API`;
-    else                sourceLabel = `⚠️ Offline — showing last known values`;
-
-    const isFallback = !live && !fromCache;
-
-    container.innerHTML = `
-      <div class="sa-widget">
-        ${isFallback ? `<div class="sa-widget--fallback">⚠️ Could not reach exchange rate API — showing static values.</div>` : ''}
-        <div class="sa-widget__stats">
-          <div class="sa-widget__stat">
-            <div class="sa-widget__stat-value">${SA_STATIC.primeRate}%</div>
-            <div class="sa-widget__stat-label">Prime Rate</div>
-          </div>
-          <div class="sa-widget__stat">
-            <div class="sa-widget__stat-value">${SA_STATIC.inflationRate}%</div>
-            <div class="sa-widget__stat-label">CPI Inflation</div>
-          </div>
-          <div class="sa-widget__stat">
-            <div class="sa-widget__stat-value">R${zarPerUsd.toFixed(2)}</div>
-            <div class="sa-widget__stat-label">USD / ZAR</div>
-          </div>
-        </div>
-        <div class="sa-widget__divider"></div>
-        ${groupBalance > 0 ? `
-        <div class="sa-widget__projection">
-          <p class="sa-widget__proj-title">💡 Savings Projection — ${SA_STATIC.primeRate}% Prime Rate</p>
-          <div class="sa-widget__proj-grid">
-            <div class="sa-widget__proj-item">
-              <span class="sa-widget__proj-label">Monthly interest earned</span>
-              <span class="sa-widget__proj-value">${fmt(monthlyInterest)}</span>
-            </div>
-            <div class="sa-widget__proj-item">
-              <span class="sa-widget__proj-label">Annual interest earned</span>
-              <span class="sa-widget__proj-value">${fmt(annualGrowth)}</span>
-            </div>
-            <div class="sa-widget__proj-item">
-              <span class="sa-widget__proj-label">Current balance</span>
-              <span class="sa-widget__proj-value">${fmt(groupBalance)}</span>
-            </div>
-            <div class="sa-widget__proj-item">
-              <span class="sa-widget__proj-label">Projected in 12 months</span>
-              <span class="sa-widget__proj-value">${fmt(projectedYear)}</span>
-            </div>
-          </div>
-        </div>
-        ` : `
-        <div class="sa-widget__projection">
-          <p class="sa-widget__proj-title">💡 Savings Projection</p>
-          <p style="font-size:0.85rem;color:var(--color-text-muted);">
-            Your group balance will appear here once contributions are recorded.
-          </p>
-        </div>
-        `}
-        <p class="sa-widget__updated">
-          SARB data: ${SA_STATIC.lastUpdated} &nbsp;·&nbsp; ${sourceLabel}
-        </p>
-      </div>`;
-  }
-
-  /* ══════════════════════════════════════════════════════════
-     REFRESH BUTTON
+     REFRESH BUTTON — triggers renderSADataWidget with cache clear
      ══════════════════════════════════════════════════════════ */
   let refreshButtonWired = false;
   function wireRefreshButton(groupBalance) {
@@ -186,7 +37,10 @@ import {
     btn.onclick = async () => {
       btn.classList.add('spinning');
       btn.disabled = true;
-      await renderSAWidget(groupBalance, true);
+      const container = document.getElementById('sa-widget-container');
+      if (container) {
+        await renderSADataWidget(container, groupBalance, true);
+      }
       btn.classList.remove('spinning');
       btn.disabled = false;
     };
@@ -271,7 +125,7 @@ import {
      EXPOSE TO WINDOW (for dashboard-widgets.js callbacks)
      ══════════════════════════════════════════════════════════ */
   window.loadDashboardData = loadDashboardData;
-  window.renderSAWidget    = renderSAWidget;
+  window.renderSADataWidget = renderSADataWidget;
   window.wireRefreshButton = wireRefreshButton;
 
   /* ══════════════════════════════════════════════════════════
@@ -290,7 +144,10 @@ import {
 
       // Load dashboard data and render SA widget
       const groupBalance = await loadDashboardData(user);
-      await renderSAWidget(groupBalance);
+      const saContainer = document.getElementById('sa-widget-container');
+      if (saContainer) {
+        await renderSADataWidget(saContainer, groupBalance);
+      }
       wireRefreshButton(groupBalance);
     });
   }
