@@ -1,155 +1,214 @@
-const axios = require('axios');
-const crypto = require('crypto');
+// backend/services/paymentService.js - REAL VERSION with Firestore
 const admin = require('firebase-admin');
+
+const db = admin.firestore();
 
 class PaymentService {
   constructor() {
-    this.apiKey = process.env.YOCO_SECRET_KEY;
-    this.apiUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://online.yoco.com/v1' 
-      : 'https://sandbox.yoco.com/v1';
-    this.webhookSecret = process.env.YOCO_WEBHOOK_SECRET;
+    console.log('✅ Payment Service initialized (Firestore mode)');
   }
 
-  // Create payment charge
-  async createCharge(amount, currency, token, metadata = {}) {
+  // Process payout disbursement
+  async processPayout(payoutData) {
     try {
-      const response = await axios.post(
-        `${this.apiUrl}/charges/`,
-        {
-          amount: Math.round(amount * 100), // Convert to cents
-          currency: currency || 'ZAR',
-          token: token,
-          metadata: metadata
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const {
+        groupId,
+        memberId,
+        amount,
+        payoutMethod = 'bank_transfer',
+        reference,
+        processedBy
+      } = payoutData;
 
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (error) {
-      console.error('Yoco charge creation error:', error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || 'Payment processing failed',
-        code: error.response?.data?.code
-      };
-    }
-  }
-
-  // Get charge status
-  async getChargeStatus(chargeId) {
-    try {
-      const response = await axios.get(
-        `${this.apiUrl}/charges/${chargeId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`
-          }
-        }
-      );
-
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (error) {
-      console.error('Error fetching charge status:', error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || 'Failed to fetch payment status'
-      };
-    }
-  }
-
-  // Verify webhook signature
-  verifyWebhookSignature(payload, signature, timestamp) {
-    if (!this.webhookSecret) {
-      console.warn('Webhook secret not configured');
-      return true; // Skip verification in development
-    }
-
-    const expectedSignature = crypto
-      .createHmac('sha256', this.webhookSecret)
-      .update(`${timestamp}.${payload}`)
-      .digest('hex');
-
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
-  }
-
-  // Refund a payment
-  async refundCharge(chargeId, amount = null) {
-    try {
-      const refundData = amount ? { amount: Math.round(amount * 100) } : {};
-      
-      const response = await axios.post(
-        `${this.apiUrl}/charges/${chargeId}/refunds`,
-        refundData,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (error) {
-      console.error('Refund error:', error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || 'Refund processing failed'
-      };
-    }
-  }
-
-  // With retry logic
-  async createChargeWithRetry(amount, currency, token, metadata, maxRetries = 3) {
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const result = await this.createCharge(amount, currency, token, metadata);
-      
-      if (result.success) {
-        return result;
+      // Validate payout amount
+      if (!amount || amount <= 0) {
+        return {
+          success: false,
+          error: 'Invalid payout amount'
+        };
       }
+
+      // Check if group exists and has sufficient balance
+      const groupRef = db.collection('groups').doc(groupId);
+      const groupDoc = await groupRef.get();
       
-      lastError = result.error;
-      
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay));
+      if (!groupDoc.exists) {
+        return {
+          success: false,
+          error: 'Group not found'
+        };
       }
+
+      const groupData = groupDoc.data();
+      const currentBalance = groupData.currentBalance || 0;
+
+      if (currentBalance < amount) {
+        return {
+          success: false,
+          error: 'Insufficient group balance'
+        };
+      }
+
+      // Create payout transaction record
+      const payoutRef = db.collection('payouts').doc();
+      const payoutRecord = {
+        id: payoutRef.id,
+        groupId: groupId,
+        memberId: memberId,
+        amount: amount,
+        status: 'completed',
+        payoutMethod: payoutMethod,
+        reference: reference || `PAYOUT_${Date.now()}`,
+        processedBy: processedBy || null,
+        processedAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      await payoutRef.set(payoutRecord);
+
+      // Update group balance
+      await groupRef.update({
+        currentBalance: admin.firestore.FieldValue.increment(-amount),
+        lastPayoutAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastPayoutAmount: amount,
+        lastPayoutMember: memberId,
+        lastPayoutIndex: (groupData.lastPayoutIndex || 0) + 1
+      });
+
+      // Record in transactions collection
+      const transactionRef = db.collection('transactions').doc();
+      await transactionRef.set({
+        id: transactionRef.id,
+        groupId: groupId,
+        userId: memberId,
+        amount: -amount,
+        type: 'payout',
+        status: 'completed',
+        payoutId: payoutRef.id,
+        description: `Payout disbursement to ${memberId}`,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return {
+        success: true,
+        data: {
+          payoutId: payoutRef.id,
+          amount: amount,
+          status: 'completed',
+          newBalance: currentBalance - amount
+        }
+      };
+
+    } catch (error) {
+      console.error('Payout processing error:', error);
+      return {
+        success: false,
+        error: error.message || 'Payout processing failed'
+      };
     }
-    
-    return {
-      success: false,
-      error: `Failed after ${maxRetries} attempts: ${lastError}`
-    };
   }
 
-  // Generate payment intent response for frontend
-  generatePaymentIntent(chargeId, amount, currency = 'ZAR') {
-    return {
-      chargeId: chargeId,
-      amount: amount,
-      currency: currency,
-      status: 'pending',
-      timestamp: new Date().toISOString()
-    };
+  // Get group payout schedule
+  async getPayoutSchedule(groupId) {
+    try {
+      const groupDoc = await db.collection('groups').doc(groupId).get();
+      
+      if (!groupDoc.exists) {
+        return {
+          success: false,
+          error: 'Group not found'
+        };
+      }
+
+      const groupData = groupDoc.data();
+      const payoutOrder = groupData.payoutOrder || [];
+      const lastPayoutIndex = groupData.lastPayoutIndex || 0;
+      
+      // Determine next member to be paid
+      const nextPayoutIndex = payoutOrder.length > 0 ? (lastPayoutIndex + 1) % payoutOrder.length : 0;
+      const nextMemberId = payoutOrder[nextPayoutIndex] || null;
+
+      // Get member names for the payout order
+      const memberNames = [];
+      for (const memberUid of payoutOrder) {
+        const userDoc = await db.collection('users').doc(memberUid).get();
+        memberNames.push({
+          uid: memberUid,
+          name: userDoc.data()?.name || memberUid,
+          position: payoutOrder.indexOf(memberUid) + 1
+        });
+      }
+
+      return {
+        success: true,
+        data: {
+          payoutOrder: payoutOrder,
+          payoutOrderDetails: memberNames,
+          currentBalance: groupData.currentBalance || 0,
+          contributionAmount: groupData.contributionAmount,
+          nextPayoutMember: nextMemberId,
+          nextPayoutIndex: nextPayoutIndex,
+          lastPayoutAt: groupData.lastPayoutAt || null,
+          lastPayoutAmount: groupData.lastPayoutAmount || null,
+          totalMembers: payoutOrder.length
+        }
+      };
+
+    } catch (error) {
+      console.error('Get payout schedule error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Get payout history for a group
+  async getPayoutHistory(groupId, limit = 50) {
+    try {
+      const snapshot = await db.collection('payouts')
+        .where('groupId', '==', groupId)
+        .orderBy('processedAt', 'desc')
+        .limit(limit)
+        .get();
+
+      const payouts = [];
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        // Get member name for each payout
+        let memberName = data.memberId;
+        try {
+          const userDoc = await db.collection('users').doc(data.memberId).get();
+          if (userDoc.exists) {
+            memberName = userDoc.data().name || data.memberId;
+          }
+        } catch (e) {
+          // Use UID if name not found
+        }
+        
+        payouts.push({
+          id: doc.id,
+          memberName: memberName,
+          amount: data.amount,
+          status: data.status,
+          payoutMethod: data.payoutMethod,
+          reference: data.reference,
+          processedAt: data.processedAt,
+          createdAt: data.createdAt
+        });
+      }
+
+      return {
+        success: true,
+        data: payouts
+      };
+    } catch (error) {
+      console.error('Get payout history error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 

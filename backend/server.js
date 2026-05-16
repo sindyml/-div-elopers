@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 // server.js — Static file server with Payment API integration
 const http = require('http');
 const https = require('https');
@@ -7,30 +9,26 @@ const admin = require('firebase-admin');
 
 const PORT = process.env.PORT || 8080;
 
-// ✅ Initialize Firebase Admin ONCE
-if (!admin.apps.length) {
-  try {
-    // Try to initialize with environment variables (Azure)
-    if (process.env.FIREBASE_PROJECT_ID) {
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId: process.env.FIREBASE_PROJECT_ID,
-      });
-      console.log('✅ Firebase Admin initialized (Azure)');
-    } else {
-      // Local development - use mock or skip
-      admin.initializeApp({
-        projectId: 'demo-project',
-      });
-      console.log('⚠️ Firebase Admin initialized in demo mode (no auth)');
-    }
-  } catch (error) {
-    console.warn('⚠️ Firebase Admin not initialized:', error.message);
-  }
+// Initialize Firebase Admin with service account
+const serviceAccountPath = path.join(__dirname, '..', 'service-account-key.json');
+
+if (fs.existsSync(serviceAccountPath)) {
+  const serviceAccount = require(serviceAccountPath);
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: serviceAccount.project_id
+  });
+  console.log('✅ Firebase Admin initialized with service account');
+} else {
+  console.warn('⚠️ No service account found. Running in demo mode.');
+  admin.initializeApp({
+    projectId: 'demo-project'
+  });
 }
 
-// Import payment routes
+// Import routes
 const paymentRoutes = require('./api/payments/index.js');
+const payoutRoutes = require('./api/payouts/index.js');
 
 // Resolve the frontend directory
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
@@ -82,7 +80,9 @@ function parseJSONBody(req, callback) {
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
 
-  // ── API: /api/payments/* - Payment endpoints ─────────────────
+  // ──────────────────────────────────────────────────────────────
+  // API: /api/payments/* - Payment endpoints
+  // ──────────────────────────────────────────────────────────────
   if (urlPath.startsWith('/api/payments/')) {
     const paymentPath = urlPath.replace('/api/payments', '');
     
@@ -157,7 +157,113 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── API: /api/getFirebaseConfig ────────────────────────────
+  // ──────────────────────────────────────────────────────────────
+  // API: /api/payouts/* - Payout endpoints
+  // ──────────────────────────────────────────────────────────────
+  if (urlPath.startsWith('/api/payouts/')) {
+    const payoutPath = urlPath.replace('/api/payouts', '');
+    
+    // Parse body for POST requests
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        let parsedBody = {};
+        try {
+          parsedBody = body ? JSON.parse(body) : {};
+        } catch(e) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          return;
+        }
+        
+        const fakeReq = {
+          method: req.method,
+          url: payoutPath,
+          headers: req.headers,
+          body: parsedBody,
+          params: {},
+          query: {}
+        };
+        
+        const fakeRes = {
+          headersSent: false,
+          statusCode: 200,
+          headers: {},
+          json: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            fakeRes.setHeader('Content-Type', 'application/json');
+            fakeRes.end(JSON.stringify(data));
+          },
+          status: (code) => {
+            fakeRes.statusCode = code;
+            return fakeRes;
+          },
+          setHeader: (key, value) => {
+            fakeRes.headers[key] = value;
+          },
+          end: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            Object.keys(fakeRes.headers).forEach(key => {
+              res.setHeader(key, fakeRes.headers[key]);
+            });
+            res.writeHead(fakeRes.statusCode);
+            res.end(data);
+          }
+        };
+        
+        payoutRoutes(fakeReq, fakeRes);
+      });
+      return;
+    } else {
+      // GET request
+      const fakeReq = {
+        method: req.method,
+        url: payoutPath,
+        headers: req.headers,
+        body: {},
+        params: {},
+        query: {}
+      };
+      
+      const fakeRes = {
+        headersSent: false,
+        statusCode: 200,
+        headers: {},
+        json: (data) => {
+          if (fakeRes.headersSent) return;
+          fakeRes.headersSent = true;
+          fakeRes.setHeader('Content-Type', 'application/json');
+          fakeRes.end(JSON.stringify(data));
+        },
+        status: (code) => {
+          fakeRes.statusCode = code;
+          return fakeRes;
+        },
+        setHeader: (key, value) => {
+          fakeRes.headers[key] = value;
+        },
+        end: (data) => {
+          if (fakeRes.headersSent) return;
+          fakeRes.headersSent = true;
+          Object.keys(fakeRes.headers).forEach(key => {
+            res.setHeader(key, fakeRes.headers[key]);
+          });
+          res.writeHead(fakeRes.statusCode);
+          res.end(data);
+        }
+      };
+      
+      payoutRoutes(fakeReq, fakeRes);
+    }
+    return;
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // API: /api/getFirebaseConfig
+  // ──────────────────────────────────────────────────────────────
   if (urlPath === '/api/getFirebaseConfig' && req.method === 'GET') {
     const config = {
       apiKey: process.env.FIREBASE_API_KEY || '',
@@ -184,7 +290,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── API proxy: /api/getSAData ──────────────────────────────
+  // ──────────────────────────────────────────────────────────────
+  // API: /api/getSAData - Frankfurter API proxy
+  // ──────────────────────────────────────────────────────────────
   if (urlPath === '/api/getSAData' && req.method === 'GET') {
     const FRANKFURTER_URL = 'https://api.frankfurter.dev/v1/latest?base=USD&symbols=ZAR';
     const SA_STATIC = {
@@ -229,7 +337,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── Static file serving ────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
+  // Static file serving (frontend)
+  // ──────────────────────────────────────────────────────────────
   let staticPath = decodeURIComponent(urlPath).replace(/\.\./g, '');
   if (staticPath === '/') staticPath = '/index.html';
 
@@ -266,4 +376,5 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`StokPal server running on port ${PORT}`);
   console.log(`Payment API available at: http://localhost:${PORT}/api/payments/`);
+  console.log(`Payout API available at: http://localhost:${PORT}/api/payouts/`);
 });
