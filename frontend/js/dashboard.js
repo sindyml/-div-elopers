@@ -14,6 +14,14 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+import {
+
+  checkPendingInvites,
+  acceptInvite,
+  declineInvite
+
+} from "./groupService.js";
+
 (function () {
   const SA_STATIC = SA_DATA_DEFAULTS;
 
@@ -129,6 +137,134 @@ import {
   window.wireRefreshButton = wireRefreshButton;
 
   /* ══════════════════════════════════════════════════════════
+   INVITE LOADER
+   ══════════════════════════════════════════════════════════ */
+async function loadPendingInvites(user) {
+
+  const inviteSection =
+    document.getElementById("inviteSection");
+
+  if (!inviteSection) return;
+
+  inviteSection.innerHTML = "";
+
+  try {
+
+    const invites =
+      await checkPendingInvites(user);
+
+    if (!invites.length) {
+
+      inviteSection.innerHTML = `
+        <p>No pending invites</p>
+      `;
+
+      return;
+    }
+
+    invites.forEach(invite => {
+
+      const wrapper =
+        document.createElement("article");
+
+      wrapper.className =
+        "members-widget__invite-item";
+
+      // Group name
+      const text =
+        document.createElement("p");
+
+      text.innerHTML = `
+        <strong>${invite.groupName || "Stokvel Group"}</strong>
+      `;
+
+      // Buttons container
+      const btnRow =
+        document.createElement("div");
+
+      btnRow.style.display = "flex";
+      btnRow.style.gap = "0.5rem";
+      btnRow.style.marginTop = "0.5rem";
+
+      // ACCEPT BUTTON
+      const acceptBtn =
+        document.createElement("button");
+
+      acceptBtn.className =
+        "btn btn--primary btn--sm";
+
+      acceptBtn.textContent = "Accept";
+
+      acceptBtn.onclick = async () => {
+
+        try {
+
+          await acceptInvite(
+            invite.id,
+            user
+          );
+
+          wrapper.innerHTML = `
+            <p>✅ Invite accepted</p>
+          `;
+
+          // refresh dashboard stats
+          await loadDashboardData(user);
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert("Could not accept invite");
+        }
+      };
+
+      // DECLINE BUTTON
+      const declineBtn =
+        document.createElement("button");
+
+      declineBtn.className =
+        "btn btn--outline btn--sm";
+
+      declineBtn.textContent = "Decline";
+
+      declineBtn.onclick = async () => {
+
+        try {
+
+          await declineInvite(invite.id);
+
+          wrapper.innerHTML = `
+            <p>❌ Invite declined</p>
+          `;
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert("Could not decline invite");
+        }
+      };
+
+      btnRow.appendChild(acceptBtn);
+      btnRow.appendChild(declineBtn);
+
+      wrapper.appendChild(text);
+      wrapper.appendChild(btnRow);
+
+      inviteSection.appendChild(wrapper);
+    });
+
+  } catch (err) {
+
+    console.warn(
+      "[Dashboard] Failed loading invites:",
+      err.message
+    );
+  }
+}
+
+  /* ══════════════════════════════════════════════════════════
      INIT
      ══════════════════════════════════════════════════════════ */
   function init() {
@@ -149,6 +285,8 @@ import {
         await renderSADataWidget(saContainer, groupBalance);
       }
       wireRefreshButton(groupBalance);
+            // Load pending invites
+      await loadPendingInvites(user);
     });
   }
 
