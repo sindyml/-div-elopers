@@ -353,7 +353,7 @@ All PayFast requests include an MD5 signature that must be verified:
 6. Check payment status updated
 
 ### Automated Testing
-See `tests/payment.test.js` for integration tests.
+See `test-integration.js` for PayFast integration smoke tests. `tests/payment.test.js` covers the legacy Yoco payment service.
 
 ---
 

@@ -152,12 +152,22 @@ export class PaymentModal {
 
   _inject() {
     const existing = document.getElementById('payment-modal-root');
-    if (existing) {
+    if (existing && existing.querySelector('.payment-overlay')) {
+      // Element exists and has template already injected
       this._root = existing;
       this._wireEvents();
       return;
     }
 
+    if (existing) {
+      // Element exists but is empty - inject template into it
+      existing.innerHTML = this._buildTemplate();
+      this._root = existing;
+      this._wireEvents();
+      return;
+    }
+
+    // No element exists - create and append
     const wrapper = document.createElement('div');
     wrapper.id = 'payment-modal-root';
     wrapper.innerHTML = this._buildTemplate();

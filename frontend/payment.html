@@ -12,9 +12,6 @@
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/app.css" />
   <link rel="stylesheet" href="css/payment.css" />
-
-  <script src="components/navbar.js" defer></script>
-  <script src="components/footer.js" defer></script>
 </head>
 
 <body class="app-layout">
@@ -31,9 +28,12 @@
           Pay your stokvel contributions securely. All transactions are tracked.
         </p>
       </hgroup>
-      <a href="payment-history.html" class="btn btn--outline btn--sm">
-        View Payment History →
-      </a>
+      <div class="page-header__actions" style="display: flex; gap: var(--space-2);">
+        <button id="make-payment-btn" class="btn btn--primary btn--sm">💳 Make a Payment</button>
+        <a href="payment-history.html" class="btn btn--outline btn--sm">
+          View Payment History →
+        </a>
+      </div>
     </header>
 
     <!-- ── Global alert ─────────────────────────────── -->
@@ -131,6 +131,13 @@
   <div id="payment-modal-root"></div>
 
   <footer id="footer-root"></footer>
+
+  <!-- Firebase compat SDK for navbar auth state -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="js/firebase-compat-init.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
 
   <script type="module" src="js/payment.js"></script>
 

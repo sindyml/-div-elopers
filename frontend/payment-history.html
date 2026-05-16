@@ -12,9 +12,6 @@
   <link rel="stylesheet" href="css/theme.css" />
   <link rel="stylesheet" href="css/app.css" />
   <link rel="stylesheet" href="css/payment.css" />
-
-  <script src="components/navbar.js" defer></script>
-  <script src="components/footer.js" defer></script>
 </head>
 
 <body class="app-layout">
@@ -29,7 +26,7 @@
         <h1 class="page-header__title">🧾 Payment History</h1>
         <p class="page-header__sub">A full record of your stokvel payment transactions.</p>
       </hgroup>
-      <a href="payment.html" class="btn btn--primary btn--sm">+ Make a Payment</a>
+      <button id="make-payment-btn" class="btn btn--primary btn--sm">+ Make a Payment</button>
     </header>
 
     <!-- ── Global error ─────────────────────────────── -->
@@ -121,6 +118,13 @@
   </main>
 
   <footer id="footer-root"></footer>
+
+  <!-- Firebase compat SDK for navbar auth state -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="js/firebase-compat-init.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
 
   <script type="module" src="js/payment-history.js"></script>
 

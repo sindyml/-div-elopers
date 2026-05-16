@@ -86,10 +86,14 @@
     </div>
 
     <div id="action-buttons" style="display: none;">
-      <a href="/frontend/dashboard.html" class="btn">Go to Dashboard</a>
-      <a href="/frontend/payment.html" class="btn btn-secondary">View Payment History</a>
+      <a href="/dashboard.html" class="btn">Go to Dashboard</a>
+      <a href="/payment.html" class="btn btn-secondary">View Payment History</a>
     </div>
   </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="js/firebase-compat-init.js"></script>
 
   <script type="module">
     // Get payment ID from URL
@@ -103,11 +107,45 @@
     const message = document.querySelector('.payment-return-message');
     const spinner = document.querySelector('.spinner');
 
+    function setStatusParagraphs(lines) {
+      statusMessage.replaceChildren();
+      lines.forEach((line) => {
+        const p = document.createElement('p');
+        p.textContent = line;
+        statusMessage.appendChild(p);
+      });
+    }
+
+    async function getAuthToken() {
+      for (let i = 0; i < 20; i++) {
+        if (window.firebase?.auth) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      if (!window.firebase?.auth) {
+        throw new Error('Authentication is temporarily unavailable');
+      }
+
+      const auth = window.firebase.auth();
+      const user = await new Promise((resolve) => {
+        const unsubscribe = auth.onAuthStateChanged((nextUser) => {
+          unsubscribe();
+          resolve(nextUser);
+        });
+      });
+
+      if (!user) {
+        throw new Error('Please sign in to verify this payment.');
+      }
+
+      return user.getIdToken();
+    }
+
     if (!paymentId) {
       icon.textContent = '❌';
       title.textContent = 'No Payment Found';
       message.textContent = 'Could not find payment information.';
-      statusMessage.innerHTML = '<p>Please contact support if you made a payment.</p>';
+      setStatusParagraphs(['Please contact support if you made a payment.']);
       spinner.style.display = 'none';
       actionButtons.style.display = 'block';
     } else {
@@ -117,7 +155,12 @@
 
       async function checkPaymentStatus() {
         try {
-          const response = await fetch(`/api/payments/status/${paymentId}`);
+          const token = await getAuthToken();
+          const response = await fetch(`/api/payments/status/${paymentId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
 
           if (!response.ok) {
             throw new Error('Failed to check payment status');
@@ -130,11 +173,11 @@
             icon.textContent = '✅';
             title.textContent = 'Payment Successful!';
             message.textContent = 'Your payment has been confirmed.';
-            statusMessage.innerHTML = `
-              <p><strong>Payment ID:</strong> ${data.paymentId}</p>
-              <p><strong>Amount:</strong> R ${data.amount.toFixed(2)}</p>
-              <p><strong>Status:</strong> Completed</p>
-            `;
+            setStatusParagraphs([
+              `Payment ID: ${data.paymentId}`,
+              `Amount: R ${Number(data.amount || 0).toFixed(2)}`,
+              'Status: Completed'
+            ]);
             spinner.style.display = 'none';
             actionButtons.style.display = 'block';
             localStorage.removeItem('pendingPaymentId');
@@ -143,10 +186,10 @@
             icon.textContent = '❌';
             title.textContent = 'Payment Failed';
             message.textContent = 'Your payment was not successful.';
-            statusMessage.innerHTML = `
-              <p><strong>Status:</strong> ${data.status}</p>
-              <p>Please try again or contact support.</p>
-            `;
+            setStatusParagraphs([
+              `Status: ${data.status}`,
+              'Please try again or contact support.'
+            ]);
             spinner.style.display = 'none';
             actionButtons.style.display = 'block';
             localStorage.removeItem('pendingPaymentId');
@@ -154,17 +197,17 @@
             // Still pending
             pollCount++;
             if (pollCount < maxPolls) {
-              statusMessage.innerHTML = `<p>Payment pending... (${pollCount}/${maxPolls})</p>`;
+              setStatusParagraphs([`Payment pending... (${pollCount}/${maxPolls})`]);
               setTimeout(checkPaymentStatus, 2000);
             } else {
               // Timeout
               icon.textContent = '⚠️';
               title.textContent = 'Payment Verification Timeout';
               message.textContent = 'We are still processing your payment.';
-              statusMessage.innerHTML = `
-                <p>Your payment may take a few minutes to process.</p>
-                <p>Please check your payment history in a few minutes.</p>
-              `;
+              setStatusParagraphs([
+                'Your payment may take a few minutes to process.',
+                'Please check your payment history in a few minutes.'
+              ]);
               spinner.style.display = 'none';
               actionButtons.style.display = 'block';
             }
@@ -178,7 +221,7 @@
             icon.textContent = '⚠️';
             title.textContent = 'Connection Error';
             message.textContent = 'Could not verify payment status.';
-            statusMessage.innerHTML = '<p>Please check your payment history or contact support.</p>';
+            setStatusParagraphs(['Please check your payment history or contact support.']);
             spinner.style.display = 'none';
             actionButtons.style.display = 'block';
           }

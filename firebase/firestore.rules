@@ -224,8 +224,15 @@ service cloud.firestore {
       // Only the system can manage payment queues
       allow write: if false;
     }
+
+    // Notifications collection
+    match /notifications/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create, update, delete: if false;
+    }
   }
 }
+<<<<<<< HEAD:firestore.rules
 
 // Payouts collection
 match /payouts/{payoutId} {
@@ -233,3 +240,5 @@ match /payouts/{payoutId} {
   allow write: if request.auth != null && 
     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Treasurer', 'Admin']);
 }
+=======
+>>>>>>> origin/main:firebase/firestore.rules

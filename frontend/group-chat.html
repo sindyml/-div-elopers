@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StokPal — Group Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/chat.css">
+</head>
+<body class="app-layout">
+
+  <header id="navbar-root"></header>
+
+  <main class="app-main" style="max-width: 1400px; margin: 0 auto; padding: var(--space-6) var(--space-4);">
+    <div class="chat-layout" style="display: flex; gap: 24px; min-height: 70vh;">
+
+      <!-- SIDEBAR (group list) -->
+      <aside class="chat-sidebar" id="chat-sidebar">
+        <div class="chat-sidebar__header">
+          <h2 class="chat-sidebar__title">💬 Groups</h2>
+          <button class="chat-sidebar__close" id="sidebar-close" aria-label="Close sidebar">✕</button>
+        </div>
+        <div class="chat-sidebar__search">
+          <input type="text" id="group-search" placeholder="Search groups..." class="form-input" />
+        </div>
+        <ul id="chat-group-list" class="chat-group-list"></ul>
+      </aside>
+
+      <!-- MAIN CHAT AREA -->
+      <div class="chat-main">
+        <!-- Empty state (no group selected) -->
+        <div id="chat-empty" class="chat-empty">
+          <div class="chat-empty__icon">💬</div>
+          <p class="chat-empty__title">No chat selected</p>
+          <p class="chat-empty__sub">Choose a group from the sidebar to start messaging.</p>
+          <button id="open-sidebar-btn" class="btn btn--primary">Show groups</button>
+        </div>
+
+        <!-- Active chat view -->
+        <div id="chat-view" class="chat-view" hidden>
+          <header class="chat-header">
+            <button id="chat-back-btn" class="chat-back-btn" aria-label="Back to groups">←</button>
+            <div class="chat-header__info">
+              <div class="chat-header__avatar" id="chat-group-avatar">S</div>
+              <div>
+                <h2 class="chat-header__name" id="chat-group-name">Group Name</h2>
+                <p class="chat-header__members" id="chat-member-count">— members</p>
+              </div>
+            </div>
+          </header>
+
+          <div id="chat-messages" class="chat-messages"></div>
+
+          <form id="chat-composer" class="chat-composer">
+            <textarea id="chat-input" class="chat-input" placeholder="Type a message..." rows="1"></textarea>
+            <button type="submit" id="chat-send-btn" class="chat-send-btn" disabled>Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast-root"></div>
+  <footer id="footer-root"></footer>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <script src="js/firebase-compat-init.js"></script>
+  <script src="components/navbar.js"></script>
+  <script src="components/footer.js"></script>
+
+  <script type="module" src="js/group-chat.js"></script>
+</body>
+</html>

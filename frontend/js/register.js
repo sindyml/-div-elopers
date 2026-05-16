@@ -47,23 +47,17 @@ async function handleOAuthSignIn(provider, providerName) {
         }
       }
       
-      const role = prompt("Select your role: Member, Treasurer, or Admin");
-      
-      if (role && ["Member", "Treasurer", "Admin"].includes(role)) {
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          displayName: displayName,
-          role: role,
-          provider: providerName,
-          createdAt: new Date().toISOString()
-        });
-        alert("Account created successfully!");
-        window.location.href = "dashboard.html";
-      } else {
-        await user.delete();
-        alert("Invalid role selection. Registration cancelled.");
-        return;
-      }
+      // Always assign 'Member' role for new OAuth registrations (security fix)
+      // Admins can upgrade roles later through admin panel
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        displayName: displayName,
+        role: 'Member',
+        provider: providerName,
+        createdAt: new Date().toISOString()
+      });
+      alert("Account created successfully!");
+      window.location.href = "dashboard.html";
     } else {
       // RETURNING USER: Just welcome them back and redirect
       alert("Welcome back!");

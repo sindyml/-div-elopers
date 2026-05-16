@@ -1,0 +1,430 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap');
+
+  .cb-wrap {
+    font-family: 'DM Sans', var(--font-sans), sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 1rem 0 2rem;
+  }
+
+  .cb-shell {
+    background: var(--color-background-primary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 520px;
+  }
+
+  .cb-header {
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--color-background-secondary);
+  }
+
+  .cb-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1D9E75;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .cb-avatar svg {
+    width: 18px;
+    height: 18px;
+    fill: #fff;
+  }
+
+  .cb-header-text h2 {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+    color: var(--color-text-primary);
+  }
+
+  .cb-header-text p {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .cb-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #1D9E75;
+    display: inline-block;
+  }
+
+  .cb-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  .cb-messages::-webkit-scrollbar { width: 4px; }
+  .cb-messages::-webkit-scrollbar-thumb { background: var(--color-border-tertiary); border-radius: 4px; }
+
+  .cb-msg {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    animation: msgIn 0.2s ease;
+  }
+
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cb-msg--bot { flex-direction: row; }
+  .cb-msg--user { flex-direction: row-reverse; }
+
+  .cb-msg-bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--color-text-primary);
+  }
+
+  .cb-msg--bot .cb-msg-bubble {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-bottom-left-radius: 4px;
+  }
+
+  .cb-msg--user .cb-msg-bubble {
+    background: #0F6E56;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .cb-msg-micro {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #E1F5EE;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: #0F6E56;
+    font-weight: 500;
+  }
+
+  .cb-msg--user .cb-msg-micro {
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+  }
+
+  .cb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .cb-chip {
+    font-size: 12px;
+    padding: 5px 11px;
+    border-radius: 99px;
+    border: 0.5px solid var(--color-border-secondary);
+    background: var(--color-background-primary);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+
+  .cb-chip:hover {
+    background: #E1F5EE;
+    color: #0F6E56;
+    border-color: #5DCAA5;
+  }
+
+  .cb-thinking {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--color-background-secondary);
+    border: 0.5px solid var(--color-border-tertiary);
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+
+  .cb-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #5DCAA5;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  .cb-dot:nth-child(2) { animation-delay: 0.2s; }
+  .cb-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.1); }
+  }
+
+  .cb-footer {
+    border-top: 0.5px solid var(--color-border-tertiary);
+    padding: 12px 14px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    background: var(--color-background-primary);
+  }
+
+  .cb-input {
+    flex: 1;
+    resize: none;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 13.5px;
+    font-family: inherit;
+    background: var(--color-background-secondary);
+    color: var(--color-text-primary);
+    outline: none;
+    line-height: 1.5;
+    max-height: 80px;
+    overflow-y: auto;
+    transition: border-color 0.15s;
+  }
+
+  .cb-input:focus { border-color: #5DCAA5; }
+  .cb-input::placeholder { color: var(--color-text-tertiary); }
+
+  .cb-send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #1D9E75;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  .cb-send:hover { background: #0F6E56; }
+  .cb-send:active { transform: scale(0.93); }
+  .cb-send:disabled { background: var(--color-border-tertiary); cursor: not-allowed; }
+
+  .cb-send svg { width: 16px; height: 16px; fill: #fff; }
+
+  .cb-disclaimer {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    text-align: center;
+    margin-top: 10px;
+  }
+</style>
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Stokvel AI assistant chatbot widget</h2>
+
+<div class="cb-wrap">
+  <div class="cb-shell">
+    <div class="cb-header">
+      <div class="cb-avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+        </svg>
+      </div>
+      <div class="cb-header-text">
+        <h2>Stokvel Assistant</h2>
+        <p><span class="cb-status-dot"></span> Online · Ready to help</p>
+      </div>
+    </div>
+
+    <div class="cb-messages" id="cb-messages" role="log" aria-live="polite" aria-label="Chat messages">
+      <div class="cb-msg cb-msg--bot">
+        <div class="cb-msg-micro" aria-hidden="true">S</div>
+        <div>
+          <div class="cb-msg-bubble">
+            Sawubona! I'm your Stokvel Assistant. I can help you with contributions, payouts, meeting schedules, group management, and invites. What would you like to know?
+          </div>
+          <div class="cb-chips" id="cb-starter-chips">
+            <button class="cb-chip" data-q="How do I check my contribution balance?">My balance</button>
+            <button class="cb-chip" data-q="When is the next payout?">Next payout</button>
+            <button class="cb-chip" data-q="How do I invite a member to my group?">Invite a member</button>
+            <button class="cb-chip" data-q="How do meetings work?">Meetings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cb-footer">
+      <textarea
+        class="cb-input"
+        id="cb-input"
+        placeholder="Ask about contributions, payouts, meetings…"
+        rows="1"
+        aria-label="Type your message"
+      ></textarea>
+      <button class="cb-send" id="cb-send" aria-label="Send message">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <p class="cb-disclaimer">Powered by Claude · Responses are for guidance only</p>
+</div>
+
+<script>
+const messagesEl = document.getElementById('cb-messages');
+const inputEl = document.getElementById('cb-input');
+const sendBtn = document.getElementById('cb-send');
+
+const SYSTEM = `You are a friendly, knowledgeable assistant built into a South African stokvel management app. A stokvel is a rotating savings group where members contribute regularly and take turns receiving the full pool (called a payout).
+
+The app has these features:
+- Groups: users can belong to multiple stokvel groups with roles (admin or member)
+- Contributions: members record and track their monthly/periodic contributions
+- Payouts: a scheduled rotation where each member receives the group pot on their turn
+- Meetings: group meetings can be scheduled with date, time, location, and agenda
+- Invites: admins can invite people to groups by email; invitees get a notification and can accept/decline
+- Notifications: in-app notifications for invites, payouts, contributions, meetings, and admin announcements
+- Group chat: a real-time group chat is accessible from the dashboard
+
+Be warm, concise, and practical. Use South African context naturally. Answer in 2–4 sentences unless more detail is clearly needed. If a question is outside the app's scope, gently redirect.`;
+
+const history = [];
+let busy = false;
+
+function appendMsg(role, text) {
+  const wrap = document.createElement('div');
+  wrap.className = `cb-msg cb-msg--${role === 'user' ? 'user' : 'bot'}`;
+
+  const micro = document.createElement('div');
+  micro.className = 'cb-msg-micro';
+  micro.setAttribute('aria-hidden', 'true');
+  micro.textContent = role === 'user' ? 'U' : 'S';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'cb-msg-bubble';
+  bubble.textContent = text;
+
+  wrap.appendChild(micro);
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return wrap;
+}
+
+function showThinking() {
+  const wrap = document.createElement('div');
+  wrap.className = 'cb-msg cb-msg--bot';
+  wrap.id = 'cb-thinking-wrap';
+
+  const micro = document.createElement('div');
+  micro.className = 'cb-msg-micro';
+  micro.setAttribute('aria-hidden', 'true');
+  micro.textContent = 'S';
+
+  const dots = document.createElement('div');
+  dots.className = 'cb-thinking';
+  dots.setAttribute('aria-label', 'Thinking…');
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'cb-dot';
+    dots.appendChild(d);
+  }
+
+  wrap.appendChild(micro);
+  wrap.appendChild(dots);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('cb-thinking-wrap');
+  if (el) el.remove();
+}
+
+async function sendMessage(text) {
+  if (!text.trim() || busy) return;
+  busy = true;
+  sendBtn.disabled = true;
+
+  const chips = document.getElementById('cb-starter-chips');
+  if (chips) chips.remove();
+
+  appendMsg('user', text);
+  history.push({ role: 'user', content: text });
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  showThinking();
+
+  try {
+    const res = await fetch(window.CHAT_PROXY_URL || 'http://localhost:3001/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM,
+        messages: history
+      })
+    });
+    const data = await res.json();
+    const reply = data?.content?.map(b => b.text || '').join('') || 'Sorry, I could not get a response. Please try again.';
+    removeThinking();
+    appendMsg('bot', reply);
+    history.push({ role: 'assistant', content: reply });
+  } catch (err) {
+    removeThinking();
+    appendMsg('bot', 'Something went wrong. Please check your connection and try again.');
+  } finally {
+    busy = false;
+    sendBtn.disabled = false;
+  }
+}
+
+sendBtn.addEventListener('click', () => sendMessage(inputEl.value));
+
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage(inputEl.value);
+  }
+});
+
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 80) + 'px';
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('cb-chip')) {
+    sendMessage(e.target.dataset.q);
+  }
+});
+</script>
