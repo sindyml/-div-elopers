@@ -178,9 +178,14 @@
         const { handleGroupCreation } = await import('./js/onGroupCreate.js');
         await handleGroupCreation(groupRef.id);
         // ============================================================
+        //redirects user to dashboard upon successfully creating a group
+        showMsg('Group created successfully! Redirecting...', 'success');
 
-        showMsg('Group created successfully!', 'success');
         form.reset();
+
+        setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
       } catch (err) {
         console.error(err);
         showMsg('Error: ' + err.message, 'error');
