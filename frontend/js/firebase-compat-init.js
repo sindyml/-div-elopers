@@ -17,7 +17,8 @@
     return;
   }
 
-  fetch('/api/getFirebaseConfig')
+  // FETCH FROM RENDER BACKEND - NOT RELATIVE PATH
+  fetch('https://div-elopers.onrender.com/api/getFirebaseConfig')
     .then((res) => {
       if (!res.ok) {
         throw new Error('Firebase config request failed');
