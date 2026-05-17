@@ -18,21 +18,22 @@ import {
   onSnapshot,
   getDocs,
   addDoc,
-  serverTimestamp,
+  doc,
   updateDoc,
-  doc
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { COLLECTIONS, ROLES } from "./constants.js";
 
 /* ══════════════════════════════════════════════════════════
    MODULE-LEVEL STATE
    ══════════════════════════════════════════════════════════ */
-let selectedGroupId    = null;
-let allGroupIds        = [];        // ← tracks every group the user belongs to
-let userRole           = null;
-let currentUser        = null;
-let unsubMeetings      = null;
-let unsubContributions = null;
+let selectedGroupId       = null;
+let allGroupIds           = [];
+let userRole              = null;
+let currentUser           = null;
+let unsubMeetings         = null;
+let unsubContributions    = null;
+let unsubMeetingRequests  = null;   // ← new: listener for meetingRequests
 
 /* ══════════════════════════════════════════════════════════
    DOM REFERENCES
@@ -66,7 +67,6 @@ function showToast({ type = 'info', title = '', message = '', duration = 4000 })
       ${message ? `<p class="toast__msg">${message}</p>` : ''}
     </div>`;
   root.appendChild(toast);
-
   const dismiss = () => {
     toast.classList.add('toast--exit');
     toast.addEventListener('animationend', () => toast.remove(), { once: true });
@@ -353,6 +353,224 @@ async function showInviteBanners(user) {
 }
 
 /* ══════════════════════════════════════════════════════════
+   MEETING REQUESTS WIDGET  (Admin / Treasurer only)
+
+   Mounts into a container element with id="meeting-requests-widget-root"
+   on the dashboard. Called from mountDashboardWidgets() below only when
+   the user's role is Admin or Treasurer.
+
+   Uses an onSnapshot query on meetingRequests where:
+     groupId  == selectedGroupId   (scoped to current group)
+     status   == 'pending'         (only unactioned requests)
+
+   Each request card shows:
+     • requesterName  — the member's name written at creation time
+     • reason         — the member's free-text reason for the request
+     • createdAt      — formatted relative timestamp
+
+   The admin can Accept or Decline directly from the dashboard card.
+   On action:
+     • status        → 'accepted' | 'rejected'
+     • actionedBy    → currentUser.uid
+     • actionedAt    → serverTimestamp()
+     • memberNotified → false  (reset so member sees outcome banner)
+
+   The onSnapshot 'removed' event cleans up the card automatically
+   because the query filters status == 'pending'.
+   ══════════════════════════════════════════════════════════ */
+export function mountMeetingRequestsWidget(container, groupId, role) {
+  if (!container) return;
+  if (role !== ROLES.ADMIN && role !== ROLES.TREASURER) {
+    container.hidden = true;
+    return;
+  }
+
+  container.hidden = false;
+
+  // Build the widget shell
+  container.innerHTML = `
+    <section class="dashboard-card meeting-requests-widget" aria-labelledby="mr-widget-heading">
+      <header class="meeting-requests-widget__header">
+        <h3 id="mr-widget-heading" class="meeting-requests-widget__title">
+          🗓 Meeting Requests
+        </h3>
+        <output
+          id="mr-widget-badge"
+          class="meeting-requests-widget__badge"
+          aria-label="Pending meeting requests"
+          hidden
+        ></output>
+      </header>
+      <p id="mr-widget-empty" class="meeting-requests-widget__empty">
+        No pending meeting requests.
+      </p>
+      <ul
+        id="mr-widget-list"
+        class="meeting-requests-widget__list"
+        aria-live="polite"
+        aria-relevant="additions removals"
+      ></ul>
+    </section>`;
+
+  const listEl  = container.querySelector('#mr-widget-list');
+  const emptyEl = container.querySelector('#mr-widget-empty');
+  const badgeEl = container.querySelector('#mr-widget-badge');
+
+  /* ── Helper: sync count badge + empty state ── */
+  function syncUI() {
+    const count = listEl.querySelectorAll('li').length;
+    if (count > 0) {
+      badgeEl.textContent = String(count);
+      badgeEl.hidden      = false;
+      emptyEl.hidden      = true;
+    } else {
+      badgeEl.hidden  = true;
+      emptyEl.hidden  = false;
+    }
+  }
+
+  /* ── Helper: build one request card as <li> ── */
+  function buildRequestCard(request) {
+    const li = document.createElement('li');
+    li.className         = 'mr-widget-item';
+    li.dataset.requestId = request.id;
+
+    // Timestamp
+    let tsText = '';
+    if (request.createdAt?.toDate) {
+      tsText = timeAgo(request.createdAt.toDate());
+    }
+
+    // Header row — member name + timestamp
+    const cardHeader = document.createElement('header');
+    cardHeader.className = 'mr-widget-item__header';
+
+    const nameEl = document.createElement('p');
+    nameEl.className   = 'mr-widget-item__name';
+    nameEl.textContent = request.requesterName || 'A group member';
+
+    const tsEl = document.createElement('time');
+    tsEl.className = 'mr-widget-item__time';
+    if (request.createdAt?.toDate) {
+      tsEl.dateTime    = request.createdAt.toDate().toISOString();
+      tsEl.textContent = tsText;
+    }
+
+    cardHeader.appendChild(nameEl);
+    cardHeader.appendChild(tsEl);
+
+    // Reason block
+    const reasonEl = document.createElement('p');
+    reasonEl.className   = 'mr-widget-item__reason';
+    reasonEl.textContent = request.reason || '(No reason provided)';
+
+    // Action buttons
+    const actions = document.createElement('menu');
+    actions.className = 'mr-widget-item__actions';
+
+    const acceptLi  = document.createElement('li');
+    const acceptBtn = document.createElement('button');
+    acceptBtn.type        = 'button';
+    acceptBtn.className   = 'mr-widget-item__btn mr-widget-item__btn--accept';
+    acceptBtn.textContent = 'Accept';
+    acceptBtn.setAttribute('aria-label',
+      `Accept meeting request from ${request.requesterName || 'member'}`);
+
+    const declineLi  = document.createElement('li');
+    const declineBtn = document.createElement('button');
+    declineBtn.type        = 'button';
+    declineBtn.className   = 'mr-widget-item__btn mr-widget-item__btn--decline';
+    declineBtn.textContent = 'Decline';
+    declineBtn.setAttribute('aria-label',
+      `Decline meeting request from ${request.requesterName || 'member'}`);
+
+    // Accept handler
+    acceptBtn.addEventListener('click', async () => {
+      [acceptBtn, declineBtn].forEach(b => { b.disabled = true; });
+      try {
+        await updateDoc(doc(db, 'meetingRequests', request.id), {
+          status:         'accepted',
+          actionedBy:     currentUser.uid,
+          actionedAt:     serverTimestamp(),
+          memberNotified: false,
+        });
+        showToast({
+          type:    'success',
+          title:   'Request accepted',
+          message: `${request.requesterName || 'Member'}'s meeting request has been accepted.`,
+        });
+        // Card removed automatically by onSnapshot 'removed' event
+      } catch (err) {
+        console.error('[MR Widget] Accept failed:', err);
+        showToast({ type: 'error', title: 'Failed to accept', message: err.message });
+        [acceptBtn, declineBtn].forEach(b => { b.disabled = false; });
+      }
+    });
+
+    // Decline handler
+    declineBtn.addEventListener('click', async () => {
+      [acceptBtn, declineBtn].forEach(b => { b.disabled = true; });
+      try {
+        await updateDoc(doc(db, 'meetingRequests', request.id), {
+          status:         'rejected',
+          actionedBy:     currentUser.uid,
+          actionedAt:     serverTimestamp(),
+          memberNotified: false,
+        });
+        showToast({
+          type:    'warning',
+          title:   'Request declined',
+          message: `${request.requesterName || 'Member'}'s meeting request has been declined.`,
+        });
+      } catch (err) {
+        console.error('[MR Widget] Decline failed:', err);
+        showToast({ type: 'error', title: 'Failed to decline', message: err.message });
+        [acceptBtn, declineBtn].forEach(b => { b.disabled = false; });
+      }
+    });
+
+    acceptLi.appendChild(acceptBtn);
+    declineLi.appendChild(declineBtn);
+    actions.appendChild(acceptLi);
+    actions.appendChild(declineLi);
+
+    li.appendChild(cardHeader);
+    li.appendChild(reasonEl);
+    li.appendChild(actions);
+    return li;
+  }
+
+  /* ── Real-time listener ── */
+  if (unsubMeetingRequests) unsubMeetingRequests();
+
+  const q = query(
+    collection(db, 'meetingRequests'),
+    where('groupId', '==', groupId),
+    where('status',  '==', 'pending'),
+    orderBy('createdAt', 'asc')
+  );
+
+  unsubMeetingRequests = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      const request = { id: change.doc.id, ...change.doc.data() };
+
+      if (change.type === 'added') {
+        listEl.appendChild(buildRequestCard(request));
+      }
+
+      if (change.type === 'removed') {
+        listEl.querySelector(`[data-request-id="${request.id}"]`)?.remove();
+      }
+    });
+    syncUI();
+  }, (err) => {
+    console.error('[MR Widget] Listener error:', err);
+  });
+
+  return () => { if (unsubMeetingRequests) unsubMeetingRequests(); };
+}
+
+/* ══════════════════════════════════════════════════════════
    MEMBERS LOADER
    ══════════════════════════════════════════════════════════ */
 async function loadMembers(groupId, groupName) {
@@ -460,6 +678,10 @@ async function loadGroups(uid) {
 
       startMeetingListener([group.id]);
       await loadPayoutWidget(uid, [group.id]);
+
+      // Re-mount the meeting requests widget for the newly selected group
+      const mrContainer = el('meeting-requests-widget-root');
+      if (mrContainer) mountMeetingRequestsWidget(mrContainer, group.id, userRole);
     };
 
     li.appendChild(button);
@@ -726,11 +948,8 @@ async function loadPayoutWidget(uid, groupIds) {
 
 /* ══════════════════════════════════════════════════════════
    CHAT BOT UI  — Gemini Agent version
-   Passes groupId, uid, and groupIds to the server so the
-   agent can call Firestore tools with the right context.
    ══════════════════════════════════════════════════════════ */
 export function mountChatWidget() {
-  // Inject styles
   if (!document.getElementById('chat-widget-styles')) {
     const style = document.createElement('style');
     style.id = 'chat-widget-styles';
@@ -752,7 +971,6 @@ export function mountChatWidget() {
         line-height: 1; padding: 2px 5px; border-radius: 999px; display: none;
       }
       .chat-fab__badge--show { display: block; }
-
       .chat-panel {
         position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 999;
         width: min(420px, calc(100vw - 2rem));
@@ -765,7 +983,6 @@ export function mountChatWidget() {
         transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease;
       }
       .chat-panel--open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-
       .chat-panel__header {
         display: flex; align-items: center; gap: 0.65rem; padding: 0.9rem 1rem;
         background: var(--color-primary, #16a34a); color: #fff; flex-shrink: 0;
@@ -788,7 +1005,6 @@ export function mountChatWidget() {
         opacity: 0.8; transition: opacity 0.15s; flex-shrink: 0;
       }
       .chat-panel__close:hover { opacity: 1; }
-
       .chat-panel__messages {
         flex: 1; overflow-y: auto; padding: 1rem;
         display: flex; flex-direction: column; gap: 0.65rem;
@@ -797,7 +1013,6 @@ export function mountChatWidget() {
       .chat-panel__messages::-webkit-scrollbar { width: 4px; }
       .chat-panel__messages::-webkit-scrollbar-track { background: transparent; }
       .chat-panel__messages::-webkit-scrollbar-thumb { background: var(--color-border, #d1d5db); border-radius: 4px; }
-
       .chat-msg { display: flex; gap: 0.5rem; align-items: flex-end; animation: chat-msg-in 0.2s ease both; }
       @keyframes chat-msg-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
       .chat-msg--user { flex-direction: row-reverse; }
@@ -805,14 +1020,8 @@ export function mountChatWidget() {
         max-width: 78%; padding: 0.6rem 0.85rem; border-radius: 1rem;
         font-size: 0.875rem; line-height: 1.5; word-break: break-word;
       }
-      .chat-msg--bot  .chat-msg__bubble {
-        background: var(--color-surface-2, #f3f4f6); color: var(--color-text, #111827);
-        border-bottom-left-radius: 0.25rem;
-      }
-      .chat-msg--user .chat-msg__bubble {
-        background: var(--color-primary, #16a34a); color: #fff;
-        border-bottom-right-radius: 0.25rem;
-      }
+      .chat-msg--bot  .chat-msg__bubble { background: var(--color-surface-2, #f3f4f6); color: var(--color-text, #111827); border-bottom-left-radius: 0.25rem; }
+      .chat-msg--user .chat-msg__bubble { background: var(--color-primary, #16a34a); color: #fff; border-bottom-right-radius: 0.25rem; }
       .chat-msg__avatar {
         width: 1.75rem; height: 1.75rem; border-radius: 50%;
         background: var(--color-primary, #16a34a); color: #fff;
@@ -821,16 +1030,10 @@ export function mountChatWidget() {
       }
       .chat-msg--user .chat-msg__avatar { background: var(--color-border, #d1d5db); color: var(--color-text-muted, #6b7280); }
       .chat-msg__time { font-size: 0.68rem; color: var(--color-text-muted, #9ca3af); text-align: right; margin-top: 0.15rem; }
-
-      /* Thinking indicator — shows while agent calls tools */
-      .chat-thinking {
-        display: flex; gap: 0.5rem; align-items: flex-end;
-      }
+      .chat-thinking { display: flex; gap: 0.5rem; align-items: flex-end; }
       .chat-thinking__bubble {
-        display: flex; flex-direction: column; gap: 4px;
-        padding: 0.65rem 0.85rem;
-        background: var(--color-surface-2, #f3f4f6);
-        border-radius: 1rem; border-bottom-left-radius: 0.25rem;
+        display: flex; flex-direction: column; gap: 4px; padding: 0.65rem 0.85rem;
+        background: var(--color-surface-2, #f3f4f6); border-radius: 1rem; border-bottom-left-radius: 0.25rem;
         font-size: 0.78rem; color: var(--color-text-muted, #6b7280);
       }
       .chat-thinking__dots { display: flex; gap: 4px; }
@@ -843,7 +1046,6 @@ export function mountChatWidget() {
       .chat-thinking__dot:nth-child(3) { animation-delay: 0.4s; }
       @keyframes typing-bounce { 0%,60%,100% { transform:translateY(0); } 30% { transform:translateY(-5px); } }
       .chat-thinking__label { font-size: 0.72rem; opacity: 0.75; }
-
       .chat-panel__footer {
         display: flex; gap: 0.5rem; padding: 0.75rem 1rem;
         border-top: 1px solid var(--color-border, #e5e7eb);
@@ -868,7 +1070,6 @@ export function mountChatWidget() {
       .chat-panel__send:hover    { background: var(--color-primary-dark, #15803d); }
       .chat-panel__send:active   { transform: scale(0.93); }
       .chat-panel__send:disabled { opacity: 0.5; cursor: not-allowed; }
-
       .chat-welcome {
         display: flex; flex-direction: column; align-items: center;
         justify-content: center; gap: 0.5rem; height: 100%;
@@ -884,7 +1085,6 @@ export function mountChatWidget() {
         padding: 0.35rem 0.75rem; font-size: 0.78rem; cursor: pointer; transition: background 0.15s;
       }
       .chat-welcome__chip:hover { background: var(--color-primary-light, #dcfce7); border-color: var(--color-primary, #16a34a); }
-
       @media (max-width: 480px) {
         .chat-panel { bottom: 0; right: 0; width: 100vw; height: 100dvh; border-radius: 0; }
         .chat-fab   { bottom: 1rem; right: 1rem; }
@@ -893,7 +1093,6 @@ export function mountChatWidget() {
     document.head.appendChild(style);
   }
 
-  // ── Build DOM ──────────────────────────────────────────
   const fab = document.createElement('button');
   fab.className = 'chat-fab';
   fab.setAttribute('aria-label', 'Open AI assistant');
@@ -943,7 +1142,6 @@ export function mountChatWidget() {
   document.body.appendChild(fab);
   document.body.appendChild(panel);
 
-  // ── References ─────────────────────────────────────────
   const messagesEl = panel.querySelector('#chat-messages');
   const inputEl    = panel.querySelector('#chat-input');
   const sendBtn    = panel.querySelector('#chat-send');
@@ -957,7 +1155,6 @@ export function mountChatWidget() {
 
   badgeEl.classList.add('chat-fab__badge--show');
 
-  // ── Open / close ───────────────────────────────────────
   function openPanel() {
     isOpen = true;
     panel.classList.add('chat-panel--open');
@@ -977,20 +1174,17 @@ export function mountChatWidget() {
   closeBtn.addEventListener('click', closePanel);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) closePanel(); });
 
-  // ── Scroll ─────────────────────────────────────────────
   function scrollToBottom(smooth = true) {
     requestAnimationFrame(() => {
       messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
     });
   }
 
-  // ── Auto-grow textarea ─────────────────────────────────
   inputEl.addEventListener('input', () => {
     inputEl.style.height = 'auto';
     inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
   });
 
-  // ── Render helpers ─────────────────────────────────────
   function nowLabel() {
     return new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
   }
@@ -1043,7 +1237,6 @@ export function mountChatWidget() {
     document.getElementById('chat-thinking-indicator')?.remove();
   }
 
-  // ── Send logic ─────────────────────────────────────────
   const CHAT_PROXY = '/api/chat';
 
   async function sendMessage(text) {
@@ -1069,8 +1262,6 @@ export function mountChatWidget() {
     ].join(' ');
 
     showThinking('Thinking…');
-
-    // Simulate label updates since we don't get streaming events from our proxy
     const thinkingTimer = setTimeout(() => updateThinkingLabel('Checking your data…'), 1500);
 
     try {
@@ -1080,7 +1271,6 @@ export function mountChatWidget() {
         body: JSON.stringify({
           system:   systemCtx,
           messages: chatHistory,
-          // ── Agent context — critical for tool execution ──
           groupId:  selectedGroupId,
           uid:      currentUser?.uid || null,
           groupIds: allGroupIds,
@@ -1092,13 +1282,9 @@ export function mountChatWidget() {
 
       if (!res.ok) {
         let friendlyMsg = 'Something went wrong. Please try again.';
-        if (res.status === 401 || res.status === 403) {
-          friendlyMsg = '🔑 Authentication error — the API key needs to be configured on the server.';
-        } else if (res.status === 429) {
-          friendlyMsg = '⏳ Too many requests — please wait a moment and try again.';
-        } else if (res.status >= 500) {
-          friendlyMsg = '🛠 The assistant server is having issues. Try again shortly.';
-        }
+        if (res.status === 401 || res.status === 403) friendlyMsg = '🔑 Authentication error — the API key needs to be configured on the server.';
+        else if (res.status === 429) friendlyMsg = '⏳ Too many requests — please wait a moment and try again.';
+        else if (res.status >= 500) friendlyMsg = '🛠 The assistant server is having issues. Try again shortly.';
         appendMessage('bot', friendlyMsg);
         chatHistory.pop();
       } else {
@@ -1117,24 +1303,18 @@ export function mountChatWidget() {
       chatHistory.pop();
       console.warn('[Agent Chat] Fetch failed:', err.message);
     } finally {
-      isStreaming       = false;
-      sendBtn.disabled  = false;
+      isStreaming      = false;
+      sendBtn.disabled = false;
       inputEl.focus();
     }
   }
 
-  // ── Event listeners ────────────────────────────────────
   sendBtn.addEventListener('click', () => sendMessage(inputEl.value));
-
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputEl.value); }
   });
-
   panel.querySelectorAll('.chat-welcome__chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const prompt = chip.dataset.prompt;
-      if (prompt) sendMessage(prompt);
-    });
+    chip.addEventListener('click', () => { if (chip.dataset.prompt) sendMessage(chip.dataset.prompt); });
   });
 }
 
@@ -1148,15 +1328,34 @@ auth.onAuthStateChanged(async (user) => {
   await showInviteBanners(user);
 
   const groupIds     = await loadGroups(user.uid);
-  allGroupIds        = groupIds;   // ← store for the agent
+  allGroupIds        = groupIds;
 
   const groupDetails = await Promise.all(groupIds.map(id => getGroupDetails(id)));
   const groupMap     = {};
   groupIds.forEach((id, i) => { if (groupDetails[i]) groupMap[id] = groupDetails[i].name; });
 
+  // Determine role for the first group (default selectedGroupId)
+  if (groupIds.length > 0) {
+    selectedGroupId = groupIds[0];
+    try {
+      userRole = await getUserRoleInGroup(selectedGroupId, user.uid);
+    } catch (_) { userRole = null; }
+  }
+
   startMeetingListener(groupIds);
   startContributionListener(user.uid, groupMap);
   await loadPayoutWidget(user.uid, groupIds);
+
+  /*
+    Mount the meeting requests widget if the user is Admin or Treasurer.
+    The container element must exist in dashboard.html:
+      <section id="meeting-requests-widget-root" hidden></section>
+    mountMeetingRequestsWidget() removes [hidden] for eligible roles.
+  */
+  const mrContainer = el('meeting-requests-widget-root');
+  if (mrContainer && selectedGroupId) {
+    mountMeetingRequestsWidget(mrContainer, selectedGroupId, userRole);
+  }
 
   mountChatWidget();
 });
