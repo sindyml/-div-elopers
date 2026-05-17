@@ -1,29 +1,3 @@
-Read [](file:///workspaces/-div-elopers/frontend/payment-return.html#100-100), lines 100 to 200
-
-Searched for text `payfast|Payment|payments/initiate|payments/status` (`**/frontend/js/*.js`), 50 results
-
-Read [](file:///workspaces/-div-elopers/backend)
-
-Read [](file:///workspaces/-div-elopers/backend/api)
-
-Read [](file:///workspaces/-div-elopers/backend/api/payments)
-
-Read [](file:///workspaces/-div-elopers/backend/api/payments/index.js#1-1), lines 1 to 260
-
-Read [](file:///workspaces/-div-elopers/backend/api/payments/index.js#260-260), lines 260 to 420
-
-Read [](file:///workspaces/-div-elopers/backend/api/payments/index.js#420-420), lines 420 to 510
-
-Searched for regex `initiatePayFastRedirect|make-payment-btn|POST /api/payments/initiate|payment-return.html|payment-cancel.html|payfast` (`**/frontend/**/*.{js,html}`), 34 results
-
-Read [](file:///workspaces/-div-elopers/frontend/components/payment-modal.js#700-700), lines 700 to 840
-
-Read [](file:///workspaces/-div-elopers/backend/services/payfastService.js#1-1), lines 1 to 260
-
-Read [](file:///workspaces/-div-elopers/backend/services/payfastService.js#260-260), lines 260 to 298
-
-Read [](file:///workspaces/-div-elopers/.env.example)
-
 ## Payment Gateway Implementation Breakdown
 
 ### 1. Frontend
