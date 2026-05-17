@@ -10,7 +10,8 @@ if (!response.ok) {
     throw new Error(`Firebase configuration is not available (HTTP ${response.status})`);
 }
 
-const firebaseConfig = await response.json();
+// Replace the existing fetch line with:
+const response = await fetch('https://div-elopers.onrender.com/api/getFirebaseConfig');
 const app = initializeApp(firebaseConfig);
 
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
