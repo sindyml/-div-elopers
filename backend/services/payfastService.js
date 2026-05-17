@@ -35,33 +35,26 @@ class PayFastService {
    */
   generateSignature(data, passphrase = null) {
     const pfPassphrase = passphrase || this.passphrase;
-
-    // Create parameter string
+    
+    // Sort the array alphabetically by key
+    const sortedKeys = Object.keys(data).sort();
     let pfParamString = '';
 
-    // PayFast requires parameters to be in the order they are sent,
-    // but the API documentation often implies alphabetical sorting for some integrations.
-    // Standard PayFast HTML redirect signature requires the exact order of fields.
-    // However, common Node.js implementations sort them to ensure consistency.
-    const keys = Object.keys(data).sort();
-
-    for (const key of keys) {
-      if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
-        pfParamString += `${key}=${encodeURIComponent(data[key].toString().trim()).replace(/%20/g, '+')}&`;
-      }
+    for (const key of sortedKeys) {
+        if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+            const value = data[key].toString().trim();
+            pfParamString += `${key}=${encodeURIComponent(value).replace(/%20/g, '+')}&`;
+        }
     }
 
-    // Remove last ampersand
     pfParamString = pfParamString.slice(0, -1);
 
-    // Add passphrase if provided
     if (pfPassphrase) {
-      pfParamString += `&passphrase=${encodeURIComponent(pfPassphrase.trim()).replace(/%20/g, '+')}`;
+        pfParamString += `&passphrase=${encodeURIComponent(pfPassphrase.trim()).replace(/%20/g, '+')}`;
     }
 
-    // Generate MD5 hash
     return crypto.createHash('md5').update(pfParamString).digest('hex');
-  }
+}
 
   /**
    * Generate PayFast payment data for a transaction
