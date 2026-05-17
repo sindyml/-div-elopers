@@ -479,6 +479,8 @@ async function handleRequest(req, res) {
     req.params = { userId: historyMatch[1] };
   }
 
+  console.log(`[Payment API] Request details: method=${method}, url=${url}, params=${JSON.stringify(req.params)}`);
+
   // Parse query parameters
   if (req.url.includes('?')) {
     const urlObj = new URL(req.url, `http://${req.headers.host}`);
