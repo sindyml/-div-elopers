@@ -5,14 +5,17 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
-// Fetch from Render backend - NOT localhost
-const response = await fetch('https://div-elopers.onrender.com/api/getFirebaseConfig');
-
-if (!response.ok) {
-    throw new Error(`Firebase configuration is not available (HTTP ${response.status})`);
-}
-
-const firebaseConfig = await response.json();
+// Use direct config (hardcoded for static Firebase Hosting)
+const firebaseConfig = {
+  apiKey: "AIzaSyBPhe_IXilwwYXnWwOEm80dho7laI6LGTw",
+  authDomain: "stokvel-database.firebaseapp.com",
+  databaseURL: "https://stokvel-database-default-rtdb.firebaseio.com",
+  projectId: "stokvel-database",
+  storageBucket: "stokvel-database.firebasestorage.app",
+  messagingSenderId: "997328421094",
+  appId: "1:997328421094:web:9f88bf8ac720b118d97b27",
+  measurementId: "G-2D5G4K33SP"
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
