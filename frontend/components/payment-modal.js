@@ -32,8 +32,9 @@
 
 import { auth } from '../js/firebase-config.js';
 import {
+  initiatePayment,
   getPaymentStatus,
-} from '../js/payment-api-mock.js';
+} from '../js/paymentService.js';
 import {
   validatePaymentContext,
   validatePaymentMethod,
@@ -774,30 +775,18 @@ export class PaymentModal {
       }
 
       // Call backend API to initiate PayFast payment
-      const response = await fetch('/api/payments/initiate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this._getAuthToken()}`
-        },
-        body: JSON.stringify({
-          amount: total,
-          contributionId: contributionId,
-          groupId: groupId,
-          groupName: groupName,
-          userEmail: userEmail,
-          userName: userName,
-          metadata: {
-            paymentMethod: this._selectedMethod
-          }
-        })
+      const result = await initiatePayment({
+        amount: total,
+        contributionId: contributionId,
+        groupId: groupId,
+        groupName: groupName,
+        userEmail: userEmail,
+        userName: userName,
+        metadata: {
+          paymentMethod: this._selectedMethod
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Payment initiation failed');
-      }
-
-      const result = await response.json();
       this._paymentId = result.paymentId;
 
       // Store payment ID in localStorage for return handling
@@ -816,22 +805,6 @@ export class PaymentModal {
         payBtn.textContent = 'Pay Now';
       }
     }
-  }
-
-  /**
-   * Get Firebase auth token
-   * @returns {Promise<string>} Auth token
-   */
-  async _getAuthToken() {
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        return await currentUser.getIdToken();
-      }
-    } catch (e) {
-      console.log('Could not get auth token:', e);
-    }
-    return '';
   }
 
   /**

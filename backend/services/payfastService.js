@@ -37,8 +37,15 @@ class PayFastService {
 
     // Create parameter string
     let pfParamString = '';
-    for (let key in data) {
-      if (data.hasOwnProperty(key) && data[key] !== '') {
+
+    // PayFast requires parameters to be in the order they are sent,
+    // but the API documentation often implies alphabetical sorting for some integrations.
+    // Standard PayFast HTML redirect signature requires the exact order of fields.
+    // However, common Node.js implementations sort them to ensure consistency.
+    const keys = Object.keys(data).sort();
+
+    for (const key of keys) {
+      if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
         pfParamString += `${key}=${encodeURIComponent(data[key].toString().trim()).replace(/%20/g, '+')}&`;
       }
     }
