@@ -74,11 +74,34 @@ import {
       const membershipsRef = collection(db, COLLECTIONS.MEMBERSHIPS);
       const qMemberships   = query(membershipsRef, where('uid', '==', user.uid));
       const membershipsSnap = await getDocs(qMemberships);
+      console.log("Membership count:", membershipsSnap.size);
 
-      if (membershipsSnap.empty) {
-        window.location.href = 'onboarding.html';
-        return groupBalance;
-      }
+      // Prevent premature redirect while Firestore loads
+if (membershipsSnap.empty) {
+
+  console.warn(
+    "[Dashboard] No memberships found for user:",
+    user.uid
+  );
+
+  // Wait briefly before redirecting
+  setTimeout(async () => {
+
+    const retrySnap = await getDocs(qMemberships);
+
+    if (retrySnap.empty) {
+
+      console.warn(
+        "[Dashboard] Redirecting to onboarding"
+      );
+
+      window.location.href = 'onboarding.html';
+    }
+
+  }, 1500);
+
+  return groupBalance;
+}
 
       let groupId;
       let userRole = 'member';
@@ -99,6 +122,40 @@ import {
       if (groupSnap.exists()) {
         const group = groupSnap.data();
         groupBalance = group.totalBalance || 0;
+
+        /* ═══════════════════════════════════════════
+   ADMIN CONTROLS
+   ═══════════════════════════════════════════ */
+
+const adminActions =
+  document.getElementById(
+    "group-admin-actions"
+  );
+
+const editLink =
+  document.getElementById(
+    "edit-group-link"
+  );
+
+const settingsLink =
+  document.getElementById(
+    "group-settings-link"
+  );
+
+if (
+  userRole === "admin" &&
+  adminActions
+) {
+
+  adminActions.style.display =
+    "flex";
+
+  editLink.href =
+    `group-edit.html?groupId=${groupId}`;
+
+  settingsLink.href =
+    `group-settings.html?groupId=${groupId}`;
+}
 
         const badgeEl = document.getElementById('group-name-badge');
         if (badgeEl) {
