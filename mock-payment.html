@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Payment Gateway</title>
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+
+<body>
+
+<div class="payment-container">
+
+  <h1>💳 Mock Payment Gateway</h1>
+
+  <p>
+    This is a simulated payment environment
+    for demonstration purposes.
+  </p>
+
+  <form id="paymentForm">
+
+    <input
+      type="text"
+      id="cardName"
+      placeholder="Cardholder Name"
+      required
+    />
+
+    <input
+      type="text"
+      id="cardNumber"
+      placeholder="Card Number"
+      maxlength="16"
+      required
+    />
+
+    <input
+      type="text"
+      id="expiry"
+      placeholder="MM/YY"
+      required
+    />
+
+    <input
+      type="text"
+      id="cvv"
+      placeholder="CVV"
+      maxlength="3"
+      required
+    />
+
+    <button type="submit">
+      Pay Now
+    </button>
+
+  </form>
+
+  <p id="paymentMessage"></p>
+
+</div>
+
+<script type="module" src="js/mock-payment.js"></script>
+
+</body>
+</html>
