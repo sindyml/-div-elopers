@@ -23,20 +23,7 @@
       <section class="register-card__body">
         <aside id="alertMessage" class="alert alert--hidden" aria-live="polite"></aside>
 
-        <!-- OAuth buttons — primary sign-in method -->
-        <section class="oauth-buttons" aria-label="Sign in with social accounts">
-          <button type="button" id="googleLoginBtn" class="btn btn--outline oauth-btn">
-            Google
-          </button>
-          <button type="button" id="githubLoginBtn" class="btn btn--outline oauth-btn">
-            GitHub
-          </button>
-          <button type="button" id="microsoftLoginBtn" class="btn btn--outline oauth-btn">
-            Microsoft
-          </button>
-        </section>
-
-        <hr class="divider" aria-label="or sign in with email" />
+    
 
         <!-- Email/password fallback for users who registered with email -->
         <form id="loginForm">
@@ -53,6 +40,20 @@
           <button type="submit" class="btn btn--primary btn--full">Sign in</button>
         </form>
       </section>
+      
+      <hr class="divider" aria-label="or sign in with email" />
+        <!-- OAuth buttons — primary sign-in method -->
+        <section class="oauth-buttons" aria-label="Sign in with social accounts">
+          <button type="button" id="googleLoginBtn" class="btn btn--outline oauth-btn">
+            Google
+          </button>
+          <button type="button" id="githubLoginBtn" class="btn btn--outline oauth-btn">
+            GitHub
+          </button>
+          <button type="button" id="microsoftLoginBtn" class="btn btn--outline oauth-btn">
+            Microsoft
+          </button>
+        </section>
 
       <p class="forgot-password">
              <a href="forgot-password.html" class="forgot-password-link">Forgot password?</a>
