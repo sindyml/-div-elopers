@@ -77,31 +77,56 @@ import {
       console.log("Membership count:", membershipsSnap.size);
 
       // Prevent premature redirect while Firestore loads
-if (membershipsSnap.empty) {
+      if (membershipsSnap.empty) {
+        console.warn("[Dashboard] No memberships found for user:", user.uid);
 
-  console.warn(
-    "[Dashboard] No memberships found for user:",
-    user.uid
-  );
+        // First, check if there are pending invites. If yes, stay on dashboard.
+        // We check for user.email as checkPendingInvites relies on it.
+        if (user.email) {
+          try {
+            const pendingInvites = await checkPendingInvites(user);
+            if (pendingInvites && pendingInvites.length > 0) {
+              console.log("[Dashboard] Pending invites found, staying on dashboard.");
+              return groupBalance;
+            }
+          } catch (inviteErr) {
+            console.warn("[Dashboard] Failed to check invites during initial load:", inviteErr.message);
+          }
+        }
 
-  // Wait briefly before redirecting
-  setTimeout(async () => {
+        // Wait longer (3s) before final decision to redirect.
+        // This accounts for Firestore eventual consistency and slow network.
+        setTimeout(async () => {
+          const retrySnap = await getDocs(qMemberships);
 
-    const retrySnap = await getDocs(qMemberships);
+          if (!retrySnap.empty) {
+            console.log("[Dashboard] Memberships found on retry. Reloading to re-initialize all dashboard components.");
+            window.location.reload();
+            return;
+          }
 
-    if (retrySnap.empty) {
+          // Final check for invites before redirecting
+          if (user.email) {
+            try {
+              const retryInvites = await checkPendingInvites(user);
+              if (retryInvites.length === 0) {
+                console.warn("[Dashboard] Redirecting to onboarding (no memberships or invites confirmed)");
+                window.location.href = 'onboarding.html';
+              } else {
+                console.log("[Dashboard] Pending invites found on retry, staying on dashboard.");
+              }
+            } catch (retryInviteErr) {
+              // If even checking invites fails, and memberships are empty, redirect
+              window.location.href = 'onboarding.html';
+            }
+          } else {
+            // If no email to check invites and memberships still empty, redirect
+            window.location.href = 'onboarding.html';
+          }
+        }, 3000);
 
-      console.warn(
-        "[Dashboard] Redirecting to onboarding"
-      );
-
-      window.location.href = 'onboarding.html';
-    }
-
-  }, 1500);
-
-  return groupBalance;
-}
+        return groupBalance;
+      }
 
       let groupId;
       let userRole = 'member';
