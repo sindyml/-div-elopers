@@ -5,13 +5,16 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
 
-const response = await fetch('/api/getFirebaseConfig');
+// Fetch from Render backend - NOT localhost
+const response = await fetch('https://div-elopers.onrender.com/api/getFirebaseConfig');
+
 if (!response.ok) {
     throw new Error(`Firebase configuration is not available (HTTP ${response.status})`);
 }
 
-// Replace the existing fetch line with:
-const response = await fetch('https://div-elopers.onrender.com/api/getFirebaseConfig');
+const firebaseConfig = await response.json();
+
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
