@@ -208,6 +208,52 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(config));
     return;
   }
+  
+// ──────────────────────────────────────────────────────────────
+// API: /api/set-user-role - Set custom claims for a user
+// ──────────────────────────────────────────────────────────────
+if (urlPath === '/api/set-user-role' && req.method === 'POST') {
+  setCORSHeaders(res);
+  
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', async () => {
+    try {
+      const { uid, role } = JSON.parse(body);
+      
+      // Verify the requesting user is authenticated (optional security)
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+      
+      const token = authHeader.split('Bearer ')[1];
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      
+      // Only allow admins to set roles (optional - for production)
+      // For now, allow any authenticated user
+      
+      // Set custom claim
+      await admin.auth().setCustomUserClaims(uid, { role: role });
+      
+      // Update Firestore
+      await db.collection('users').doc(uid).update({
+        role: role,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, message: `Role ${role} set for user ${uid}` }));
+    } catch (error) {
+      console.error('Error setting role:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error.message }));
+    }
+  });
+  return;
+}
 
   /* ────────────────────────────────────────────────────────────────────────────
      Static file serving
