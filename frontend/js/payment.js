@@ -163,9 +163,9 @@ async function initiatePayFastRedirect(user) {
       },
       body: JSON.stringify({
         amount:         amount,
-        contributionId: contrib.id,
-        groupId:        contrib.groupId,
-        groupName:      groupName,
+        contributionId: selectedContribution.id,
+        groupId:        selectedContribution.groupId,
+        groupName:      selectedGroupName,
         userEmail:      userEmail,
         userName:       userName,
         metadata:       { paymentMethod: 'card' },
