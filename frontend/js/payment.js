@@ -100,6 +100,8 @@ async function initiatePayFastRedirect(user) {
   showError(null);
 
   let redirecting = false;
+  let selectedContribution = null;
+  let selectedGroupName = 'Unknown Group';
 
   try {
     const groups = await getUserGroups(user.uid);
@@ -126,12 +128,19 @@ async function initiatePayFastRedirect(user) {
       return;
     }
 
-    // Use the first pending contribution
-    const contrib = pending[0];
     const groupMap = {};
     groups.forEach(g => { groupMap[g.id] = g.name; });
-    const groupName = groupMap[contrib.groupId] || contrib.groupId || 'Unknown Group';
-    const amount = parseFloat(contrib.amount) || 0;
+
+    selectedContribution = pending[0];
+    selectedGroupName = groupMap[selectedContribution.groupId] || selectedContribution.groupId || 'Unknown Group';
+
+    if (pending.length > 1) {
+      showError('Multiple pending contributions found. Please choose one from the list below or continue with the payment modal.');
+      openPaymentModalForContribution(user, selectedContribution, selectedGroupName);
+      return;
+    }
+
+    const amount = parseFloat(selectedContribution.amount) || 0;
 
     // Gather user details for PayFast pre-fill
     const userEmail = user.email || '';
@@ -194,16 +203,28 @@ async function initiatePayFastRedirect(user) {
     form.submit(); // ← redirects to PayFast
 
   } catch (err) {
-    showError('Failed to initiate payment: ' + (err.message || 'Unknown error'));
+    const message = err.message || 'Unknown error';
+    showError('Failed to initiate payment directly. Opening the payment modal instead. ' + message);
+    if (selectedContribution) {
+      openPaymentModalForContribution(user, selectedContribution, selectedGroupName);
+    }
   } finally {
-    // Restore button unless the page is navigating away to PayFast
     if (!redirecting && btn) {
       btn.disabled = false;
       btn.textContent = '💳 Make a Payment';
     }
   }
 }
-
+function openPaymentModalForContribution(user, contrib, groupName) {
+  if (!user || !contrib) return;
+  modal.open({
+    userId:         user.uid,
+    groupId:        contrib.groupId,
+    contributionId: contrib.id,
+    amount:         parseFloat(contrib.amount) || 0,
+    groupName:      groupName,
+  });
+}
 /* ── Data loading ──────────────────────────────────────────── */
 
 async function loadPendingContributions(userId) {

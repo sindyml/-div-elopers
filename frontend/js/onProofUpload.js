@@ -1,5 +1,13 @@
 // frontend/js/onProofUpload.js
 import { db } from './firebase-config.js';
+import {
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+  updateDoc,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 export async function onProofUpload(userId, groupId, fileUrl) {
     if (!userId || !groupId || !fileUrl) {
@@ -7,24 +15,24 @@ export async function onProofUpload(userId, groupId, fileUrl) {
         return;
     }
     
-    // Find the pending contribution for this user and group
-    const contributionsRef = db.collection('contributions');
-    const query = await contributionsRef
-        .where('userId', '==', userId)
-        .where('groupId', '==', groupId)
-        .where('status', '==', 'pending')
-        .limit(1)
-        .get();
-    
-    if (query.empty) {
+    const contributionsQuery = query(
+      collection(db, 'contributions'),
+      where('userId', '==', userId),
+      where('groupId', '==', groupId),
+      where('status', '==', 'pending'),
+      limit(1)
+    );
+
+    const querySnapshot = await getDocs(contributionsQuery);
+    if (querySnapshot.empty) {
         console.log(`No pending contribution found for user ${userId} in group ${groupId}`);
         return;
     }
-    
-    const contributionDoc = query.docs[0];
-    await contributionDoc.ref.update({
+
+    const contributionDoc = querySnapshot.docs[0];
+    await updateDoc(contributionDoc.ref, {
         paymentEvidence: 'proof',
-        evidenceUrl: fileUrl
+        evidenceUrl: fileUrl,
     });
     
     console.log(`Updated contribution ${contributionDoc.id} with proof evidence for user ${userId} in group ${groupId}`);
