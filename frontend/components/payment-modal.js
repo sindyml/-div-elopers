@@ -30,6 +30,7 @@
      });
    ============================================================ */
 
+import { auth } from '../js/firebase-config.js';
 import {
   getPaymentStatus,
 } from '../js/payment-api-mock.js';
@@ -763,12 +764,10 @@ export class PaymentModal {
       let userEmail = '';
       let userName = '';
       try {
-        if (window.firebase && window.firebase.auth && window.firebase.auth()) {
-          const currentUser = window.firebase.auth().currentUser;
-          if (currentUser) {
-            userEmail = currentUser.email || '';
-            userName = currentUser.displayName || '';
-          }
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          userEmail = currentUser.email || '';
+          userName = currentUser.displayName || '';
         }
       } catch (e) {
         console.log('Could not get user info:', e);
@@ -825,11 +824,9 @@ export class PaymentModal {
    */
   async _getAuthToken() {
     try {
-      if (window.firebase && window.firebase.auth && window.firebase.auth()) {
-        const currentUser = window.firebase.auth().currentUser;
-        if (currentUser) {
-          return await currentUser.getIdToken();
-        }
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        return await currentUser.getIdToken();
       }
     } catch (e) {
       console.log('Could not get auth token:', e);
