@@ -1,3 +1,11 @@
+// Add this at the very top of payfastService.js
+require('dotenv').config();
+// Debug: Show what's being loaded
+console.log('🔧 PayFast Service Initializing...');
+console.log('   Merchant ID:', process.env.PAYFAST_MERCHANT_ID || '❌ NOT FOUND');
+console.log('   Merchant Key:', process.env.PAYFAST_MERCHANT_KEY ? '✅ Found' : '❌ NOT FOUND');
+console.log('   Passphrase:', process.env.PAYFAST_PASSPHRASE || '❌ NOT FOUND');
+
 const crypto = require('crypto');
 const axios = require('axios');
 

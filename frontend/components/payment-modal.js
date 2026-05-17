@@ -500,13 +500,16 @@ export class PaymentModal {
     `;
   }
 
-  /* ── Event Wiring ──────────────────────────────────────────── */
+  /* ── Event Wiring (FIXED with null checks) ────────────────── */
 
   _wireEvents() {
-    // Close on backdrop click
-    this._root.querySelector('.payment-overlay').addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) this.close();
-    });
+    // Close on backdrop click - ADD NULL CHECK
+    const overlay = this._root.querySelector('.payment-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) this.close();
+      });
+    }
 
     // Close on Escape key
     document.addEventListener('keydown', (e) => {
@@ -535,47 +538,56 @@ export class PaymentModal {
       }
     });
 
-    // Payment method radio cards
-    this._root.querySelectorAll('.payment-method-card input[type="radio"]').forEach((radio) => {
-      radio.addEventListener('change', () => {
-        this._selectedMethod = radio.value;
-        this._root.querySelectorAll('.payment-method-card').forEach((card) => {
-          card.classList.toggle('is-selected', card.dataset.method === radio.value);
+    // Payment method radio cards - ADD NULL CHECK
+    const radioCards = this._root.querySelectorAll('.payment-method-card input[type="radio"]');
+    if (radioCards && radioCards.length) {
+      radioCards.forEach((radio) => {
+        radio.addEventListener('change', () => {
+          this._selectedMethod = radio.value;
+          this._root.querySelectorAll('.payment-method-card').forEach((card) => {
+            card.classList.toggle('is-selected', card.dataset.method === radio.value);
+          });
+          this._updateBreakdown();
         });
-        this._updateBreakdown();
       });
-    });
+    }
 
-    // Proof upload zone
-    const zone      = this._root.querySelector('#pm-upload-zone');
+    // Proof upload zone - ADD NULL CHECKS
+    const zone = this._root.querySelector('#pm-upload-zone');
     const fileInput = this._root.querySelector('#pm-file-input');
     const removeBtn = this._root.querySelector('#pm-remove-file');
 
-    zone.addEventListener('click', () => fileInput.click());
-    zone.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
+    if (zone) {
+      zone.addEventListener('click', () => fileInput && fileInput.click());
+      zone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput && fileInput.click();
+        }
+      });
+      zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('is-dragover'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('is-dragover'));
+      zone.addEventListener('drop', (e) => {
         e.preventDefault();
-        fileInput.click();
-      }
-    });
-    zone.addEventListener('dragover',  (e) => { e.preventDefault(); zone.classList.add('is-dragover'); });
-    zone.addEventListener('dragleave', ()  => zone.classList.remove('is-dragover'));
-    zone.addEventListener('drop',      (e) => {
-      e.preventDefault();
-      zone.classList.remove('is-dragover');
-      const file = e.dataTransfer?.files?.[0];
-      if (file) this._handleFileSelected(file);
-    });
+        zone.classList.remove('is-dragover');
+        const file = e.dataTransfer?.files?.[0];
+        if (file) this._handleFileSelected(file);
+      });
+    }
 
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files?.[0];
-      if (file) this._handleFileSelected(file);
-    });
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files?.[0];
+        if (file) this._handleFileSelected(file);
+      });
+    }
 
-    removeBtn.addEventListener('click', (e) => {
-      e.stopPropagation(); // don't retrigger zone click
-      this._clearFileSelection();
-    });
+    if (removeBtn) {
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._clearFileSelection();
+      });
+    }
   }
 
   /* ── Screen Management ─────────────────────────────────────── */
@@ -614,22 +626,28 @@ export class PaymentModal {
     this._currentScreen = name;
   }
 
-  /* ── Form Screen ───────────────────────────────────────────── */
+  /* ── Form Screen (FIXED with null checks) ─────────────────── */
 
   _populateForm() {
     const { amount, groupName } = this._context;
     const base = parseFloat(amount) || 0;
 
-    this._root.querySelector('#pm-amount-display').textContent = `R ${base.toFixed(2)}`;
-    this._root.querySelector('#pm-group-display').textContent  = groupName || '—';
+    const amountDisplay = this._root.querySelector('#pm-amount-display');
+    const groupDisplay = this._root.querySelector('#pm-group-display');
+    const cardRadio = this._root.querySelector('input[value="card"]');
+    const methodCards = this._root.querySelectorAll('.payment-method-card');
+
+    if (amountDisplay) amountDisplay.textContent = `R ${base.toFixed(2)}`;
+    if (groupDisplay) groupDisplay.textContent = groupName || '—';
 
     // Reset to card method
     this._selectedMethod = 'card';
-    const cardRadio = this._root.querySelector('input[value="card"]');
     if (cardRadio) cardRadio.checked = true;
-    this._root.querySelectorAll('.payment-method-card').forEach((c) => {
-      c.classList.toggle('is-selected', c.dataset.method === 'card');
-    });
+    if (methodCards) {
+      methodCards.forEach((c) => {
+        c.classList.toggle('is-selected', c.dataset.method === 'card');
+      });
+    }
 
     this._updateBreakdown();
     this._hideAlert('pm-form-error');
@@ -641,12 +659,16 @@ export class PaymentModal {
     const fee     = base * feeRate;
     const total   = base + fee;
 
-    this._root.querySelector('#pm-base-amount').textContent  = `R ${base.toFixed(2)}`;
-    this._root.querySelector('#pm-fee-amount').textContent   = `R ${fee.toFixed(2)}`;
-    this._root.querySelector('#pm-total-amount').textContent = `R ${total.toFixed(2)}`;
-
-    // Show fee row only for card payments
+    const baseAmountEl = this._root.querySelector('#pm-base-amount');
+    const feeAmountEl = this._root.querySelector('#pm-fee-amount');
+    const totalAmountEl = this._root.querySelector('#pm-total-amount');
     const feeRow = this._root.querySelector('#pm-fee-row');
+
+    if (baseAmountEl) baseAmountEl.textContent = `R ${base.toFixed(2)}`;
+    if (feeAmountEl) feeAmountEl.textContent = `R ${fee.toFixed(2)}`;
+    if (totalAmountEl) totalAmountEl.textContent = `R ${total.toFixed(2)}`;
+    
+    // Show fee row only for card payments
     if (feeRow) feeRow.style.display = feeRate > 0 ? '' : 'none';
   }
 
@@ -693,15 +715,17 @@ export class PaymentModal {
     ];
 
     const list = this._root.querySelector('#pm-confirm-list');
-    list.innerHTML = rows
-      .map(
-        (r) =>
-          `<li class="payment-confirm-list__item${r.bold ? ' is-total' : ''}">
-             <span>${r.label}</span>
-             <span>${r.value}</span>
-           </li>`
-      )
-      .join('');
+    if (list) {
+      list.innerHTML = rows
+        .map(
+          (r) =>
+            `<li class="payment-confirm-list__item${r.bold ? ' is-total' : ''}">
+               <span>${r.label}</span>
+               <span>${r.value}</span>
+             </li>`
+        )
+        .join('');
+    }
 
     this._showScreen('confirm');
   }
@@ -710,15 +734,19 @@ export class PaymentModal {
 
   async _handlePay() {
     const payBtn = this._root.querySelector('#pm-pay-btn');
-    payBtn.disabled = true;
-    payBtn.textContent = 'Authorising…';
+    if (payBtn) {
+      payBtn.disabled = true;
+      payBtn.textContent = 'Authorising…';
+    }
     this._hideAlert('pm-confirm-error');
 
     // Network pre-flight: fast-fail before showing processing screen
     if (!isNetworkAvailable()) {
       this._showAlert('pm-confirm-error', 'No internet connection. Please check your network and try again.');
-      payBtn.disabled = false;
-      payBtn.textContent = 'Pay Now';
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.textContent = 'Pay Now';
+      }
       return;
     }
 
@@ -784,8 +812,10 @@ export class PaymentModal {
       const info = categorizePaymentError(err, 'initiate');
       this._showScreen('confirm');
       this._showAlert('pm-confirm-error', info.message);
-      payBtn.disabled = false;
-      payBtn.textContent = 'Pay Now';
+      if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.textContent = 'Pay Now';
+      }
     }
   }
 
@@ -946,15 +976,17 @@ export class PaymentModal {
     ];
 
     const list = this._root.querySelector('#pm-receipt-list');
-    list.innerHTML = rows
-      .map(
-        (r) =>
-          `<li class="payment-receipt__row">
-             <span class="payment-receipt__row-label">${r.label}</span>
-             <span class="payment-receipt__row-value">${r.value}</span>
-           </li>`
-      )
-      .join('');
+    if (list) {
+      list.innerHTML = rows
+        .map(
+          (r) =>
+            `<li class="payment-receipt__row">
+               <span class="payment-receipt__row-label">${r.label}</span>
+               <span class="payment-receipt__row-value">${r.value}</span>
+             </li>`
+        )
+        .join('');
+    }
 
     this._showScreen('receipt');
 
@@ -1035,10 +1067,15 @@ export class PaymentModal {
     this._selectedFile = file;
 
     // Show preview
-    this._root.querySelector('#pm-file-name').textContent = file.name;
-    this._root.querySelector('#pm-file-size').textContent = `${(file.size / 1024).toFixed(1)} KB`;
-    this._root.querySelector('#pm-upload-preview').hidden = false;
-    this._root.querySelector('#pm-upload-zone').classList.add('has-file');
+    const fileNameEl = this._root.querySelector('#pm-file-name');
+    const fileSizeEl = this._root.querySelector('#pm-file-size');
+    const previewEl = this._root.querySelector('#pm-upload-preview');
+    const zoneEl = this._root.querySelector('#pm-upload-zone');
+    
+    if (fileNameEl) fileNameEl.textContent = file.name;
+    if (fileSizeEl) fileSizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+    if (previewEl) previewEl.hidden = false;
+    if (zoneEl) zoneEl.classList.add('has-file');
 
     // Enable submit button
     const submitBtn = this._root.querySelector('#pm-submit-proof-btn');
@@ -1048,11 +1085,14 @@ export class PaymentModal {
   _clearFileSelection() {
     this._selectedFile = null;
 
-    this._root.querySelector('#pm-upload-preview').hidden = true;
-    this._root.querySelector('#pm-upload-zone').classList.remove('has-file');
-    this._root.querySelector('#pm-file-input').value = '';
-
+    const previewEl = this._root.querySelector('#pm-upload-preview');
+    const zoneEl = this._root.querySelector('#pm-upload-zone');
+    const fileInput = this._root.querySelector('#pm-file-input');
     const submitBtn = this._root.querySelector('#pm-submit-proof-btn');
+
+    if (previewEl) previewEl.hidden = true;
+    if (zoneEl) zoneEl.classList.remove('has-file');
+    if (fileInput) fileInput.value = '';
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Upload Proof';
@@ -1069,9 +1109,11 @@ export class PaymentModal {
     const progress   = this._root.querySelector('#pm-upload-progress');
     const progressBar = this._root.querySelector('#pm-progress-bar');
 
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading…';
-    progress.hidden = false;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Uploading…';
+    }
+    if (progress) progress.hidden = false;
     this._hideAlert('pm-proof-error');
     this._hideAlert('pm-proof-success');
 
@@ -1079,8 +1121,10 @@ export class PaymentModal {
     let pct = 0;
     const ticker = setInterval(() => {
       pct = Math.min(pct + 12, 85);
-      progressBar.style.width = `${pct}%`;
-      progressBar.setAttribute('aria-valuenow', String(pct));
+      if (progressBar) {
+        progressBar.style.width = `${pct}%`;
+        progressBar.setAttribute('aria-valuenow', String(pct));
+      }
     }, 200);
 
     try {
@@ -1089,24 +1133,28 @@ export class PaymentModal {
       }
 
       clearInterval(ticker);
-      progressBar.style.width = '100%';
-      progressBar.setAttribute('aria-valuenow', '100');
+      if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.setAttribute('aria-valuenow', '100');
+      }
 
       await new Promise((r) => setTimeout(r, 400));
 
-      progress.hidden = true;
-      progressBar.style.width = '0%';
-      submitBtn.textContent = '✓ Uploaded';
+      if (progress) progress.hidden = true;
+      if (progressBar) progressBar.style.width = '0%';
+      if (submitBtn) submitBtn.textContent = '✓ Uploaded';
 
       this._showAlert('pm-proof-success', '✅ Proof uploaded successfully! Your treasurer will verify it shortly.');
 
     } catch (err) {
       clearInterval(ticker);
-      progress.hidden = true;
-      progressBar.style.width = '0%';
-      progressBar.setAttribute('aria-valuenow', '0');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Upload Proof';
+      if (progress) progress.hidden = true;
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressBar) progressBar.setAttribute('aria-valuenow', '0');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Upload Proof';
+      }
       this._showAlert('pm-proof-error', err.message || 'Upload failed. Please try again.');
     }
   }
