@@ -13,6 +13,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -158,10 +159,42 @@ export function closeRequestStatusBanner() {
 window.closeRequestStatusBanner = closeRequestStatusBanner;
 
 /* ═══════════════════════════════════════════════════════════
+   DUPLICATE MEETING GUARD
+   Queries the meetings collection for any document in this group
+   with the same date AND time before allowing a new write.
+   Returns true if a duplicate exists, false if the slot is free.
+   ─────────────────────────────────────────────────────────────
+   Why a pre-write check rather than a Firestore transaction?
+   Firestore does not support unique constraints natively. A
+   transaction could still race in theory, but for a stokvel
+   scheduler — where two admins scheduling the exact same slot
+   simultaneously is an edge case — a pre-write getDocs check is
+   the right balance of simplicity and reliability.
+   ─────────────────────────────────────────────────────────────
+   Note: also add a Firestore security rule or Cloud Function if
+   you need a hard server-side guarantee against duplicates.
+═══════════════════════════════════════════════════════════ */
+async function meetingSlotTaken(groupId, date, time) {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.MEETINGS),
+        where('groupId', '==', groupId),
+        where('date',    '==', date),
+        where('time',    '==', time),
+        limit(1)                          // only need to know if at least one exists
+      )
+    );
+    return !snap.empty;
+  } catch (err) {
+    // On error, be conservative: don't block the write, but log it.
+    console.warn('[Meetings] Duplicate check failed:', err.message);
+    return false;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    ADMIN / TREASURER: REQUESTS LISTENER (meetings page panel)
-   Separate from the dashboard widget — this is the in-page
-   panel on meetings.html only. The dashboard widget in
-   dashboard-widgets.js has its own independent listener.
 ═══════════════════════════════════════════════════════════ */
 export function startRequestsListener() {
   if (_unsubscribeRequests) _unsubscribeRequests();
@@ -270,7 +303,7 @@ async function handleRequestAction(requestId, action, articleEl) {
       status:         action,
       actionedBy:     currentUser.uid,
       actionedAt:     serverTimestamp(),
-      memberNotified: false,    // reset — member sees outcome banner on next login
+      memberNotified: false,
     });
     showNotification(
       action === 'accepted'
@@ -322,12 +355,6 @@ export async function submitMeetingRequest() {
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Sending…'; }
 
   try {
-    /*
-      Resolve the group's admin UID from memberships so the document
-      explicitly links the request to the admin who should see it.
-      Non-fatal if this fails — adminUid falls back to null and the
-      dashboard widget queries by groupId instead.
-    */
     let adminUid = null;
     try {
       const snap = await getDocs(query(
@@ -339,35 +366,16 @@ export async function submitMeetingRequest() {
     } catch (_) { /* non-fatal */ }
 
     await addDoc(collection(db, 'meetingRequests'), {
-      /* ── Identity & relationships ─────────────────────────
-         groupId      links to groups/{groupId}
-         requestedBy  links to users/{uid} (the member)
-         adminUid     links to users/{uid} (the group admin, resolved above)
-      */
       groupId:        currentGroupId,
       requestedBy:    currentUser.uid,
       requesterName:  currentUser.displayName || currentUser.email || 'Member',
       adminUid:       adminUid,
-
-      /* ── Request content ──────────────────────────────────
-         reason  is the member's free-text explanation shown
-                 on both the meetings page panel and the
-                 dashboard widget card.
-      */
       reason:         reason,
-
-      /* ── Lifecycle ────────────────────────────────────────
-         status          'pending' | 'accepted' | 'rejected'
-         memberNotified  false until member has seen the outcome banner;
-                         reset to false when admin acts so the banner fires again
-      */
       status:         'pending',
       memberNotified: false,
-
-      /* ── Timestamps & audit ───────────────────────────────*/
       createdAt:      serverTimestamp(),
-      actionedBy:     null,   // set to admin UID when accepted/rejected
-      actionedAt:     null,   // set to serverTimestamp() when accepted/rejected
+      actionedBy:     null,
+      actionedAt:     null,
     });
 
     if (statusEl) statusEl.textContent = '';
@@ -558,10 +566,19 @@ export function buildMeetingItem(meeting, role) {
 
 /* ═══════════════════════════════════════════════════════════
    SCHEDULE FORM
+   ─────────────────────────────────────────────────────────
+   Duplicate prevention flow:
+     1. All existing field validation runs first (required
+        fields, past date, time range).
+     2. meetingSlotTaken() queries Firestore for any document
+        in this group with the same date AND time.
+     3. If a match is found, setScheduleStatus() shows a clear
+        error and the write is aborted — no document is created.
+     4. Only when the slot is confirmed free does addDoc() run.
 ═══════════════════════════════════════════════════════════ */
 function setScheduleStatus(message) {
-  const el = document.getElementById('schedule-status');
-  if (el) el.textContent = message;
+  const statusEl = document.getElementById('schedule-status');
+  if (statusEl) statusEl.textContent = message;
 }
 
 const scheduleForm = document.getElementById('schedule-form');
@@ -569,28 +586,61 @@ if (scheduleForm) {
   scheduleForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     setScheduleStatus('');
+
     if (currentRole !== ROLES.ADMIN && currentRole !== ROLES.TREASURER) {
       setScheduleStatus('Only Admins and Treasurers can schedule meetings.');
       return;
     }
+
     const data  = Object.fromEntries(new FormData(e.currentTarget));
     const today = new Date().toISOString().slice(0, 10);
+
+    // ── Field validation ──────────────────────────────────
     if (!data.group || !data.date || !data.time || !data.location || !data.agenda) {
-      setScheduleStatus('Please fill in all required fields.'); return;
+      setScheduleStatus('Please fill in all required fields.');
+      return;
     }
-    if (data.date < today) { setScheduleStatus('Please select a future date.'); return; }
+    if (data.date < today) {
+      setScheduleStatus('Please select a future date.');
+      return;
+    }
     if (data.time < MEETING_TIME.MIN || data.time > MEETING_TIME.MAX) {
-      setScheduleStatus('Meeting time must be between 8:00 AM and 8:00 PM.'); return;
+      setScheduleStatus('Meeting time must be between 8:00 AM and 8:00 PM.');
+      return;
     }
+
     const submitBtn = e.currentTarget.querySelector('button[type="submit"]');
-    submitBtn.disabled = true; submitBtn.textContent = 'Saving…';
+    submitBtn.disabled    = true;
+    submitBtn.textContent = 'Checking…';
+
+    // ── Duplicate check ───────────────────────────────────
+    // Query for any existing meeting in this group on the same
+    // date at the same time. Uses limit(1) so Firestore only
+    // reads a single document regardless of how many exist.
+    const duplicate = await meetingSlotTaken(currentGroupId, data.date, data.time);
+    if (duplicate) {
+      setScheduleStatus(
+        `A meeting is already scheduled for ${formatDate(data.date)} at ${data.time}. ` +
+        `Please choose a different date or time.`
+      );
+      submitBtn.disabled    = false;
+      submitBtn.textContent = 'Schedule Meeting';
+      return;
+    }
+
+    // ── Write ─────────────────────────────────────────────
+    submitBtn.textContent = 'Saving…';
     try {
       await addDoc(collection(db, COLLECTIONS.MEETINGS), {
         groupId:   currentGroupId,
         title:     data.agenda.split('\n')[0].substring(0, 60),
-        date:      data.date, time: data.time,
-        location:  data.location, agenda: data.agenda,
-        minutes:   '', createdBy: currentUser.uid, createdAt: serverTimestamp(),
+        date:      data.date,
+        time:      data.time,
+        location:  data.location,
+        agenda:    data.agenda,
+        minutes:   '',
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp(),
       });
       e.currentTarget.reset();
       setScheduleStatus('');
@@ -598,7 +648,8 @@ if (scheduleForm) {
       console.error('Failed to schedule meeting:', err);
       setScheduleStatus('Failed to save. Please try again.');
     } finally {
-      submitBtn.disabled = false; submitBtn.textContent = 'Schedule Meeting';
+      submitBtn.disabled    = false;
+      submitBtn.textContent = 'Schedule Meeting';
     }
   });
 }
@@ -629,12 +680,17 @@ export async function saveMinutes() {
   const textarea      = document.getElementById('minutes-text');
   const text          = textarea ? textarea.value.trim() : '';
   const minutesStatus = document.getElementById('minutes-status');
-  if (!text) { if (minutesStatus) minutesStatus.textContent = 'Please enter meeting minutes before saving.'; return; }
+  if (!text) {
+    if (minutesStatus) minutesStatus.textContent = 'Please enter meeting minutes before saving.';
+    return;
+  }
   const saveBtn = document.getElementById('minutes-save-btn');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
   try {
     await updateDoc(doc(db, COLLECTIONS.MEETINGS, currentMeetingId), {
-      minutes: text, minutesUpdatedAt: serverTimestamp(), minutesUpdatedBy: currentUser.uid,
+      minutes:          text,
+      minutesUpdatedAt: serverTimestamp(),
+      minutesUpdatedBy: currentUser.uid,
     });
     if (minutesStatus) minutesStatus.textContent = '';
     document.getElementById('minutes-dialog')?.close();
@@ -701,12 +757,12 @@ document.addEventListener('click', (e) => {
   const action = e.target.closest('[data-action]')?.dataset.action;
   if (!action) return;
   switch (action) {
-    case 'close-banner':               closeBanner(); break;
-    case 'close-minutes-dialog':       document.getElementById('minutes-dialog')?.close(); break;
-    case 'close-member-banner':        closeMemberBanner(); break;
-    case 'open-request-meeting':       openRequestMeetingDialog(); break;
+    case 'close-banner':                 closeBanner(); break;
+    case 'close-minutes-dialog':         document.getElementById('minutes-dialog')?.close(); break;
+    case 'close-member-banner':          closeMemberBanner(); break;
+    case 'open-request-meeting':         openRequestMeetingDialog(); break;
     case 'close-request-meeting-dialog': document.getElementById('request-meeting-dialog')?.close(); break;
-    case 'close-request-status-banner': closeRequestStatusBanner(); break;
+    case 'close-request-status-banner':  closeRequestStatusBanner(); break;
   }
 });
 
@@ -717,3 +773,4 @@ window.addEventListener('beforeunload', () => {
   if (_unsubscribeMeetings) _unsubscribeMeetings();
   if (_unsubscribeRequests) _unsubscribeRequests();
 });
+
