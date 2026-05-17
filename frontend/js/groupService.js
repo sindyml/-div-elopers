@@ -72,6 +72,10 @@ export async function checkAndAcceptInvites(user) {
     });
 
     await updateDoc(docSnap.ref, { status: 'invite accepted' });
+
+    // ADDED: Call handleMemberJoin to create contributions and update payouts
+    const { handleMemberJoin } = await import('./onGroupCreate.js');
+    await handleMemberJoin(groupId, user.uid);
   }
 }
 
@@ -159,6 +163,10 @@ export async function acceptInvite(inviteId, user) {
   });
 
   await updateDoc(inviteRef, { status: 'invite accepted' });
+
+  // ADDED: Call handleMemberJoin to create contributions and update payouts
+  const { handleMemberJoin } = await import('./onGroupCreate.js');
+  await handleMemberJoin(groupId, user.uid);
 }
 
 // Declines a specific invite by ID — called when user clicks Decline on a notification
