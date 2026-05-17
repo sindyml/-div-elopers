@@ -11,20 +11,25 @@ const axios = require('axios');
 
 class PayFastService {
   constructor() {
-    // PayFast credentials from environment variables
-    this.merchantId = process.env.PAYFAST_MERCHANT_ID;
-    this.merchantKey = process.env.PAYFAST_MERCHANT_KEY;
-    this.passphrase = process.env.PAYFAST_PASSPHRASE;
+  // TEMPORARY: Hardcode sandbox credentials for testing
+  // TODO: Remove this and use env variables once Render is fixed
+  this.merchantId = '10000100';
+  this.merchantKey = '46f0cd694581a';
+  this.passphrase = '';
+  
+  console.log('🔧 PayFast Service Initializing with HARDCODED sandbox credentials');
+  console.log('   Merchant ID:', this.merchantId);
+  console.log('   Merchant Key:', this.merchantKey ? '✅ Set' : '❌ NOT FOUND');
 
-    // PayFast URLs (sandbox vs production)
-    this.baseUrl = process.env.NODE_ENV === 'production'
-      ? 'https://www.payfast.co.za/eng/process'
-      : 'https://sandbox.payfast.co.za/eng/process';
+  // PayFast URLs (sandbox vs production)
+  this.baseUrl = process.env.NODE_ENV === 'production'
+    ? 'https://www.payfast.co.za/eng/process'
+    : 'https://sandbox.payfast.co.za/eng/process';
 
-    this.validateUrl = process.env.NODE_ENV === 'production'
-      ? 'https://www.payfast.co.za/eng/query/validate'
-      : 'https://sandbox.payfast.co.za/eng/query/validate';
-  }
+  this.validateUrl = process.env.NODE_ENV === 'production'
+    ? 'https://www.payfast.co.za/eng/query/validate'
+    : 'https://sandbox.payfast.co.za/eng/query/validate';
+}
 
   /**
    * Generate MD5 signature for PayFast request
