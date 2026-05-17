@@ -25,7 +25,7 @@ import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/
 // Just to verify the script is loading properly
 console.log("register is running");
 
-// STEP 4: Helper function that handles ALL OAuth sign-ins (Google, GitHub, Microsoft)
+// STEP 4: Helper function that handles ALL OAuth sign-ins (Google, GitHub)
 async function handleOAuthSignIn(provider, providerName) {
   try {
     const result = await signInWithPopup(auth, provider);
@@ -47,20 +47,56 @@ async function handleOAuthSignIn(provider, providerName) {
         }
       }
       
-      // Always assign 'Member' role for new OAuth registrations (security fix)
-      // Admins can upgrade roles later through admin panel
+      // Ask for role selection (Admin, Treasurer, Member)
+      let selectedRole = 'Member'; // Default
+      const roleInput = prompt("Select your role:\n1 - Admin\n2 - Treasurer\n3 - Member\n\nEnter number (1-3):");
+      
+      if (roleInput === '1') {
+        selectedRole = 'Admin';
+      } else if (roleInput === '2') {
+        selectedRole = 'Treasurer';
+      } else if (roleInput === '3') {
+        selectedRole = 'Member';
+      } else {
+        selectedRole = 'Member'; // Default if invalid input
+      }
+      
+      // Try to set custom claim in Firebase Auth (optional - for advanced role checking)
+      try {
+        const idToken = await user.getIdToken();
+        await fetch('/api/set-user-role', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            role: selectedRole
+          })
+        });
+        // Force refresh the token to get new claims
+        await user.getIdToken(true);
+      } catch (claimError) {
+        console.warn('Could not set custom claims:', claimError);
+        // Continue anyway - Firestore role will still work
+      }
+      
+      // Save to Firestore with selected role
       await setDoc(doc(db, "users", user.uid), {
         email: user.email,
         displayName: displayName,
-        role: 'Member',
+        role: selectedRole,
         provider: providerName,
         createdAt: new Date().toISOString()
       });
-      alert("Account created successfully!");
+      
+      alert(`Account created successfully! Your role is: ${selectedRole}`);
       window.location.href = "dashboard.html";
     } else {
       // RETURNING USER: Just welcome them back and redirect
-      alert("Welcome back!");
+      const userData = userDoc.data();
+      alert(`Welcome back! Your role is: ${userData.role || 'Member'}`);
       window.location.href = "dashboard.html";
     }
     
@@ -89,7 +125,6 @@ async function handleOAuthSignIn(provider, providerName) {
 }
 
 // STEP 5: EMAIL/PASSWORD REGISTRATION (traditional signup)
-// EMAIL/PASSWORD REGISTRATION
 const form = document.getElementById("registerForm");
 
 if (form) {
@@ -121,6 +156,25 @@ if (form) {
         createdAt: new Date().toISOString()
       });
 
+      // Try to set custom claim
+      try {
+        const idToken = await user.getIdToken();
+        await fetch('/api/set-user-role', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            role: role
+          })
+        });
+        await user.getIdToken(true);
+      } catch (claimError) {
+        console.warn('Could not set custom claims:', claimError);
+      }
+
       alert("Registration successful! Please check your email to verify your account.");
       window.location.href = "login.html";
 
@@ -145,4 +199,3 @@ if (githubBtn) {
     handleOAuthSignIn(new GithubAuthProvider(), "github");
   });
 }
-
