@@ -65,6 +65,8 @@ export function applyRoleUI(role) {
       const layout = document.querySelector('section.meetings-layout');
       if (layout) layout.style.gridTemplateColumns = '1fr';
     }
+    // Show the member info banner
+    showMemberBanner();
   }
 
   const timeInput = document.getElementById('meeting-time');
@@ -73,6 +75,60 @@ export function applyRoleUI(role) {
     timeInput.max = MEETING_TIME.MAX;
   }
 }
+
+/* ── Member info banner ───────────────────────────────────── */
+
+export function showMemberBanner() {
+  const banner = document.getElementById('member-info-banner');
+  if (banner) banner.removeAttribute('hidden');
+}
+
+export function closeMemberBanner() {
+  const banner = document.getElementById('member-info-banner');
+  if (banner) banner.setAttribute('hidden', '');
+}
+window.closeMemberBanner = closeMemberBanner;
+
+export function openRequestMeetingDialog() {
+  const dialog = document.getElementById('request-meeting-dialog');
+  if (dialog) dialog.showModal();
+}
+window.openRequestMeetingDialog = openRequestMeetingDialog;
+
+export async function submitMeetingRequest() {
+  const textarea  = document.getElementById('request-meeting-text');
+  const statusEl  = document.getElementById('request-meeting-status');
+  const text      = textarea ? textarea.value.trim() : '';
+
+  if (!text) {
+    if (statusEl) statusEl.textContent = 'Please describe the meeting you would like to request.';
+    return;
+  }
+
+  const saveBtn = document.getElementById('request-meeting-save-btn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Sending…'; }
+
+  try {
+    await addDoc(collection(db, COLLECTIONS.MEETING_REQUESTS || 'meetingRequests'), {
+      groupId:     currentGroupId,
+      requestedBy: currentUser.uid,
+      details:     text,
+      status:      'pending',
+      createdAt:   serverTimestamp(),
+    });
+    if (statusEl) statusEl.textContent = '';
+    const dialog = document.getElementById('request-meeting-dialog');
+    if (dialog) dialog.close();
+    if (textarea) textarea.value = '';
+    showNotification('Your meeting request has been sent to the group admin.');
+  } catch (err) {
+    console.error('Failed to submit meeting request:', err);
+    if (statusEl) statusEl.textContent = 'Failed to send request. Please try again.';
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Send Request'; }
+  }
+}
+window.submitMeetingRequest = submitMeetingRequest;
 
 /**
  * Populates the group <select> from the groups array already returned
@@ -126,10 +182,10 @@ export function startMeetingListener(role) {
 
   if (!currentGroupId) return;
 
-//to stop new meeting notifications firing for existing meetings when the page loads, add "initialLoadDone"
-let initialLoadDone = false;
+  //to stop new meeting notifications firing for existing meetings when the page loads, add "initialLoadDone"
+  let initialLoadDone = false;
 
-const meetingsQuery = query(
+  const meetingsQuery = query(
     collection(db, COLLECTIONS.MEETINGS),
     where('groupId', '==', currentGroupId),
     orderBy('date', 'asc'),
@@ -409,6 +465,15 @@ if (minutesForm) {
   });
 }
 
+// ── Request meeting form submit ────────────────────────────
+const requestMeetingForm = document.getElementById('request-meeting-form');
+if (requestMeetingForm) {
+  requestMeetingForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitMeetingRequest();
+  });
+}
+
 // ── Delegated click handler for data-action buttons ────────
 document.addEventListener('click', (e) => {
   const action = e.target.closest('[data-action]')?.dataset.action;
@@ -417,6 +482,13 @@ document.addEventListener('click', (e) => {
     closeBanner();
   } else if (action === 'close-minutes-dialog') {
     const dialog = document.getElementById('minutes-dialog');
+    if (dialog) dialog.close();
+  } else if (action === 'close-member-banner') {
+    closeMemberBanner();
+  } else if (action === 'open-request-meeting') {
+    openRequestMeetingDialog();
+  } else if (action === 'close-request-meeting-dialog') {
+    const dialog = document.getElementById('request-meeting-dialog');
     if (dialog) dialog.close();
   }
 });
