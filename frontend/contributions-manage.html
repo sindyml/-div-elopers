@@ -370,20 +370,21 @@
         });
 
         // Wait for Firebase auth state before loading page data
-        auth.onAuthStateChanged((user) => {
+        /*auth.onAuthStateChanged((user) => {
             if (!user) {
                 window.location.href = 'login.html';
                 return;
             }
             loadManagePage();
-        });
+        }); */
+        loadManagePage();
     </script>
 
-    <!-- Firebase compat SDK for navbar auth state -->
+    <!-- Firebase compat SDK for navbar auth state 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="js/firebase-compat-init.js"></script>
     <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
+    <script src="components/footer.js"></script> -->
 </body>
 </html>

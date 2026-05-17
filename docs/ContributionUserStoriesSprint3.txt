@@ -1,0 +1,18 @@
+Dispute Resolution
+"As a Member, I want to dispute a missed payment so that I can correct errors in my contribution record."
+
+"As a Treasurer, I want to approve or reject a dispute so that I can correct contribution records when a member provides valid proof of payment."
+
+Payment Evidence
+"As a Member, I want the system to record when I pay online so that the treasurer knows my payment was made electronically."
+
+"As a Member, I want to upload proof of payment so that the treasurer can verify my offline payment."
+
+"As a Treasurer, I want to see whether a payment was made online or via proof upload so that I know how to verify it before confirming."
+
+"As a Treasurer, I want to view uploaded proof files so that I can verify offline payments."
+
+Payment Gateway Link
+"As a Member, I want to pay my contribution online through a payment gateway so that I don't have to pay cash or do EFT manually."
+
+"As a Treasurer, I want to be notified when a member pays online so that I can confirm their contribution."

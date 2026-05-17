@@ -72,10 +72,10 @@
             getMemberDisputes,
             createDispute,
             listenToNotifications,
-            loadMyPage as loadContributionsPage
-        } from 'js/contributions.js';
-        import { PaymentModal } from 'components/payment-modal.js';
-        import { uploadPaymentProof, validateProofFile } from 'js/payment-upload.js';
+            
+        } from './js/contributions.js';
+        /*import { PaymentModal } from './components/payment-modal.js';
+        import { uploadPaymentProof, validateProofFile } from './js/payment-upload.js';
 
         // ── Payment modal ────────────────────────────────────────
         const paymentModal = new PaymentModal();
@@ -86,7 +86,7 @@
             const err = validateProofFile(file);
             if (err) throw new Error(err);
             await uploadPaymentProof(file, paymentId, user.uid);
-        };
+        };*/
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -422,7 +422,7 @@
             container.appendChild(subMessage);
         }
 
-        async function loadMyPage() {
+     async function loadMyPage() {
             const currentUserId = getCurrentUserId();
             if (!currentUserId) {
                 window.location.href = 'login.html';
@@ -471,20 +471,21 @@
         });
 
         // Wait for Firebase auth state before loading page data
-        auth.onAuthStateChanged((user) => {
+       /* auth.onAuthStateChanged((user) => {
             if (!user) {
                 window.location.href = 'login.html';
                 return;
             }
             loadMyPage();
-        });
+        });*/
+        loadMyPage();
     </script>
 
-    <!-- Firebase compat SDK for navbar auth state -->
+    <!-- Firebase compat SDK for navbar auth state 
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="js/firebase-compat-init.js"></script>
     <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
+    <script src="components/footer.js"></script> -->
 </body>
 </html>

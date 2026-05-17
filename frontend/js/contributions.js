@@ -18,7 +18,19 @@ import { getUserProfile } from '../js/userService.js';
 import { COLLECTIONS } from '../js/constants.js';
 
 function getCurrentUserId() {
-    return auth.currentUser ? auth.currentUser.uid : null;
+    // Hardcoded for testing 
+    //return "5SNBHi5mFqOtAZZKC8st15sKZd62";
+    //return "qCHCRZa8l2TQegqztNlSGSY5cD32";
+    //return "vZhTbL2mrWU5RGUeGMLj6Mbn1kp2";
+    //return "zlBV3VCnFIa7bOdmIbmhxBNr90F2";
+    //return "RUlvGEMQy3ZkChhISVYgdXZnFV72"; //Member
+    return "0gZ8YLt9G2OUmkTnM7KIpc8Gcih2"; //Treasurer
+    
+    /* if (USE_MOCK) {
+         return mockData.currentUserId;
+     }
+     const currentUser = auth.currentUser;
+     return currentUser ? currentUser.uid : null;*/
 }
 
 async function getCurrentUserRole() {
