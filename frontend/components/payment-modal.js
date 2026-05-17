@@ -798,18 +798,8 @@ export class PaymentModal {
       }
 
       const result = await response.json();
-      // Call backend API to initiate PayFast payment
-      const result = await initiatePayment({
-        amount: total,
-        contributionId: contributionId,
-        groupId: groupId,
-        groupName: groupName,
-        userEmail: userEmail,
-        userName: userName,
-        metadata: {
-          paymentMethod: this._selectedMethod
-        }
-      });
+      
+      // REMOVED THE DUPLICATE initiatePayment CALL HERE
 
       this._paymentId = result.paymentId;
 
