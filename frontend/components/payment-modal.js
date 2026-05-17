@@ -32,6 +32,10 @@
 
 import { auth } from '../js/firebase-config.js';
 import {
+  initiatePayment,
+  getPaymentStatus,
+} from '../js/paymentService.js';
+import {
   validatePaymentContext,
   validatePaymentMethod,
   isNetworkAvailable,
@@ -794,6 +798,19 @@ export class PaymentModal {
       }
 
       const result = await response.json();
+      // Call backend API to initiate PayFast payment
+      const result = await initiatePayment({
+        amount: total,
+        contributionId: contributionId,
+        groupId: groupId,
+        groupName: groupName,
+        userEmail: userEmail,
+        userName: userName,
+        metadata: {
+          paymentMethod: this._selectedMethod
+        }
+      });
+
       this._paymentId = result.paymentId;
 
       // Store payment ID in localStorage for return handling
@@ -812,22 +829,6 @@ export class PaymentModal {
         payBtn.textContent = 'Pay Now';
       }
     }
-  }
-
-  /**
-   * Get Firebase auth token
-   * @returns {Promise<string>} Auth token
-   */
-  async _getAuthToken() {
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        return await currentUser.getIdToken();
-      }
-    } catch (e) {
-      console.log('Could not get auth token:', e);
-    }
-    return '';
   }
 
   /**

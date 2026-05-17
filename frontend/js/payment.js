@@ -24,6 +24,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getUserGroups }           from './groupService.js';
 import { PaymentModal }            from '../components/payment-modal.js';
+import { initiatePayment }         from './paymentService.js';
 import { COLLECTIONS }             from './constants.js';
 import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
 //Added imports
@@ -180,13 +181,15 @@ async function initiatePayFastRedirect(user) {
         userName:       userName,
         metadata:       { paymentMethod: 'card' },
       }),
+    const result = await initiatePayment({
+      amount:         amount,
+      contributionId: selectedContribution.id,
+      groupId:        selectedContribution.groupId,
+      groupName:      selectedGroupName,
+      userEmail:      userEmail,
+      userName:       userName,
+      metadata:       { paymentMethod: 'card' },
     });
-
-    if (!response.ok) {
-      throw new Error('Payment initiation failed. Please try again.');
-    }
-
-    const result = await response.json();
 
     // Persist payment ID so payment-return.html can verify the transaction
     localStorage.setItem('pendingPaymentId', result.paymentId);

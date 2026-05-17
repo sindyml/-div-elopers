@@ -55,10 +55,22 @@ async function authenticateUser(req, res, next) {
 async function initiatePayment(req, res) {
   try {
     const { amount, contributionId, groupId, groupName, metadata, userEmail, userName } = req.body;
-    const userId = req.user.uid;
+    const userId = req.user ? req.user.uid : null;
+
+    if (!userId) {
+      sendJSON(res, 401, { error: 'Unauthorized' });
+      return;
+    }
 
     if (!amount || amount <= 0) {
       sendJSON(res, 400, { error: 'Invalid amount' });
+      return;
+    }
+
+    // Check PayFast configuration
+    if (!process.env.PAYFAST_MERCHANT_ID || !process.env.PAYFAST_MERCHANT_KEY) {
+      console.error('❌ PayFast credentials missing in environment variables');
+      sendJSON(res, 503, { error: 'Payment gateway not configured' });
       return;
     }
 
