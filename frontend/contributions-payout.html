@@ -28,26 +28,214 @@
     <footer id="footer-root"></footer>
 
     <script type="module">
-        import { auth } from './js/firebase-config.js';
+        import { auth, db } from './js/firebase-config.js';
         import { 
             getPayoutSchedule,
             getGroupById,
             getCurrentUserId,
-            getUserGroups
+            getUserGroups,
+            getCurrentUserRole
         } from './js/contributions.js';
+        import { doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get(name);
         }
 
+        // ============================================================
+        // EDIT PAYOUT ORDER MODAL (Treasurer/Admin only)
+        // ============================================================
+        async function openEditOrderModal(groupId, groupName, currentPayouts, refreshCallback) {
+            // Create modal
+            const modal = document.createElement('section');
+            modal.classList.add('dispute-modal');
+            
+            const modalContent = document.createElement('article');
+            modalContent.classList.add('dispute-modal-content');
+            modalContent.style.width = '500px';
+            modalContent.style.maxWidth = '90%';
+            
+            const title = document.createElement('h3');
+            title.textContent = `Edit Payout Order - ${groupName}`;
+            modalContent.appendChild(title);
+            
+            // Create list container
+            const listContainer = document.createElement('ul');
+            listContainer.style.listStyle = 'none';
+            listContainer.style.padding = '0';
+            listContainer.style.margin = '1rem 0';
+            
+            // Copy payouts for reordering
+            let currentOrder = [...currentPayouts];
+            
+            function renderList() {
+                listContainer.innerHTML = '';
+                currentOrder.forEach((payout, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.style.display = 'flex';
+                    listItem.style.alignItems = 'center';
+                    listItem.style.justifyContent = 'space-between';
+                    listItem.style.padding = '0.75rem';
+                    listItem.style.borderBottom = '1px solid #e0e0e0';
+                    listItem.style.backgroundColor = index % 2 === 0 ? '#f9f9f9' : 'white';
+                    
+                    const position = document.createElement('span');
+                    position.textContent = `${index + 1}.`;
+                    position.style.fontWeight = 'bold';
+                    position.style.minWidth = '35px';
+                    
+                    const name = document.createElement('span');
+                    name.textContent = payout.userDisplayName;
+                    name.style.flex = '1';
+                    name.style.marginLeft = '0.5rem';
+                    
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.style.display = 'flex';
+                    buttonGroup.style.gap = '5px';
+                    
+                    if (index > 0) {
+                        const upBtn = document.createElement('button');
+                        upBtn.textContent = '↑';
+                        upBtn.classList.add('btn', 'btn--sm');
+                        upBtn.style.background = '#e0e0e0';
+                        upBtn.style.color = '#333';
+                        upBtn.addEventListener('click', () => {
+                            // Swap with previous
+                            [currentOrder[index - 1], currentOrder[index]] = [currentOrder[index], currentOrder[index - 1]];
+                            renderList();
+                        });
+                        buttonGroup.appendChild(upBtn);
+                    }
+                    
+                    if (index < currentOrder.length - 1) {
+                        const downBtn = document.createElement('button');
+                        downBtn.textContent = '↓';
+                        downBtn.classList.add('btn', 'btn--sm');
+                        downBtn.style.background = '#e0e0e0';
+                        downBtn.style.color = '#333';
+                        downBtn.addEventListener('click', () => {
+                            // Swap with next
+                            [currentOrder[index], currentOrder[index + 1]] = [currentOrder[index + 1], currentOrder[index]];
+                            renderList();
+                        });
+                        buttonGroup.appendChild(downBtn);
+                    }
+                    
+                    listItem.appendChild(position);
+                    listItem.appendChild(name);
+                    listItem.appendChild(buttonGroup);
+                    listContainer.appendChild(listItem);
+                });
+            }
+            
+            renderList();
+            modalContent.appendChild(listContainer);
+            
+            // Instructions
+            const instructions = document.createElement('p');
+            instructions.textContent = 'Use ↑ ↓ buttons to reorder members. The payout dates stay with the position.';
+            instructions.style.fontSize = '0.8rem';
+            instructions.style.color = '#666';
+            instructions.style.margin = '0.5rem 0';
+            modalContent.appendChild(instructions);
+            
+            // Action buttons
+            const buttonContainer = document.createElement('div');
+            buttonContainer.classList.add('dispute-modal-actions');
+            buttonContainer.style.marginTop = '1rem';
+            
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.classList.add('btn', 'btn--secondary');
+            cancelBtn.addEventListener('click', () => modal.remove());
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Save Order';
+            saveBtn.classList.add('btn', 'btn--primary');
+saveBtn.addEventListener('click', async () => {
+    // Check if any changes were made
+    let hasChanges = false;
+    for (let i = 0; i < currentOrder.length; i++) {
+        if (currentOrder[i].id !== currentPayouts[i].id) {
+            hasChanges = true;
+            break;
+        }
+    }
+    
+    if (!hasChanges) {
+        alert('No changes made to the order.');
+        modal.remove();
+        return;
+    }
+    
+    const batch = writeBatch(db);
+    
+    // For each position, update the payout document at that position
+    // with the user from the payout that should now be there
+    for (let i = 0; i < currentOrder.length; i++) {
+        const payoutThatShouldBeHere = currentOrder[i];
+        const currentPayoutAtThisPosition = currentPayouts[i];
+        
+        // If the user at this position changed
+        if (payoutThatShouldBeHere.userId !== currentPayoutAtThisPosition.userId) {
+            const payoutRef = doc(db, 'payouts', currentPayoutAtThisPosition.id);
+            batch.update(payoutRef, {
+                userId: payoutThatShouldBeHere.userId,
+                userDisplayName: payoutThatShouldBeHere.userDisplayName
+            });
+        }
+    }
+    
+    await batch.commit();
+    alert('Payout order updated successfully!');
+    modal.remove();
+    refreshCallback(groupId);
+});
+            
+            buttonContainer.appendChild(cancelBtn);
+            buttonContainer.appendChild(saveBtn);
+            modalContent.appendChild(buttonContainer);
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+        }
+
         async function displayPayoutSchedule(groupId, groupName) {
             const container = document.getElementById('payoutContent');
             container.innerHTML = '';
 
+            const headerContainer = document.createElement('div');
+            headerContainer.style.display = 'flex';
+            headerContainer.style.alignItems = 'center';
+            headerContainer.style.justifyContent = 'space-between';
+            headerContainer.style.marginBottom = '1rem';
+            
             const groupHeading = document.createElement('h2');
             groupHeading.textContent = `Group: ${groupName}`;
-            container.appendChild(groupHeading);
+            headerContainer.appendChild(groupHeading);
+            
+            // Check if user is Treasurer or Admin to show Edit button
+            const userRole = await getCurrentUserRole();
+            if (userRole === 'Treasurer' || userRole === 'Admin') {
+                const editOrderBtn = document.createElement('button');
+                editOrderBtn.textContent = '✏️ Edit Payout Order';
+                editOrderBtn.classList.add('btn', 'btn--secondary');
+                editOrderBtn.style.marginLeft = '1rem';
+                
+                // Store reference to refresh function
+                let refreshFunction = null;
+                editOrderBtn.addEventListener('click', async () => {
+                    const payouts = await getPayoutSchedule(groupId);
+                    if (payouts.length === 0) {
+                        alert('No payout schedule found to edit.');
+                        return;
+                    }
+                    await openEditOrderModal(groupId, groupName, payouts, refreshDisplay);
+                });
+                headerContainer.appendChild(editOrderBtn);
+            }
+            
+            container.appendChild(headerContainer);
 
             const payouts = await getPayoutSchedule(groupId);
 
@@ -88,6 +276,14 @@
                 container.appendChild(table);
             }
         }
+        
+        // Refresh function for after order change
+        async function refreshDisplay(groupId) {
+            const group = await getGroupById(groupId);
+            if (group) {
+                await displayPayoutSchedule(groupId, group.name);
+            }
+        }
 
         function displayError(message) {
             const container = document.getElementById('payoutContent');
@@ -122,6 +318,7 @@
 
                 const viewButton = document.createElement('button');
                 viewButton.textContent = 'View Payout Schedule';
+                viewButton.classList.add('btn', 'btn--primary');
                 viewButton.addEventListener('click', () => {
                     window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=dashboard`;
                 });
@@ -176,6 +373,7 @@
             }
             loadPayoutPage();
         });
+        
         
     </script>
 

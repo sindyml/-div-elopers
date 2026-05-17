@@ -36,6 +36,8 @@
       <div class="page-header__actions">
         <small id="group-name-badge" class="group-badge">Loading group...</small>
         <a href="payment.html" class="btn btn--primary btn--sm">💳 Make a Payment</a>
+        //Added a button for the Treasurer to navigate to their management panel. At the bottom, added logic such that the button only shows when the role is Treasurer or Admin.
+        <a href="contributions-manage.html" id="manageContributionsBtn" class="btn btn--outline btn--sm" style="display: none;">📋 Manage Contributions</a>
       </div>
       <!-- ADMIN ACTIONS -->
 <div
@@ -355,6 +357,9 @@
       initPaymentReminders
     } from './js/payment-reminders.js';
 
+    import { getCurrentUserRole } from './js/contributions.js';  // ADDED THIS
+
+
     const auth       = getAuth(getApp());
     const container  = document.getElementById('health-score-container');
     const refreshBtn = document.getElementById('health-refresh-btn');
@@ -382,9 +387,17 @@
       }
     }
 
-    onAuthStateChanged(auth, user => {
+    onAuthStateChanged(auth, async (user) => { // ADDED 'async'
       if (!user) return;
       initPaymentReminders(user.uid);
+
+      // ADDED THIS BLOCK
+      const userRole = await getCurrentUserRole();
+      if (userRole === 'Treasurer' || userRole === 'Admin') {
+          const manageBtn = document.getElementById('manageContributionsBtn');
+          if (manageBtn) manageBtn.style.display = 'inline-flex';
+      }
+
       setTimeout(() => renderHealthScore(user.uid), 1200);
       refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
     });
