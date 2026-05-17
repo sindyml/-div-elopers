@@ -70,15 +70,18 @@ async function initiatePayFastRedirect(user) {
     const contribSnap = await getDocs(
       query(
         collection(db, COLLECTIONS.CONTRIBUTIONS),
-        where('userId', '==', user.uid),
-        orderBy('date', 'desc')
+        where('userId', '==', user.uid)
       )
     );
 
     const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const pending = allContribs.filter(
-      c => c.status === 'pending' || c.status === 'missed'
-    );
+    const pending = allContribs
+      .filter(c => c.status === 'pending' || c.status === 'missed')
+      .sort((a, b) => {
+        const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
+        const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
+        return dateB - dateA;
+      });
 
     if (pending.length === 0) {
       showError('You have no pending contributions to pay.');

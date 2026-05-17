@@ -32,9 +32,6 @@
 
 import { auth } from '../js/firebase-config.js';
 import {
-  getPaymentStatus,
-} from '../js/payment-api-mock.js';
-import {
   validatePaymentContext,
   validatePaymentMethod,
   isNetworkAvailable,
@@ -760,25 +757,23 @@ export class PaymentModal {
       const feeRate = this._selectedMethod === 'card' ? CARD_FEE_RATE : 0;
       const total   = base + base * feeRate;
 
-      // Get user info from Firebase if available
-      let userEmail = '';
-      let userName = '';
-      try {
-        const currentUser = auth.currentUser;
-        if (currentUser) {
-          userEmail = currentUser.email || '';
-          userName = currentUser.displayName || '';
-        }
-      } catch (e) {
-        console.log('Could not get user info:', e);
-      }
+      const user = auth.currentUser;
+      const userEmail = user?.email || '';
+      const userName  = user?.displayName || '';
+      const authToken = user ? await user.getIdToken() : '';
 
-      // Call backend API to initiate PayFast payment
+      console.log('[PaymentModal] Initiating payment for:', {
+        amount: total,
+        contributionId,
+        groupId,
+      });
+
+      // Call real backend API to initiate PayFast payment
       const response = await fetch('/api/payments/initiate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await this._getAuthToken()}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           amount: total,
@@ -794,7 +789,8 @@ export class PaymentModal {
       });
 
       if (!response.ok) {
-        throw new Error('Payment initiation failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Payment initiation failed');
       }
 
       const result = await response.json();
@@ -917,7 +913,16 @@ export class PaymentModal {
     );
 
     try {
-      const statusData = await getPaymentStatus(this._paymentId);
+      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+      const response = await fetch(`/api/payments/status/${this._paymentId}`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch status');
+      }
+
+      const statusData = await response.json();
       this._consecutiveNetErrors = 0; // reset on a successful request
 
       if (statusData.status === 'completed') {

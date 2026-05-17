@@ -17,7 +17,7 @@ const path = require('path');
 const SA_DATA_SRC = fs.readFileSync(
   path.join(__dirname, '..', 'frontend', 'js', 'sa-data.js'),
   'utf-8',
-);
+).replace(/export\s+\{[^}]+\};/g, '');
 
 // ── Helpers to build a sandboxed execution context ──────────
 
