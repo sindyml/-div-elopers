@@ -165,8 +165,7 @@ async function initiatePayFastRedirect(user) {
       contributionId: selectedContribution.id,
       groupId:        selectedContribution.groupId,
     });
-
-    const response = await fetch('/api/payments/initiate', {
+     const response = await fetch('https://div-elopers.onrender.com/api/payments/initiate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
