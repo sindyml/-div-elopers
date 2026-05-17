@@ -21,14 +21,10 @@ class PayFastService {
   console.log('   Merchant ID:', this.merchantId);
   console.log('   Merchant Key:', this.merchantKey ? '✅ Set' : '❌ NOT FOUND');
 
-  // PayFast URLs (sandbox vs production)
-  this.baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://www.payfast.co.za/eng/process'
-    : 'https://sandbox.payfast.co.za/eng/process';
-
-  this.validateUrl = process.env.NODE_ENV === 'production'
-    ? 'https://www.payfast.co.za/eng/query/validate'
-    : 'https://sandbox.payfast.co.za/eng/query/validate';
+  // TEMP: Force Sandbox URL for testing
+  this.baseUrl = 'https://sandbox.payfast.co.za/eng/process';
+  this.validateUrl = 'https://sandbox.payfast.co.za/eng/query/validate';
+  
 }
 
   /**
