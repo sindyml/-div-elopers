@@ -2,198 +2,588 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
   <title>Create Group — StokPal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/theme.css" />
-  <link rel="stylesheet" href="css/register.css" />
+
+  <!-- Fonts -->
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  />
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  />
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Styles -->
+  <link
+    rel="stylesheet"
+    href="css/theme.css"
+  />
+
+  <link
+    rel="stylesheet"
+    href="css/register.css"
+  />
 </head>
+
 <body>
+
+  <!-- NAVBAR -->
   <header id="navbar-root"></header>
+
+  <!-- MAIN -->
   <main class="register-page">
+
     <article class="register-card">
+
+      <!-- HEADER -->
       <header class="register-card__header">
-        <strong class="register-card__logo">StokPal</strong>
-        <h1 class="register-card__title">Create Stokvel Group</h1>
-        <p class="register-card__sub">Set up a new group and start saving together</p>
+
+        <strong class="register-card__logo">
+          StokPal
+        </strong>
+
+        <h1 class="register-card__title">
+          Create Stokvel Group
+        </h1>
+
+        <p class="register-card__sub">
+          Set up a new group and start saving together
+        </p>
+
       </header>
 
+      <!-- BODY -->
       <section class="register-card__body">
-        <aside id="message" class="alert alert--hidden" aria-live="polite"></aside>
 
-        <form id="groupForm" class="register-form">
+        <!-- MESSAGE -->
+        <aside
+          id="message"
+          class="alert alert--hidden"
+          aria-live="polite"
+        ></aside>
+
+        <!-- FORM -->
+        <form
+          id="groupForm"
+          class="register-form"
+        >
+
+          <!-- GROUP NAME -->
           <div class="form-group">
-            <label for="name" class="form-label">Group Name</label>
-            <input type="text" id="name" class="form-input" placeholder="e.g. Kasi Savers" required />
+
+            <label
+              for="name"
+              class="form-label"
+            >
+              Group Name
+            </label>
+
+            <input
+              type="text"
+              id="name"
+              class="form-input"
+              placeholder="e.g. Kasi Savers"
+              required
+            />
+
           </div>
 
+          <!-- CONTRIBUTION -->
           <div class="form-group">
-            <label for="amount" class="form-label">Contribution Amount (R)</label>
-            <input type="number" id="amount" class="form-input" placeholder="e.g. 500" required />
+
+            <label
+              for="amount"
+              class="form-label"
+            >
+              Contribution Amount (R)
+            </label>
+
+            <input
+              type="number"
+              id="amount"
+              class="form-input"
+              placeholder="e.g. 500"
+              required
+            />
+
           </div>
 
+          <!-- PAYOUT ORDER -->
           <div class="form-group">
-            <label for="payout" class="form-label">Payout Order</label>
-            <input type="text" id="payout" class="form-input" placeholder="Comma-separated member UIDs" />
+
+            <label
+              for="payout"
+              class="form-label"
+            >
+              Payout Order
+            </label>
+
+            <input
+              type="text"
+              id="payout"
+              class="form-input"
+              placeholder="Comma-separated member UIDs"
+            />
+
           </div>
 
+          <!-- FREQUENCY -->
           <div class="form-group">
-            <label for="frequency" class="form-label">Meeting Frequency</label>
-            <select id="frequency" class="form-input form-select">
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
+
+            <label
+              for="frequency"
+              class="form-label"
+            >
+              Meeting Frequency
+            </label>
+
+            <select
+              id="frequency"
+              class="form-input form-select"
+            >
+
+              <option value="weekly">
+                Weekly
+              </option>
+
+              <option value="monthly">
+                Monthly
+              </option>
+
             </select>
+
           </div>
 
-          <button type="submit" class="btn btn--primary btn--full">Create Group</button>
+          <!-- SUBMIT -->
+          <button
+            type="submit"
+            class="btn btn--primary btn--full"
+          >
+            Create Group
+          </button>
+
         </form>
+
       </section>
 
+      <!-- FOOTER -->
       <footer class="register-card__footer">
-        <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+        <p>
+          <a href="dashboard.html">
+            ← Back to Dashboard
+          </a>
+        </p>
+
       </footer>
+
     </article>
+
   </main>
+
+  <!-- FOOTER -->
   <footer id="footer-root"></footer>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-compat-init.js"></script>
-  <script>
-  (function () {
-    const db   = firebase.firestore();
-    const auth = firebase.auth();
+  <!-- ========================================= -->
+  <!-- MODULAR FIREBASE SCRIPT -->
+  <!-- ========================================= -->
 
-    const form    = document.getElementById('groupForm');
-    const message = document.getElementById('message');
+  <script type="module">
+
+    // =========================================
+    // IMPORTS
+    // =========================================
+
+    import {
+      auth,
+      db
+    }
+    from "./js/firebase-config.js";
+
+    import {
+      collection,
+      addDoc,
+      doc,
+      setDoc,
+      getDoc,
+      writeBatch,
+      serverTimestamp,
+      Timestamp
+    }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    import {
+      onAuthStateChanged
+    }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+    // =========================================
+    // ELEMENTS
+    // =========================================
+
+    const form =
+      document.getElementById(
+        "groupForm"
+      );
+
+    const message =
+      document.getElementById(
+        "message"
+      );
+
+    // =========================================
+    // SHOW MESSAGE
+    // =========================================
 
     function showMsg(text, type) {
+
       message.textContent = text;
-      message.className = 'alert alert--' + type;
+
+      message.className =
+        "alert alert--" + type;
     }
 
-    // Redirect to login if not authenticated
-    auth.onAuthStateChanged(function (user) {
-      if (!user) {
-        window.location.href = 'login.html';
+    // =========================================
+    // AUTH CHECK
+    // =========================================
+
+    onAuthStateChanged(
+      auth,
+      (user) => {
+
+        if (!user) {
+
+          window.location.href =
+            "login.html";
+        }
       }
-    });
+    );
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    // =========================================
+    // FORM SUBMIT
+    // =========================================
 
-      const name      = document.getElementById('name').value.trim();
-      const amount    = document.getElementById('amount').value;
-      const payout    = document.getElementById('payout').value;
-      const frequency = document.getElementById('frequency').value;
+    form.addEventListener(
+      "submit",
+      async (e) => {
 
-      // Parse and normalize payout order: filter empty entries and de-duplicate
-      let payoutOrder = [];
-      if (payout) {
-        const rawOrder = payout.split(',').map(p => p.trim()).filter(p => p.length > 0);
-        payoutOrder = [...new Set(rawOrder)]; // Remove duplicates
+        e.preventDefault();
 
-        // Validate that UIDs are non-empty and look reasonable
-        if (payoutOrder.length > 0 && payoutOrder.some(uid => uid.length < 3)) {
-          showMsg('Invalid payout order: UIDs must be at least 3 characters', 'error');
+        const user =
+          auth.currentUser;
+
+        if (!user) {
+
+          showMsg(
+            "You must be logged in.",
+            "error"
+          );
+
           return;
         }
-      }
 
-      if (!auth.currentUser) {
-        showMsg('You must be logged in.', 'error');
-        return;
-      }
+        try {
 
-      showMsg('Creating group…', 'success');
+          // ===================================
+          // FORM VALUES
+          // ===================================
 
-      try {
-        const groupRef = await db.collection('groups').add({
-          name,
-          contributionAmount: Number(amount),
-          payoutOrder,
-          totalBalance: 0,
-          meetingFrequency: frequency,
-          createdBy: auth.currentUser.uid,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+          const name =
+            document.getElementById("name")
+              .value
+              .trim();
 
-        await groupRef.collection('members').doc(auth.currentUser.uid).set({
-          uid: auth.currentUser.uid,
-          role: 'admin',
-          joinedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+          const amount =
+            Number(
+              document.getElementById("amount")
+                .value
+            );
 
-        // Create a membership record for quick dashboard lookups
-        await db.collection('memberships').doc(auth.currentUser.uid + '_' + groupRef.id).set({
-          uid: auth.currentUser.uid,
-          groupId: groupRef.id
-        });
+          const payout =
+            document.getElementById("payout")
+              .value;
 
-        // Initialize payouts if order provided
-        if (payoutOrder.length > 0) {
-          const batch = db.batch();
+          const frequency =
+            document.getElementById("frequency")
+              .value;
 
-          const payoutDetailsPromises = payoutOrder.map(async (uid, i) => {
-            let displayName = 'Member ' + (i + 1);
-            try {
-              const userDoc = await db.collection('users').doc(uid).get();
-              if (userDoc.exists) {
-                displayName = userDoc.data().displayName || userDoc.data().name || userDoc.data().email || displayName;
-              }
-            } catch (e) {
-              console.warn('Could not fetch user name for payout:', uid);
+          // ===================================
+          // PAYOUT ORDER
+          // ===================================
+
+          let payoutOrder = [];
+
+          if (payout) {
+
+            payoutOrder =
+              [
+                ...new Set(
+                  payout
+                    .split(",")
+                    .map(p => p.trim())
+                    .filter(Boolean)
+                )
+              ];
+
+            // Validate UIDs
+            if (
+              payoutOrder.some(
+                uid => uid.length < 3
+              )
+            ) {
+
+              showMsg(
+                "Invalid payout order.",
+                "error"
+              );
+
+              return;
             }
-            return { uid, displayName, order: i + 1 };
-          });
-
-          const payoutDetails = await Promise.all(payoutDetailsPromises);
-
-          for (const detail of payoutDetails) {
-            // Calculate payout date using calendar months instead of hard-coded 30 days
-            const payoutDate = new Date();
-            payoutDate.setMonth(payoutDate.getMonth() + (detail.order - 1));
-
-            const payoutRef = db.collection('payouts').doc();
-            batch.set(payoutRef, {
-              groupId: groupRef.id,
-              userId: detail.uid,
-              userDisplayName: detail.displayName,
-              order: detail.order,
-              amount: Number(amount),
-              payoutDate: firebase.firestore.Timestamp.fromDate(payoutDate),
-              status: 'pending'
-            });
           }
-          await batch.commit();
+
+          showMsg(
+            "Creating group...",
+            "success"
+          );
+
+          // ===================================
+          // CREATE GROUP
+          // ===================================
+
+          const groupRef =
+            await addDoc(
+              collection(db, "groups"),
+              {
+
+                name,
+
+                contributionAmount:
+                  amount,
+
+                payoutOrder,
+
+                totalBalance: 0,
+
+                meetingFrequency:
+                  frequency,
+
+                createdBy:
+                  user.uid,
+
+                createdAt:
+                  serverTimestamp()
+              }
+            );
+
+          // ===================================
+          // ADD ADMIN MEMBER
+          // ===================================
+
+          await setDoc(
+            doc(
+              db,
+              "groups",
+              groupRef.id,
+              "members",
+              user.uid
+            ),
+            {
+
+              uid: user.uid,
+
+              role: "admin",
+
+              joinedAt:
+                serverTimestamp()
+            }
+          );
+
+          // ===================================
+          // MEMBERSHIP RECORD
+          // ===================================
+
+          await setDoc(
+            doc(
+              db,
+              "memberships",
+              `${user.uid}_${groupRef.id}`
+            ),
+            {
+
+              uid: user.uid,
+
+              groupId:
+                groupRef.id
+            }
+          );
+
+          // ===================================
+          // OPTIONAL PAYOUTS
+          // ===================================
+
+          if (payoutOrder.length > 0) {
+
+            const batch =
+              writeBatch(db);
+
+            for (
+              let i = 0;
+              i < payoutOrder.length;
+              i++
+            ) {
+
+              const uid =
+                payoutOrder[i];
+
+              let displayName =
+                `Member ${i + 1}`;
+
+              try {
+
+                const userDoc =
+                  await getDoc(
+                    doc(db, "users", uid)
+                  );
+
+                if (userDoc.exists()) {
+
+                  displayName =
+                    userDoc.data().displayName
+                    || userDoc.data().name
+                    || userDoc.data().email
+                    || displayName;
+                }
+
+              } catch (err) {
+
+                console.warn(
+                  "Could not fetch user:",
+                  err
+                );
+              }
+
+              // Payout date
+              const payoutDate =
+                new Date();
+
+              payoutDate.setMonth(
+                payoutDate.getMonth() + i
+              );
+
+              const payoutRef =
+                doc(
+                  collection(
+                    db,
+                    "payouts"
+                  )
+                );
+
+              batch.set(
+                payoutRef,
+                {
+
+                  groupId:
+                    groupRef.id,
+
+                  userId: uid,
+
+                  userDisplayName:
+                    displayName,
+
+                  order: i + 1,
+
+                  amount,
+
+                  payoutDate:
+                    Timestamp.fromDate(
+                      payoutDate
+                    ),
+
+                  status:
+                    "pending"
+                }
+              );
+            }
+
+            await batch.commit();
+          }
+
+          // ===================================
+          // OPTIONAL:
+          // HANDLE GROUP CREATION LOGIC
+          // ===================================
+
+          try {
+
+            const {
+              handleGroupCreation
+            }
+            =
+            await import(
+              "./js/onGroupCreate.js"
+            );
+
+            await handleGroupCreation(
+              groupRef.id
+            );
+
+          } catch (err) {
+
+            console.warn(
+              "onGroupCreate.js skipped:",
+              err
+            );
+          }
+
+          // ===================================
+          // SUCCESS
+          // ===================================
+
+          showMsg(
+            "Group created successfully! Redirecting...",
+            "success"
+          );
+
+          form.reset();
+
+          setTimeout(() => {
+
+            window.location.href =
+              "dashboard.html";
+
+          }, 1500);
+
+        } catch (err) {
+
+          console.error(err);
+
+          showMsg(
+            "Error: " + err.message,
+            "error"
+          );
         }
-
-        // ============================================================
-        // ADDED: Call handleGroupCreation to create contributions and correct payouts
-        // ============================================================
-        // Import the function dynamically
-        const { handleGroupCreation } = await import('./js/onGroupCreate.js');
-        await handleGroupCreation(groupRef.id);
-        // ============================================================
-        //redirects user to dashboard upon successfully creating a group
-        showMsg('Group created successfully! Redirecting...', 'success');
-
-        form.reset();
-
-        setTimeout(() => {
-        window.location.href = "dashboard.html";
-      }, 1500);
-      } catch (err) {
-        console.error(err);
-        showMsg('Error: ' + err.message, 'error');
       }
-    });
-  })();
+    );
+
   </script>
+
+  <!-- COMPONENTS -->
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
+
 </body>
 </html>
