@@ -9,6 +9,13 @@ require('dotenv').config();
 
 const PORT = process.env.PORT || 8080;
 
+// ── CORS Helper ───────────────────────────────────────────────────────────────
+function setCORSHeaders(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 if (!admin.apps.length) {
   try {
@@ -60,16 +67,18 @@ function parseJSONBody(req, callback) {
 }
 
 function jsonError(res, status, message) {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+  setCORSHeaders(res);
+  res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: message }));
 }
 
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
 
-  // CORS preflight
+  // CORS preflight for ALL API routes
   if (req.method === 'OPTIONS' && urlPath.startsWith('/api/')) {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    setCORSHeaders(res);
+    res.writeHead(204);
     res.end();
     return;
   }
@@ -83,10 +92,20 @@ const server = http.createServer((req, res) => {
     const fakeReq = { method: req.method, url: paymentPath, headers: req.headers, body: null, params: {}, query: {}, user: null };
     const fakeRes = {
       statusCode: 200, headers: {},
-      json: (data) => { fakeRes.setHeader('Content-Type', 'application/json'); fakeRes.end(JSON.stringify(data)); },
+      json: (data) => { 
+        setCORSHeaders(res);
+        fakeRes.setHeader('Content-Type', 'application/json'); 
+        fakeRes.end(JSON.stringify(data)); 
+      },
       status: (code) => { fakeRes.statusCode = code; return fakeRes; },
       setHeader: (key, value) => { fakeRes.headers[key] = value; },
-      end: (data) => { fakeRes.headers['Content-Type'] = fakeRes.headers['Content-Type'] || 'application/json'; Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k])); res.writeHead(fakeRes.statusCode); res.end(data); },
+      end: (data) => { 
+        fakeRes.headers['Content-Type'] = fakeRes.headers['Content-Type'] || 'application/json'; 
+        Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
+        setCORSHeaders(res);
+        res.writeHead(fakeRes.statusCode); 
+        res.end(data); 
+      },
       getHeader: (key) => fakeRes.headers[key],
     };
     
@@ -120,13 +139,51 @@ const server = http.createServer((req, res) => {
         let parsedBody = {};
         try { parsedBody = body ? JSON.parse(body) : {}; } catch(e) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; }
         const fakeReq = { method: req.method, url: payoutPath, headers: req.headers, body: parsedBody, params: {}, query: {} };
-        const fakeRes = { headersSent: false, statusCode: 200, headers: {}, json: (data) => { if (fakeRes.headersSent) return; fakeRes.headersSent = true; fakeRes.setHeader('Content-Type', 'application/json'); fakeRes.end(JSON.stringify(data)); }, status: (code) => { fakeRes.statusCode = code; return fakeRes; }, setHeader: (key, value) => { fakeRes.headers[key] = value; }, end: (data) => { if (fakeRes.headersSent) return; fakeRes.headersSent = true; Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k])); res.writeHead(fakeRes.statusCode); res.end(data); } };
+        const fakeRes = { 
+          headersSent: false, statusCode: 200, headers: {}, 
+          json: (data) => { 
+            if (fakeRes.headersSent) return; 
+            fakeRes.headersSent = true; 
+            setCORSHeaders(res);
+            fakeRes.setHeader('Content-Type', 'application/json'); 
+            fakeRes.end(JSON.stringify(data)); 
+          }, 
+          status: (code) => { fakeRes.statusCode = code; return fakeRes; }, 
+          setHeader: (key, value) => { fakeRes.headers[key] = value; }, 
+          end: (data) => { 
+            if (fakeRes.headersSent) return; 
+            fakeRes.headersSent = true; 
+            Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
+            setCORSHeaders(res);
+            res.writeHead(fakeRes.statusCode); 
+            res.end(data); 
+          } 
+        };
         processRequest(fakeReq, fakeRes);
       });
       return;
     } else {
       const fakeReq = { method: req.method, url: payoutPath, headers: req.headers, body: {}, params: {}, query: {} };
-      const fakeRes = { headersSent: false, statusCode: 200, headers: {}, json: (data) => { if (fakeRes.headersSent) return; fakeRes.headersSent = true; fakeRes.setHeader('Content-Type', 'application/json'); fakeRes.end(JSON.stringify(data)); }, status: (code) => { fakeRes.statusCode = code; return fakeRes; }, setHeader: (key, value) => { fakeRes.headers[key] = value; }, end: (data) => { if (fakeRes.headersSent) return; fakeRes.headersSent = true; Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k])); res.writeHead(fakeRes.statusCode); res.end(data); } };
+      const fakeRes = { 
+        headersSent: false, statusCode: 200, headers: {}, 
+        json: (data) => { 
+          if (fakeRes.headersSent) return; 
+          fakeRes.headersSent = true; 
+          setCORSHeaders(res);
+          fakeRes.setHeader('Content-Type', 'application/json'); 
+          fakeRes.end(JSON.stringify(data)); 
+        }, 
+        status: (code) => { fakeRes.statusCode = code; return fakeRes; }, 
+        setHeader: (key, value) => { fakeRes.headers[key] = value; }, 
+        end: (data) => { 
+          if (fakeRes.headersSent) return; 
+          fakeRes.headersSent = true; 
+          Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
+          setCORSHeaders(res);
+          res.writeHead(fakeRes.statusCode); 
+          res.end(data); 
+        } 
+      };
       processRequest(fakeReq, fakeRes);
     }
     return;
@@ -136,6 +193,7 @@ const server = http.createServer((req, res) => {
      /api/getFirebaseConfig
      ──────────────────────────────────────────────────────────────────────────── */
   if (urlPath === '/api/getFirebaseConfig' && req.method === 'GET') {
+    setCORSHeaders(res);
     const config = {
       apiKey: process.env.FIREBASE_API_KEY || '',
       authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
