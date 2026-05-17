@@ -61,14 +61,14 @@ export async function checkAndAcceptInvites(user) {
     await setDoc(doc(db, COLLECTIONS.GROUPS, groupId, 'members', user.uid), {
       uid: user.uid,
       displayName: user.displayName || user.email,
-      role: 'member',
+      role: 'Member',
       joinedAt: serverTimestamp()
     });
 
     await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
       uid: user.uid,
       groupId: groupId,
-      role: 'member'
+      role: 'Member'
     });
 
     await updateDoc(docSnap.ref, { status: 'invite accepted' });
@@ -148,14 +148,14 @@ export async function acceptInvite(inviteId, user) {
   await setDoc(doc(db, COLLECTIONS.GROUPS, groupId, 'members', user.uid), {
     uid: user.uid,
     displayName: user.displayName || user.email,
-    role: 'member',
+    role: 'Member',
     joinedAt: serverTimestamp()
   });
 
   await setDoc(doc(db, COLLECTIONS.MEMBERSHIPS, user.uid + '_' + groupId), {
     uid: user.uid,
     groupId: groupId,
-    role: 'member'
+    role: 'Member'
   });
 
   await updateDoc(inviteRef, { status: 'invite accepted' });
