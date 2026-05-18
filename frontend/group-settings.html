@@ -147,11 +147,9 @@ listenForAuth(async (user) => {
   // ====================================
 
   if (
-    userRole === "admin"
-    
-  ) if (m.uid === currentUser.uid) {
-  return;
-}{
+  userRole === "admin" &&
+  m.uid !== currentUser.uid
+) {
 
     const treasurerBtn =
       document.createElement("button");
