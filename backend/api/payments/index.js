@@ -29,11 +29,11 @@ async function authenticateUser(req, res, next) {
   }
 }
 
-// ✅ FIXED: uses %20 not + so it matches what browser sends to PayFast
+// ✅ FIXED: uses URLSearchParams so + matches exactly what browser form sends
 function generateSignature(data) {
-  const paramString = Object.keys(data)
-    .map(key => `${key}=${encodeURIComponent(String(data[key]).trim())}`)
-    .join('&');
+  const paramString = new URLSearchParams(
+    Object.fromEntries(Object.keys(data).map(k => [k, String(data[k]).trim()]))
+  ).toString();
 
   console.log('🔐 SIGNATURE PARAM STRING:', paramString);
   return {
@@ -63,6 +63,7 @@ async function initiatePayment(req, res) {
     const rawName = groupName ? `${groupName} - Contribution` : 'Stokvel Contribution';
     const itemName = rawName.replace(/[^a-zA-Z0-9 .,_-]/g, '').trim().substring(0, 100);
 
+    // Fields in this exact order — do NOT change order
     const paymentData = {
       merchant_id:  '10000100',
       merchant_key: '46f0cd694581a',
