@@ -29,17 +29,18 @@ async function authenticateUser(req, res, next) {
   }
 }
 
-// ✅ FIXED: uses URLSearchParams so + matches exactly what browser form sends
+// ✅ CORRECT: Sort keys alphabetically as PayFast requires
 function generateSignature(data) {
-  const paramString = new URLSearchParams(
-    Object.fromEntries(Object.keys(data).map(k => [k, String(data[k]).trim()]))
-  ).toString();
+  const paramString = Object.keys(data)
+    .sort() // alphabetical order required by PayFast
+    .filter(key => data[key] !== '' && data[key] != null)
+    .map(key => `${key}=${encodeURIComponent(String(data[key]).trim())}`)
+    .join('&');
 
   console.log('🔐 SIGNATURE PARAM STRING:', paramString);
-  return {
-    paramString,
-    signature: crypto.createHash('md5').update(paramString).digest('hex')
-  };
+  const signature = crypto.createHash('md5').update(paramString).digest('hex');
+  console.log('🔐 SIGNATURE:', signature);
+  return { paramString, signature };
 }
 
 async function initiatePayment(req, res) {
@@ -60,29 +61,24 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
+    // Simple clean item name - no special characters
     const itemName = 'Stokvel Contribution';
 
-    // Determine base URL dynamically for sandbox/local testing
-    const host = req.headers.host || 'localhost:8080';
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const baseUrl = `${protocol}://${host}`;
-
-    // Fields in this exact order — do NOT change order
+    // PayFast will sort these alphabetically when verifying
     const paymentData = {
+      amount:       parseFloat(amount).toFixed(2),
+      cancel_url:   `https://div-elopers.onrender.com/payment-cancel.html?paymentId=${paymentId}`,
+      item_name:    itemName,
+      m_payment_id: paymentId,
       merchant_id:  '10000100',
       merchant_key: '46f0cd694581a',
-      return_url:   `${baseUrl}/payment-return.html?paymentId=${paymentId}`,
-      cancel_url:   `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`,
-      notify_url:   `${baseUrl}/api/payments/notify`,
-      m_payment_id: paymentId,
-      amount:       parseFloat(amount).toFixed(2),
-      item_name:    itemName,
+      notify_url:   'https://div-elopers.onrender.com/api/payments/notify',
+      return_url:   `https://div-elopers.onrender.com/payment-return.html?paymentId=${paymentId}`,
     };
 
     const { signature } = generateSignature(paymentData);
     paymentData.signature = signature;
 
-    console.log('🔐 SIGNATURE:', signature);
     console.log('📦 PAYMENT DATA:', paymentData);
 
     await paymentRef.set({
@@ -119,7 +115,6 @@ async function initiatePayment(req, res) {
 async function handleNotify(req, res) {
   try {
     console.log('📡 PayFast ITN received:', req.body);
-
     const { m_payment_id, payment_status, amount_gross, pf_payment_id } = req.body;
 
     if (!m_payment_id) {
