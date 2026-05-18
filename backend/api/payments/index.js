@@ -29,16 +29,10 @@ async function authenticateUser(req, res, next) {
   }
 }
 
-// ✅ This is the correct PayFast signature method
+// ✅ FIXED: uses %20 not + so it matches what browser sends to PayFast
 function generateSignature(data) {
   const paramString = Object.keys(data)
-    .map(key => {
-      // Replace spaces with + and encode special chars but NOT slashes/colons in URLs
-      const value = String(data[key])
-        .trim()
-        .replace(/\+/g, ' '); // normalize first
-      return `${key}=${encodeURIComponent(value).replace(/%20/g, '+')}`;
-    })
+    .map(key => `${key}=${encodeURIComponent(String(data[key]).trim())}`)
     .join('&');
 
   console.log('🔐 SIGNATURE PARAM STRING:', paramString);
@@ -66,11 +60,9 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    // Sanitize item_name
     const rawName = groupName ? `${groupName} - Contribution` : 'Stokvel Contribution';
     const itemName = rawName.replace(/[^a-zA-Z0-9 .,_-]/g, '').trim().substring(0, 100);
 
-    // ✅ PayFast requires these fields in THIS exact order
     const paymentData = {
       merchant_id:  '10000100',
       merchant_key: '46f0cd694581a',
@@ -82,7 +74,7 @@ async function initiatePayment(req, res) {
       item_name:    itemName,
     };
 
-    const { paramString, signature } = generateSignature(paymentData);
+    const { signature } = generateSignature(paymentData);
     paymentData.signature = signature;
 
     console.log('🔐 SIGNATURE:', signature);
