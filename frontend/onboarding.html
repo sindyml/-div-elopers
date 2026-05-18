@@ -177,53 +177,57 @@
 </head>
 
 <body>
-<div class="onboarding-wrapper">
-  <div class="onboarding-card">
+<main class="onboarding-wrapper">
+  <article class="onboarding-card">
 
-    <h1 class="onboarding-card__logo">🌿 StokPal</h1>
-    <p class="onboarding-card__sub">Welcome! Let's get you set up with a stokvel group.</p>
+    <header>
+      <h1 class="onboarding-card__logo">🌿 StokPal</h1>
+      <p class="onboarding-card__sub">Welcome! Let's get you set up with a stokvel group.</p>
+    </header>
 
-    <div class="onboarding-tabs">
-      <button class="onboarding-tab active" data-tab="join">Join a Group</button>
-      <button class="onboarding-tab" data-tab="create">Create a Group</button>
-    </div>
+    <nav class="onboarding-tabs" aria-label="Onboarding options">
+      <button id="join-tab" class="onboarding-tab active" data-tab="join" aria-controls="panel-join" aria-selected="true">Join a Group</button>
+      <button id="create-tab" class="onboarding-tab" data-tab="create" aria-controls="panel-create" aria-selected="false">Create a Group</button>
+    </nav>
 
     <!-- JOIN PANEL -->
-    <div class="onboarding-panel active" id="panel-join">
+    <section class="onboarding-panel active" id="panel-join" role="tabpanel" aria-labelledby="join-tab">
       <div class="form-group">
         <label for="search-group-name">Search by group name</label>
         <input type="text" id="search-group-name" placeholder="e.g. Kasi lovers" />
       </div>
       <button class="btn-primary" id="btn-search-group">Search</button>
-      <div class="group-search-results" id="group-search-results"></div>
-      <p class="onboarding-msg" id="join-msg"></p>
-    </div>
+      <div class="group-search-results" id="group-search-results" aria-live="polite"></div>
+      <p class="onboarding-msg" id="join-msg" role="status" aria-live="polite"></p>
+    </section>
 
     <!-- CREATE PANEL -->
-    <div class="onboarding-panel" id="panel-create">
-      <div class="form-group">
-        <label for="new-group-name">Group Name</label>
-        <input type="text" id="new-group-name" placeholder="e.g. Friday Stokvel" required />
-      </div>
-      <div class="form-group">
-        <label for="new-group-freq">Meeting Frequency</label>
-        <select id="new-group-freq">
-          <option value="monthly">Monthly</option>
-          <option value="weekly">Weekly</option>
-          <option value="biweekly">Bi-weekly</option>
-          <option value="quarterly">Quarterly</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="new-group-amount">Contribution Amount (R)</label>
-        <input type="number" id="new-group-amount" placeholder="e.g. 500" min="1" required />
-      </div>
-      <button class="btn-primary" id="btn-create-group">Create Group &amp; Continue</button>
-      <p class="onboarding-msg" id="create-msg"></p>
-    </div>
+    <section class="onboarding-panel" id="panel-create" role="tabpanel" aria-labelledby="create-tab" hidden>
+      <form id="create-group-form">
+        <div class="form-group">
+          <label for="new-group-name">Group Name</label>
+          <input type="text" id="new-group-name" placeholder="e.g. Friday Stokvel" required />
+        </div>
+        <div class="form-group">
+          <label for="new-group-freq">Meeting Frequency</label>
+          <select id="new-group-freq">
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="new-group-amount">Contribution Amount (R)</label>
+          <input type="number" id="new-group-amount" placeholder="e.g. 500" min="1" required />
+        </div>
+        <button type="submit" class="btn-primary" id="btn-create-group">Create Group &amp; Continue</button>
+      </form>
+      <p class="onboarding-msg" id="create-msg" role="status" aria-live="polite"></p>
+    </section>
 
-  </div>
-</div>
+  </article>
+</main>
 
 <!-- Firebase compat (for auth state) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -393,7 +397,8 @@
   }
 
   // ── CREATE GROUP ──────────────────────────────────────────
-  document.getElementById('btn-create-group').addEventListener('click', async () => {
+  document.getElementById('create-group-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
     const name   = document.getElementById('new-group-name').value.trim();
     const freq   = document.getElementById('new-group-freq').value;
     const amount = parseFloat(document.getElementById('new-group-amount').value);

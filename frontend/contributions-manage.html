@@ -24,27 +24,29 @@
         </header>
 
         <!-- PENDING DISPUTES section -->
-        <section id="pending-disputes-section">
-            <h2>PENDING DISPUTES</h2>
+        <section id="pending-disputes-section" aria-labelledby="disputes-heading">
+            <h2 id="disputes-heading">PENDING DISPUTES</h2>
             <button id="viewPendingDisputesBtn" class="btn btn--primary">View Pending Disputes</button>
-            <section id="pendingDisputesContainer">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Member</th>
-                            <th>Group</th>
-                            <th>Amount</th>
-                            <th>Deadline</th>
-                            <th>Reason</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingDisputesTableBody"></tbody>
-                </table>
-            </section>
+            <article id="pendingDisputesContainer" class="card" style="margin-top: var(--space-4);">
+                <div class="data-table-wrapper">
+                    <table class="data-table" aria-label="Pending disputes table">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Group</th>
+                                <th>Amount</th>
+                                <th>Deadline</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingDisputesTableBody"></tbody>
+                    </table>
+                </div>
+            </article>
         </section>
 
-        <section id="manageContent"></section>
+        <section id="manageContent" aria-live="polite"></section>
     </main>
 
     <footer id="footer-root"></footer>
@@ -57,12 +59,12 @@
             getCurrentUserRole,
             getTreasurerGroups,
             getUserDisplayName,
-            updateContributionStatus,
             listenToGroupContributions,
             getPendingDisputes,
-            approveDispute,
             rejectDispute
         } from './js/contributions.js';
+        import { confirmContribution } from './js/contributionService.js';
+        import { approveDispute } from './js/disputeService.js';
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -100,10 +102,19 @@
                 approveBtn.textContent = 'Approve';
                 approveBtn.classList.add('btn', 'btn--success', 'btn--sm');
                 approveBtn.addEventListener('click', async () => {
-                    await approveDispute(dispute.id, dispute.contributionId);
-                    alert('Dispute approved. Contribution status updated to confirmed.');
-                    loadPendingDisputes(); // Refresh
-                    loadManagePage(); // Refresh contribution table
+                    try {
+                        approveBtn.disabled = true;
+                        approveBtn.textContent = '...';
+                        await approveDispute(dispute.id, dispute.contributionId);
+                        alert('Dispute approved. Contribution status updated to confirmed.');
+                        loadPendingDisputes(); // Refresh
+                        loadManagePage(); // Refresh contribution table
+                    } catch (err) {
+                        console.error('Dispute approval failed:', err);
+                        alert('Error: ' + err.message);
+                        approveBtn.disabled = false;
+                        approveBtn.textContent = 'Approve';
+                    }
                 });
                 
                 const rejectBtn = document.createElement('button');
@@ -262,7 +273,17 @@
                         confirmButton.textContent = 'Confirm';
                         confirmButton.classList.add('btn', 'confirm');
                         confirmButton.addEventListener('click', async () => {
-                            await updateContributionStatus(contribution.id, 'confirmed');
+                            try {
+                                confirmButton.disabled = true;
+                                confirmButton.textContent = '...';
+                                await confirmContribution(contribution.id);
+                                alert('Contribution confirmed successfully');
+                            } catch (err) {
+                                console.error('Confirmation failed:', err);
+                                alert('Error: ' + err.message);
+                                confirmButton.disabled = false;
+                                confirmButton.textContent = 'Confirm';
+                            }
                         });
 
                         const missButton = document.createElement('button');

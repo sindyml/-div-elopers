@@ -138,7 +138,7 @@ export async function handleGroupCreation(groupId) {
                 status: 'pending',
                 paymentEvidence: null,
                 evidenceUrl: null,
-                createdAt: new Date()
+                createdAt: Timestamp.now()
             });
             contributionsCreated++;
         }
@@ -172,7 +172,7 @@ export async function handleGroupCreation(groupId) {
             payoutDate: payoutDateStr,
             order: order,
             amount: payoutAmount,
-            createdAt: new Date()
+            createdAt: Timestamp.now()
         });
         payoutsCreated++;
     }
@@ -239,7 +239,7 @@ export async function handleMemberJoin(groupId, userId) {
                 status: 'pending',
                 paymentEvidence: null,
                 evidenceUrl: null,
-                createdAt: new Date()
+                createdAt: Timestamp.now()
             });
         }
         console.log(`[DEBUG] Created contributions for new member ${userId}`);
@@ -279,7 +279,7 @@ export async function handleMemberJoin(groupId, userId) {
             payoutDate: payoutDateStr,
             order: order,
             amount: payoutAmount,
-            createdAt: new Date()
+            createdAt: Timestamp.now()
         });
         console.log(`[DEBUG] Created payout for ${member.uid}, order ${order}, amount ${payoutAmount}`);
     }

@@ -55,8 +55,10 @@ if (!admin.apps.length) {
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-const paymentRoutes = require('./api/payments/index.js');
-const payoutRoutes  = require('./api/payouts/index.js');
+const paymentRoutes      = require('./api/payments/index.js');
+const payoutRoutes       = require('./api/payouts/index.js');
+const contributionRoutes = require('./api/contributions/index.js');
+const disputeRoutes      = require('./api/disputes/index.js');
 
 // ── Static files ──────────────────────────────────────────────────────────────
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend');
@@ -140,6 +142,87 @@ const server = http.createServer((req, res) => {
       parseJSONBody(req, (err, body) => { if (err) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; } parseAndRoute(body); });
     } else { parseAndRoute(); }
     return;
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/contributions/* - Contribution endpoints
+     ──────────────────────────────────────────────────────────────────────────── */
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/disputes/* - Dispute endpoints
+     ──────────────────────────────────────────────────────────────────────────── */
+  if (urlPath.startsWith('/api/disputes/')) {
+    const disputePath = urlPath.replace('/api/disputes', '');
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        let parsedBody = {};
+        try { parsedBody = body ? JSON.parse(body) : {}; } catch(e) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; }
+        const fakeReq = { method: req.method, url: disputePath, headers: req.headers, body: parsedBody, params: {}, query: {} };
+        const fakeRes = {
+          headersSent: false, statusCode: 200, headers: {},
+          json: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            setCORSHeaders(res);
+            fakeRes.setHeader('Content-Type', 'application/json');
+            fakeRes.end(JSON.stringify(data));
+          },
+          status: (code) => { fakeRes.statusCode = code; return fakeRes; },
+          setHeader: (key, value) => { fakeRes.headers[key] = value; },
+          end: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
+            setCORSHeaders(res);
+            res.writeHead(fakeRes.statusCode);
+            res.end(data);
+          }
+        };
+        disputeRoutes(fakeReq, fakeRes);
+      });
+      return;
+    }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/contributions/* - Contribution endpoints
+     ──────────────────────────────────────────────────────────────────────────── */
+  if (urlPath.startsWith('/api/contributions/')) {
+    const contribPath = urlPath.replace('/api/contributions', '');
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        let parsedBody = {};
+        try { parsedBody = body ? JSON.parse(body) : {}; } catch(e) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; }
+        const fakeReq = { method: req.method, url: contribPath, headers: req.headers, body: parsedBody, params: {}, query: {} };
+        const fakeRes = {
+          headersSent: false, statusCode: 200, headers: {},
+          json: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            setCORSHeaders(res);
+            fakeRes.setHeader('Content-Type', 'application/json');
+            fakeRes.end(JSON.stringify(data));
+          },
+          status: (code) => { fakeRes.statusCode = code; return fakeRes; },
+          setHeader: (key, value) => { fakeRes.headers[key] = value; },
+          end: (data) => {
+            if (fakeRes.headersSent) return;
+            fakeRes.headersSent = true;
+            Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
+            setCORSHeaders(res);
+            res.writeHead(fakeRes.statusCode);
+            res.end(data);
+          }
+        };
+        contributionRoutes(fakeReq, fakeRes);
+      });
+      return;
+    }
   }
 
   /* ────────────────────────────────────────────────────────────────────────────
