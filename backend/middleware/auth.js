@@ -13,7 +13,7 @@ async function authenticateUser(req, res, next) {
     // Check for token
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: true };
+        req.user = { uid: 'test-user-123', isAdmin: false };
         return await next();
       }
       return sendError(res, 401, 'No token provided');
@@ -31,7 +31,7 @@ async function authenticateUser(req, res, next) {
       return await next();
     } catch (error) {
       if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: true };
+        req.user = { uid: 'test-user-123', isAdmin: false };
         return await next();
       }
       return sendError(res, 401, 'Invalid token');

@@ -64,6 +64,8 @@ groupSelector.addEventListener('change', async () => {
 
 async function checkAccessForGroup(groupId, uid) {
   generateBtn.disabled = true;
+  exportCsvBtn.disabled = true;
+  exportPdfBtn.disabled = true;
   reportContent.innerHTML = '<div style="padding: 2rem; text-align: center;">Verifying permissions...</div>';
 
   const role = await getUserRoleInGroup(groupId, uid);
@@ -71,14 +73,9 @@ async function checkAccessForGroup(groupId, uid) {
 
   if (roleLower === ROLES.ADMIN.toLowerCase() || roleLower === ROLES.TREASURER.toLowerCase()) {
     generateBtn.disabled = false;
-    exportCsvBtn.disabled = false;
-    exportPdfBtn.disabled = false;
     reportContent.innerHTML = '<div style="padding: var(--space-10); text-align: center; color: var(--color-text-muted);">Select report parameters and click "Generate Report" to view data.</div>';
   } else {
     reportContent.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--color-danger);">Access Denied. You must be an Admin or Treasurer of this group to view analytics.</div>';
-    generateBtn.disabled = true;
-    exportCsvBtn.disabled = true;
-    exportPdfBtn.disabled = true;
   }
 }
 
@@ -100,6 +97,8 @@ async function generateReport() {
   reportContent.innerHTML = '<div style="padding: 2rem; text-align: center;">Generating report...</div>';
   reportSummary.innerHTML = '';
   reportHeader.style.display = 'none';
+  exportCsvBtn.disabled = true;
+  exportPdfBtn.disabled = true;
 
   currentReportType = type;
   currentGroupName  = groupSelector.options[groupSelector.selectedIndex].text;
@@ -113,9 +112,13 @@ async function generateReport() {
       await generateCustomReport(groupId, from, to);
     }
 
-    reportHeader.style.display = 'block';
-    reportTitle.textContent = reportTypeSelect.options[reportTypeSelect.selectedIndex].text;
-    reportMetadata.textContent = `Group: ${currentGroupName} | Period: ${from || 'All time'} to ${to || 'Present'}`;
+    if (currentReportData.length > 0) {
+      reportHeader.style.display = 'block';
+      reportTitle.textContent = reportTypeSelect.options[reportTypeSelect.selectedIndex].text;
+      reportMetadata.textContent = `Group: ${currentGroupName} | Period: ${from || 'All time'} to ${to || 'Present'}`;
+      exportCsvBtn.disabled = false;
+      exportPdfBtn.disabled = false;
+    }
   } catch (err) {
     console.error('Report error:', err);
     reportContent.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--color-danger);">Error generating report: ${err.message}</div>`;
@@ -146,7 +149,6 @@ async function generateComplianceReport(groupId, from, to) {
     const c = doc.data();
     if (!members[c.userId]) return;
 
-    // Filter by date if applicable
     if (from && c.date < from) return;
     if (to && c.date > to) return;
 
@@ -223,14 +225,13 @@ async function generateCustomReport(groupId, from, to) {
     if (from && c.date < from) continue;
     if (to && c.date > to) continue;
 
-    // We might need to fetch display names if they aren't in the contribution doc
     const memberName = c.userDisplayName || 'Member';
 
     data.push({
       Date: c.date,
       Member: memberName,
-      Amount: 'R ' + c.amount.toLocaleString('en-ZA'),
-      Status: c.status.toUpperCase(),
+      Amount: 'R ' + (c.amount || 0).toLocaleString('en-ZA'),
+      Status: (c.status || '').toUpperCase(),
       Method: c.paymentEvidence === 'online' ? 'Online' : 'Manual/Proof'
     });
 
@@ -307,7 +308,11 @@ function exportToCSV() {
   const rows = currentReportData.map(obj =>
     headers.map(h => {
       let val = obj[h];
-      if (typeof val === 'string' && val.includes(',')) return `"${val}"`;
+      if (val === undefined || val === null) val = '';
+      val = String(val);
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        val = '"' + val.replace(/"/g, '""') + '"';
+      }
       return val;
     }).join(',')
   );

@@ -76,6 +76,46 @@ export async function initiatePayment({
 }
 
 /**
+ * Disburse a payout to a member (Treasurer/Admin only).
+ *
+ * @param {Object} params
+ * @param {string} params.groupId
+ * @param {string} params.memberId
+ * @param {number} params.amount
+ * @param {string} params.reference
+ * @returns {Promise<Object>} The disbursement result
+ */
+export async function disbursePayout({
+  groupId,
+  memberId,
+  amount,
+  reference
+}) {
+  const token = await getAuthToken();
+
+  const response = await fetch(`${API_BASE_URL}/api/payouts/disburse`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      groupId,
+      memberId,
+      amount,
+      reference
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to disburse payout');
+  }
+
+  return await response.json();
+}
+
+/**
  * Get the status of a payment.
  *
  * @param {string} paymentId

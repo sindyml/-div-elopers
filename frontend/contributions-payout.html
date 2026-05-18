@@ -10,6 +10,39 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
+    <style>
+        .payout-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .payout-modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius-md);
+            width: 400px;
+            box-shadow: var(--shadow-lg);
+        }
+        .payout-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .error-feedback {
+            color: var(--color-danger);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+    </style>
 </head>
 <body class="app-layout">
 
@@ -36,6 +69,7 @@
             getUserGroups,
             getCurrentUserRole
         } from './js/contributions.js';
+        import { disbursePayout } from './js/paymentService.js';
         import { doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         function getUrlParameter(name) {
@@ -43,11 +77,60 @@
             return urlParams.get(name);
         }
 
-        // ============================================================
-        // EDIT PAYOUT ORDER MODAL (Treasurer/Admin only)
-        // ============================================================
+        async function openDisburseModal(groupId, memberId, memberName, amount, refreshCallback) {
+            const modal = document.createElement('div');
+            modal.className = 'payout-modal';
+            modal.innerHTML = `
+                <div class="payout-modal-content">
+                    <h3>Confirm Payout Disbursement</h3>
+                    <p>You are about to record a payout to <strong>${memberName}</strong>.</p>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Amount (ZAR)</label>
+                        <input type="number" id="disburse-amount" class="form-input" value="${amount}" readonly />
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Reference / Note</label>
+                        <input type="text" id="disburse-reference" class="form-input" placeholder="e.g. Bank Transfer Ref" />
+                    </div>
+                    <div id="disburse-error" class="error-feedback"></div>
+                    <div class="payout-modal-actions">
+                        <button id="cancel-disburse" class="btn btn--secondary">Cancel</button>
+                        <button id="confirm-disburse" class="btn btn--primary">Confirm Disbursement</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            const errorEl = modal.querySelector('#disburse-error');
+            document.getElementById('cancel-disburse').onclick = () => modal.remove();
+            document.getElementById('confirm-disburse').onclick = async () => {
+                const reference = document.getElementById('disburse-reference').value.trim();
+                const btn = document.getElementById('confirm-disburse');
+
+                errorEl.style.display = 'none';
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+
+                try {
+                    await disbursePayout({
+                        groupId,
+                        memberId,
+                        amount: parseFloat(amount),
+                        reference: reference || `PAYOUT_${Date.now()}`
+                    });
+                    modal.remove();
+                    alert('Payout disbursed successfully!');
+                    refreshCallback(groupId);
+                } catch (err) {
+                    errorEl.textContent = err.message || 'Disbursement failed. Please try again.';
+                    errorEl.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Confirm Disbursement';
+                }
+            };
+        }
+
         async function openEditOrderModal(groupId, groupName, currentPayouts, refreshCallback) {
-            // Create modal
             const modal = document.createElement('section');
             modal.classList.add('dispute-modal');
             
@@ -60,13 +143,11 @@
             title.textContent = `Edit Payout Order - ${groupName}`;
             modalContent.appendChild(title);
             
-            // Create list container
             const listContainer = document.createElement('ul');
             listContainer.style.listStyle = 'none';
             listContainer.style.padding = '0';
             listContainer.style.margin = '1rem 0';
             
-            // Copy payouts for reordering
             let currentOrder = [...currentPayouts];
             
             function renderList() {
@@ -101,7 +182,6 @@
                         upBtn.style.background = '#e0e0e0';
                         upBtn.style.color = '#333';
                         upBtn.addEventListener('click', () => {
-                            // Swap with previous
                             [currentOrder[index - 1], currentOrder[index]] = [currentOrder[index], currentOrder[index - 1]];
                             renderList();
                         });
@@ -115,7 +195,6 @@
                         downBtn.style.background = '#e0e0e0';
                         downBtn.style.color = '#333';
                         downBtn.addEventListener('click', () => {
-                            // Swap with next
                             [currentOrder[index], currentOrder[index + 1]] = [currentOrder[index + 1], currentOrder[index]];
                             renderList();
                         });
@@ -132,7 +211,6 @@
             renderList();
             modalContent.appendChild(listContainer);
             
-            // Instructions
             const instructions = document.createElement('p');
             instructions.textContent = 'Use ↑ ↓ buttons to reorder members. The payout dates stay with the position.';
             instructions.style.fontSize = '0.8rem';
@@ -140,7 +218,6 @@
             instructions.style.margin = '0.5rem 0';
             modalContent.appendChild(instructions);
             
-            // Action buttons
             const buttonContainer = document.createElement('div');
             buttonContainer.classList.add('dispute-modal-actions');
             buttonContainer.style.marginTop = '1rem';
@@ -153,45 +230,39 @@
             const saveBtn = document.createElement('button');
             saveBtn.textContent = 'Save Order';
             saveBtn.classList.add('btn', 'btn--primary');
-saveBtn.addEventListener('click', async () => {
-    // Check if any changes were made
-    let hasChanges = false;
-    for (let i = 0; i < currentOrder.length; i++) {
-        if (currentOrder[i].id !== currentPayouts[i].id) {
-            hasChanges = true;
-            break;
-        }
-    }
-    
-    if (!hasChanges) {
-        alert('No changes made to the order.');
-        modal.remove();
-        return;
-    }
-    
-    const batch = writeBatch(db);
-    
-    // For each position, update the payout document at that position
-    // with the user from the payout that should now be there
-    for (let i = 0; i < currentOrder.length; i++) {
-        const payoutThatShouldBeHere = currentOrder[i];
-        const currentPayoutAtThisPosition = currentPayouts[i];
-        
-        // If the user at this position changed
-        if (payoutThatShouldBeHere.userId !== currentPayoutAtThisPosition.userId) {
-            const payoutRef = doc(db, 'payouts', currentPayoutAtThisPosition.id);
-            batch.update(payoutRef, {
-                userId: payoutThatShouldBeHere.userId,
-                userDisplayName: payoutThatShouldBeHere.userDisplayName
+            saveBtn.addEventListener('click', async () => {
+                let hasChanges = false;
+                for (let i = 0; i < currentOrder.length; i++) {
+                    if (currentOrder[i].id !== currentPayouts[i].id) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                if (!hasChanges) {
+                    modal.remove();
+                    return;
+                }
+                const batch = writeBatch(db);
+                for (let i = 0; i < currentOrder.length; i++) {
+                    const payoutThatShouldBeHere = currentOrder[i];
+                    const currentPayoutAtThisPosition = currentPayouts[i];
+                    if (payoutThatShouldBeHere.userId !== currentPayoutAtThisPosition.userId) {
+                        const payoutRef = doc(db, 'payouts', currentPayoutAtThisPosition.id);
+                        batch.update(payoutRef, {
+                            userId: payoutThatShouldBeHere.userId,
+                            userDisplayName: payoutThatShouldBeHere.userDisplayName
+                        });
+                    }
+                }
+                try {
+                    await batch.commit();
+                    modal.remove();
+                    alert('Payout order updated successfully!');
+                    refreshCallback(groupId);
+                } catch (err) {
+                    alert('Failed to update order: ' + err.message);
+                }
             });
-        }
-    }
-    
-    await batch.commit();
-    alert('Payout order updated successfully!');
-    modal.remove();
-    refreshCallback(groupId);
-});
             
             buttonContainer.appendChild(cancelBtn);
             buttonContainer.appendChild(saveBtn);
@@ -202,82 +273,110 @@ saveBtn.addEventListener('click', async () => {
 
         async function displayPayoutSchedule(groupId, groupName) {
             const container = document.getElementById('payoutContent');
-            container.innerHTML = '';
+            container.innerHTML = '<p>Loading payout data...</p>';
 
-            const headerContainer = document.createElement('div');
-            headerContainer.style.display = 'flex';
-            headerContainer.style.alignItems = 'center';
-            headerContainer.style.justifyContent = 'space-between';
-            headerContainer.style.marginBottom = '1rem';
-            
-            const groupHeading = document.createElement('h2');
-            groupHeading.textContent = `Group: ${groupName}`;
-            headerContainer.appendChild(groupHeading);
-            
-            // Check if user is Treasurer or Admin to show Edit button
-            const userRole = await getCurrentUserRole();
-            if (userRole === 'Treasurer' || userRole === 'Admin') {
-                const editOrderBtn = document.createElement('button');
-                editOrderBtn.textContent = '✏️ Edit Payout Order';
-                editOrderBtn.classList.add('btn', 'btn--secondary');
-                editOrderBtn.style.marginLeft = '1rem';
+            try {
+                const group = await getGroupById(groupId);
+                const currentBalance = group?.currentBalance || 0;
+
+                const headerContainer = document.createElement('div');
+                headerContainer.style.display = 'flex';
+                headerContainer.style.alignItems = 'center';
+                headerContainer.style.justifyContent = 'space-between';
+                headerContainer.style.marginBottom = '1rem';
                 
-                // Store reference to refresh function
-                let refreshFunction = null;
-                editOrderBtn.addEventListener('click', async () => {
-                    const payouts = await getPayoutSchedule(groupId);
-                    if (payouts.length === 0) {
-                        alert('No payout schedule found to edit.');
-                        return;
-                    }
-                    await openEditOrderModal(groupId, groupName, payouts, refreshDisplay);
-                });
-                headerContainer.appendChild(editOrderBtn);
-            }
-            
-            container.appendChild(headerContainer);
+                const groupHeading = document.createElement('h2');
+                groupHeading.textContent = `Group: ${groupName}`;
+                headerContainer.appendChild(groupHeading);
 
-            const payouts = await getPayoutSchedule(groupId);
+                const userRole = await getCurrentUserRole();
+                const isPrivileged = userRole === 'Treasurer' || userRole === 'Admin';
 
-            if (payouts.length === 0) {
-                const noDataMessage = document.createElement('p');
-                noDataMessage.textContent = 'No payout schedule found for this group.';
-                container.appendChild(noDataMessage);
-            } else {
-                const table = document.createElement('table');
-                const thead = document.createElement('thead');
-                const headerRow = document.createElement('tr');
-                const headers = ['Order', 'Member Name', 'Payout Date', 'Amount'];
-                headers.forEach(text => {
-                    const th = document.createElement('th');
-                    th.textContent = text;
-                    headerRow.appendChild(th);
-                });
-                thead.appendChild(headerRow);
-                table.appendChild(thead);
+                if (isPrivileged) {
+                    const editOrderBtn = document.createElement('button');
+                    editOrderBtn.textContent = '✏️ Edit Payout Order';
+                    editOrderBtn.classList.add('btn', 'btn--secondary');
+                    editOrderBtn.style.marginLeft = '1rem';
+                    editOrderBtn.addEventListener('click', async () => {
+                        const payouts = await getPayoutSchedule(groupId);
+                        if (payouts.length === 0) {
+                            alert('No payout schedule found to edit.');
+                            return;
+                        }
+                        await openEditOrderModal(groupId, groupName, payouts, refreshDisplay);
+                    });
+                    headerContainer.appendChild(editOrderBtn);
+                }
 
-                const tbody = document.createElement('tbody');
-                payouts.forEach(payout => {
-                    const row = tbody.insertRow();
-                    const orderCell = row.insertCell(0);
-                    orderCell.setAttribute('data-label', 'Order');
-                    orderCell.textContent = payout.order;
-                    const nameCell = row.insertCell(1);
-                    nameCell.setAttribute('data-label', 'Member Name');
-                    nameCell.textContent = payout.userDisplayName;
-                    const dateCell = row.insertCell(2);
-                    dateCell.setAttribute('data-label', 'Payout Date');
-                    dateCell.textContent = payout.payoutDate;
-                    const amountCell = row.insertCell(3);
-                    amountCell.setAttribute('data-label', 'Amount');
-                    amountCell.textContent = `R${payout.amount}`;
-                });
-                table.appendChild(tbody);
-                container.appendChild(table);
+                container.innerHTML = '';
+                container.appendChild(headerContainer);
+
+                const balanceInfo = document.createElement('p');
+                balanceInfo.innerHTML = `Current Group Balance: <strong>R${currentBalance.toLocaleString('en-ZA')}</strong>`;
+                container.appendChild(balanceInfo);
+
+                const payouts = await getPayoutSchedule(groupId);
+
+                if (payouts.length === 0) {
+                    const noDataMessage = document.createElement('p');
+                    noDataMessage.textContent = 'No payout schedule found for this group.';
+                    container.appendChild(noDataMessage);
+                } else {
+                    const table = document.createElement('table');
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    const headers = ['Order', 'Member Name', 'Payout Date', 'Amount'];
+                    if (isPrivileged) headers.push('Action');
+
+                    headers.forEach(text => {
+                        const th = document.createElement('th');
+                        th.textContent = text;
+                        headerRow.appendChild(th);
+                    });
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    const tbody = document.createElement('tbody');
+                    const today = new Date().toISOString().split('T')[0];
+
+                    payouts.forEach(payout => {
+                        const row = tbody.insertRow();
+                        const isUpcoming = payout.payoutDate >= today;
+                        if (!isUpcoming && payout.status !== 'completed') row.style.opacity = '0.6';
+
+                        row.insertCell(0).textContent = payout.order;
+                        row.insertCell(1).textContent = payout.userDisplayName;
+                        row.insertCell(2).textContent = payout.payoutDate;
+                        row.insertCell(3).textContent = `R${payout.amount}`;
+
+                        if (isPrivileged) {
+                            const actionCell = row.insertCell(4);
+                            if (payout.status === 'completed') {
+                                actionCell.textContent = '✅ Paid';
+                            } else if (isUpcoming) {
+                                const disburseBtn = document.createElement('button');
+                                disburseBtn.textContent = 'Disburse';
+                                disburseBtn.className = 'btn btn--primary btn--sm';
+                                if (currentBalance < payout.amount) {
+                                    disburseBtn.disabled = true;
+                                    disburseBtn.title = 'Insufficient group balance';
+                                    disburseBtn.style.opacity = '0.5';
+                                }
+                                disburseBtn.onclick = () => openDisburseModal(groupId, payout.userId, payout.userDisplayName, payout.amount, refreshDisplay);
+                                actionCell.appendChild(disburseBtn);
+                            } else {
+                                actionCell.textContent = 'Missed';
+                            }
+                        }
+                    });
+                    table.appendChild(tbody);
+                    container.appendChild(table);
+                }
+            } catch (err) {
+                container.innerHTML = `<p class="error-feedback" style="display:block;">Error: ${err.message}</p>`;
             }
         }
         
-        // Refresh function for after order change
         async function refreshDisplay(groupId) {
             const group = await getGroupById(groupId);
             if (group) {
@@ -339,15 +438,12 @@ saveBtn.addEventListener('click', async () => {
 
             let groupId = getUrlParameter('groupId');
 
-            // If no groupId in URL, let user pick a group
             if (!groupId) {
                 const groups = await getUserGroups(currentUserId);
-
                 if (groups.length === 0) {
                     displayError('You are not a member of any group.');
                     return;
                 }
-
                 if (groups.length === 1) {
                     groupId = groups[0].id;
                 } else {
@@ -365,7 +461,6 @@ saveBtn.addEventListener('click', async () => {
             await displayPayoutSchedule(groupId, group.name);
         }
 
-        // Wait for Firebase auth state before loading page data
         auth.onAuthStateChanged((user) => {
             if (!user) {
                 window.location.href = 'login.html';
@@ -373,11 +468,8 @@ saveBtn.addEventListener('click', async () => {
             }
             loadPayoutPage();
         });
-        
-        
     </script>
 
-    <!-- Firebase compat SDK for navbar auth state -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="js/firebase-compat-init.js"></script>
