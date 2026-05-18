@@ -42,7 +42,11 @@
 import { db } from "../src/firebase.js";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { listenForAuth } from "../src/auth.js";
-import { deleteGroup } from "../src/groupService.js";
+import {
+  deleteGroup,
+  assignTreasurer,
+  assignAdmin
+} from "../src/groupService.js";
 
 const groupName = document.getElementById("groupName");
 const groupAmount = document.getElementById("groupAmount");
@@ -109,13 +113,124 @@ listenForAuth(async (user) => {
     memberList.innerHTML = "";
 
     memberSnap.forEach(docSnap => {
-      const m = docSnap.data();
 
-      const li = document.createElement("li");
-      li.textContent = `${m.uid} (${m.role})`;
+  const m = docSnap.data();
 
-      memberList.appendChild(li);
-    });
+  const li =
+    document.createElement("li");
+
+  li.style.marginBottom =
+    "1rem";
+
+  li.style.padding =
+    "1rem";
+
+  li.style.border =
+    "1px solid #ccc";
+
+  li.style.borderRadius =
+    "8px";
+
+  li.innerHTML = `
+
+    <strong>${m.uid}</strong>
+
+    <p>
+      Role:
+      <strong>${m.role}</strong>
+    </p>
+
+  `;
+
+  // ====================================
+  // ADMIN ROLE CONTROLS
+  // ====================================
+
+  if (
+    userRole === "admin"
+    
+  ) if (m.uid === currentUser.uid) {
+  return;
+}{
+
+    const treasurerBtn =
+      document.createElement("button");
+
+    treasurerBtn.textContent =
+      "Make Treasurer";
+
+    treasurerBtn.style.marginRight =
+      "0.5rem";
+
+    treasurerBtn.onclick =
+      async () => {
+
+        try {
+
+          await assignTreasurer(
+            groupId,
+            m.uid
+          );
+
+          alert(
+            "Treasurer updated successfully"
+          );
+
+          window.location.reload();
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert(
+            "Failed to assign treasurer"
+          );
+        }
+      };
+
+    const adminBtn =
+      document.createElement("button");
+
+    adminBtn.textContent =
+      "Make Admin";
+
+    adminBtn.onclick =
+      async () => {
+
+        try {
+
+          await assignAdmin(
+            groupId,
+            m.uid
+          );
+
+          alert(
+            "Admin updated successfully"
+          );
+
+          window.location.reload();
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert(
+            "Failed to assign admin"
+          );
+        }
+      };
+
+    li.appendChild(
+      treasurerBtn
+    );
+
+    li.appendChild(
+      adminBtn
+    );
+  }
+
+  memberList.appendChild(li);
+});
 
   } catch (err) {
     console.error(err);

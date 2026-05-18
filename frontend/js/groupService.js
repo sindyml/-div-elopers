@@ -182,3 +182,99 @@ export async function declineInvite(inviteId) {
 
   await updateDoc(inviteRef, { status: 'declined' });
 }
+
+// ============================================
+// ASSIGN TREASURER
+// ============================================
+
+export async function assignTreasurer(
+  groupId,
+  newUserId
+) {
+
+  const q = query(
+    collection(
+      db,
+      COLLECTIONS.GROUPS,
+      groupId,
+      "members"
+    ),
+    where("role", "==", "treasurer")
+  );
+
+  const snapshot =
+    await getDocs(q);
+
+  // Remove existing treasurer
+  for (const docSnap of snapshot.docs) {
+
+    await updateDoc(
+      docSnap.ref,
+      {
+        role: "member"
+      }
+    );
+  }
+
+  // Assign new treasurer
+  await updateDoc(
+    doc(
+      db,
+      COLLECTIONS.GROUPS,
+      groupId,
+      "members",
+      newUserId
+    ),
+    {
+      role: "treasurer"
+    }
+  );
+}
+
+// ============================================
+// ASSIGN ADMIN
+// ============================================
+
+export async function assignAdmin(
+  groupId,
+  newUserId
+) {
+
+  const q = query(
+    collection(
+      db,
+      COLLECTIONS.GROUPS,
+      groupId,
+      "members"
+    ),
+    where("role", "==", "admin")
+  );
+
+  const snapshot =
+    await getDocs(q);
+
+  // Remove existing admin
+  for (const docSnap of snapshot.docs) {
+
+    await updateDoc(
+      docSnap.ref,
+      {
+        role: "member"
+      }
+    );
+  }
+
+  // Assign new admin
+  await updateDoc(
+    doc(
+      db,
+      COLLECTIONS.GROUPS,
+      groupId,
+      "members",
+      newUserId
+    ),
+    {
+      role: "admin"
+    }
+  );
+}
