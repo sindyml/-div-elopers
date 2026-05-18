@@ -9,33 +9,49 @@
 </head>
 <body>
 
-<main>
-  <h2>Group Settings</h2>
+<main class="app-main">
+  <header class="page-header">
+    <h1 class="page-header__title">Group Settings</h1>
+  </header>
 
   <!-- Group Info -->
-  <section>
-    <h3>Group Details</h3>
-    <p id="groupName"></p>
-    <p id="groupAmount"></p>
-    <p id="groupFrequency"></p>
+  <section class="card" aria-labelledby="details-heading" style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 id="details-heading" class="widget-section__title">Group Details</h2>
+    </header>
+    <div style="padding: var(--space-5);">
+      <p id="groupName"></p>
+      <p id="groupAmount"></p>
+      <p id="groupFrequency"></p>
+    </div>
   </section>
 
   <!-- Members -->
-  <section>
-    <h3>Members</h3>
-    <ul id="memberList"></ul>
+  <section class="card" aria-labelledby="members-heading" style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 id="members-heading" class="widget-section__title">Members</h2>
+    </header>
+    <div style="padding: var(--space-5);">
+      <ul id="memberList"></ul>
+    </div>
   </section>
 
   <!-- Admin Controls -->
-  <section id="adminSection" hidden>
-    <h3>Admin Controls</h3>
-    <button id="editBtn">Edit Group</button>
-    <button id="deleteBtn">Delete Group</button>
+  <section id="adminSection" class="card" hidden style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 class="widget-section__title">Admin Controls</h2>
+    </header>
+    <div style="padding: var(--space-5); display: flex; gap: var(--space-3);">
+      <button id="editBtn" class="btn btn--primary">Edit Group</button>
+      <button id="deleteBtn" class="btn btn--danger">Delete Group</button>
+    </div>
   </section>
 
-  <p id="message"></p>
+  <p id="message" role="status" aria-live="polite"></p>
 
-  <a href="dashboard.html">← Back to Dashboard</a>
+  <nav aria-label="Breadcrumb">
+    <a href="dashboard.html" class="btn btn--ghost">← Back to Dashboard</a>
+  </nav>
 </main>
 
 <script type="module">

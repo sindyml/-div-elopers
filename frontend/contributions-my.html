@@ -30,26 +30,28 @@
         </section>
 
         <!-- YOUR DISPUTES section -->
-        <section id="disputes-section">
-            <h2>YOUR DISPUTES</h2>
+        <section id="disputes-section" aria-labelledby="disputes-heading">
+            <h2 id="disputes-heading">YOUR DISPUTES</h2>
             <button id="viewMyDisputesBtn" class="btn btn--primary">View My Disputes</button>
-            <section id="myDisputesContainer">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Group</th>
-                            <th>Amount</th>
-                            <th>Date Disputed</th>
-                            <th>Status</th>
-                            <th>Rejection Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody id="myDisputesTableBody"></tbody>
-                </table>
-            </section>
+            <article id="myDisputesContainer" class="card" style="margin-top: var(--space-4);">
+                <div class="data-table-wrapper">
+                    <table class="data-table" aria-label="My disputes table">
+                        <thead>
+                            <tr>
+                                <th>Group</th>
+                                <th>Amount</th>
+                                <th>Date Disputed</th>
+                                <th>Status</th>
+                                <th>Rejection Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="myDisputesTableBody"></tbody>
+                    </table>
+                </div>
+            </article>
         </section>
 
-        <section id="dynamicContent"></section>
+        <section id="dynamicContent" aria-live="polite"></section>
     </main>
 
     <!-- Payment modal mount point -->
