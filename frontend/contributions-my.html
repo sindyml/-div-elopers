@@ -79,7 +79,7 @@
 
         // ── Payment modal ────────────────────────────────────────
         const paymentModal = new PaymentModal();
-        paymentModal.onPaymentSuccess = () => loadMyPage(); //Was using non-existent loadContributionPage() and importing from contributions.js
+        paymentModal.onPaymentSuccess = () => loadMyPage();
         paymentModal.onProofUploaded = async (file, paymentId) => {
             const user = auth.currentUser;
             if (!user) throw new Error('Not authenticated.');
@@ -231,6 +231,9 @@
             return listenToNotifications(userId, showNotificationBanner);
         }
 
+        // ============================================================
+        // FIXED: displayContributionsTable with dispute status awareness
+        // ============================================================
         function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
             if (activeTableSection && activeTableSection.parentNode) {
                 activeTableSection.remove();
@@ -285,7 +288,21 @@
             containerElement.appendChild(tableSection);
             activeTableSection = tableSection;
 
-            activeUnsubscribe = listenToMemberContributions(getCurrentUserId(), (allContributions) => {
+            // ============================================================
+            // FIX: Fetch member's disputes once and create a map for quick lookup
+            // ============================================================
+            const currentUserId = getCurrentUserId();
+            let disputeMap = {};
+            
+            // Fetch disputes and build a map (contributionId -> dispute object)
+            getMemberDisputes(currentUserId).then(disputes => {
+                disputeMap = {};
+                disputes.forEach(dispute => {
+                    disputeMap[dispute.contributionId] = dispute;
+                });
+            }).catch(err => console.error('Failed to fetch disputes:', err));
+
+            activeUnsubscribe = listenToMemberContributions(currentUserId, (allContributions) => {
                 const groupContributions = allContributions.filter(c => c.groupId === groupId);
                 const targetTbody = document.getElementById(`contributions-body-${groupId}`);
                 if (!targetTbody) return;
@@ -304,13 +321,37 @@
                         statusCell.textContent = '✅ Confirmed';
                     } else if (contribution.status === 'missed') {
                         statusCell.textContent = '❌ Missed';
-                        const disputeBtn = document.createElement('button');
-                        disputeBtn.textContent = 'Dispute';
-                        disputeBtn.classList.add('btn', 'btn--outline', 'btn--sm');
-                        disputeBtn.addEventListener('click', () => {
-                            openDisputeModal(contribution, groupName);
-                        });
-                        statusCell.appendChild(disputeBtn);
+                        
+                        // ============================================================
+                        // FIX: Check if a dispute already exists for this contribution
+                        // ============================================================
+                        const existingDispute = disputeMap[contribution.id];
+                        
+                        if (!existingDispute) {
+                            // No dispute yet - show Dispute button
+                            const disputeBtn = document.createElement('button');
+                            disputeBtn.textContent = 'Dispute';
+                            disputeBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                            disputeBtn.addEventListener('click', () => {
+                                openDisputeModal(contribution, groupName);
+                            });
+                            statusCell.appendChild(disputeBtn);
+                        } else if (existingDispute.status === 'pending') {
+                            // Dispute already submitted and waiting for treasurer
+                            const pendingText = document.createTextNode(' ⏳ Dispute Pending');
+                            statusCell.appendChild(pendingText);
+                        } else if (existingDispute.status === 'rejected') {
+                            // Dispute was rejected - allow member to dispute again
+                            const disputeAgainBtn = document.createElement('button');
+                            disputeAgainBtn.textContent = 'Dispute Again';
+                            disputeAgainBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                            disputeAgainBtn.addEventListener('click', () => {
+                                openDisputeModal(contribution, groupName);
+                            });
+                            statusCell.appendChild(disputeAgainBtn);
+                        }
+                        // If dispute is approved, contribution status would be 'confirmed' anyway
+                        
                     } else {
                         statusCell.textContent = '⏳ Pending';
                     }
@@ -478,6 +519,7 @@
             }
             loadMyPage();
         });
+        
         
     </script>
 
