@@ -27,19 +27,17 @@ import { PaymentModal }            from '../components/payment-modal.js';
 import { initiatePayment }         from './paymentService.js';
 import { COLLECTIONS }             from './constants.js';
 import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
-//Added imports
 import { onTransactionCreate } from './onTransactionCreate.js';
 import { onProofUpload } from './onProofUpload.js';
 import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
 /* ── Modal initialisation ──────────────────────────────────── */
 
 const modal = new PaymentModal();
 
 modal.onPaymentSuccess = async (receipt) => {
-  // Only set payment evidence, NOT status (Treasurer must confirm)
   if (receipt.contributionId) {
     try {
-      // Get the contribution to find userId and groupId
       const contribDoc = await getDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, receipt.contributionId));
       if (contribDoc.exists()) {
         const contribData = contribDoc.data();
@@ -49,7 +47,6 @@ modal.onPaymentSuccess = async (receipt) => {
       console.warn('[payment.js] Could not update payment evidence:', err.message);
     }
   }
-  // Reload pending list
   const user = auth.currentUser;
   if (user) loadPendingContributions(user.uid);
 };
@@ -61,14 +58,11 @@ modal.onProofUploaded = async (file, paymentId) => {
   const validationError = validateProofFile(file);
   if (validationError) throw new Error(validationError);
 
-  // Upload the proof file (returns fileUrl)
   const { fileUrl, proofId } = await uploadPaymentProof(file, paymentId, user.uid);
-  
-  // Get the transaction to find userId and groupId
+
   const txDoc = await getDoc(doc(db, 'transactions', paymentId));
   if (txDoc.exists()) {
     const txData = txDoc.data();
-    // Pass the fileUrl to onProofUpload
     await onProofUpload(txData.userId, txData.groupId, fileUrl);
   }
 };
@@ -79,7 +73,6 @@ onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   loadPendingContributions(user.uid);
 
-  // Wire up "Make a Payment" button in header to redirect directly to PayFast
   const makePaymentBtn = document.getElementById('make-payment-btn');
   if (makePaymentBtn) {
     makePaymentBtn.addEventListener('click', () => {
@@ -90,11 +83,6 @@ onAuthStateChanged(auth, (user) => {
 
 /* ── Make a Payment Button Handler ─────────────────────────── */
 
-/**
- * Get the first pending contribution for the user and redirect
- * directly to the PayFast payment gateway.
- * @param {import('firebase/auth').User} user
- */
 async function initiatePayFastRedirect(user) {
   const btn = document.getElementById('make-payment-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Redirecting…'; }
@@ -119,7 +107,6 @@ async function initiatePayFastRedirect(user) {
     );
 
     const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Filter for pending or missed and sort by date descending manually to avoid index requirement
     const pending = allContribs
       .filter(c => c.status === 'pending' || c.status === 'missed')
       .sort((a, b) => {
@@ -146,12 +133,9 @@ async function initiatePayFastRedirect(user) {
     }
 
     const amount = parseFloat(selectedContribution.amount) || 0;
-
-    // Gather user details for PayFast pre-fill
     const userEmail = user.email || '';
     const userName  = user.displayName || '';
 
-    // Get Firebase ID token for the API call
     let authToken = '';
     try {
       authToken = await user.getIdToken();
@@ -159,7 +143,6 @@ async function initiatePayFastRedirect(user) {
       console.warn('[payment.js] Could not retrieve auth token:', tokenErr.message);
     }
 
-    // Call backend to generate signed PayFast payment data
     console.log('[payment.js] Initiating payment for:', {
       amount,
       contributionId: selectedContribution.id,
@@ -176,18 +159,30 @@ async function initiatePayFastRedirect(user) {
       metadata:       { paymentMethod: 'card' },
     });
 
-    // Persist payment ID so payment-return.html can verify the transaction
     localStorage.setItem('pendingPaymentId', result.paymentId);
 
-    // Build a hidden form and POST to PayFast — this is the gateway redirect
     const { paymentData } = result;
+
+    // ✅ FIXED: Only send exact PayFast fields — excludes paymentUrl and anything else
+    const PAYFAST_FIELDS = [
+      'merchant_id',
+      'merchant_key',
+      'return_url',
+      'cancel_url',
+      'notify_url',
+      'm_payment_id',
+      'amount',
+      'item_name',
+      'signature'
+    ];
+
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = paymentData.paymentUrl;
     form.style.display = 'none';
 
-    for (const key in paymentData) {
-      if (key !== 'paymentUrl') {
+    for (const key of PAYFAST_FIELDS) {
+      if (paymentData[key] !== undefined) {
         const input = document.createElement('input');
         input.type  = 'hidden';
         input.name  = key;
@@ -196,9 +191,12 @@ async function initiatePayFastRedirect(user) {
       }
     }
 
+    console.log('[payment.js] Submitting to PayFast:', paymentData.paymentUrl);
+    console.log('[payment.js] Fields being sent:', PAYFAST_FIELDS.map(k => `${k}=${paymentData[k]}`).join('&'));
+
     document.body.appendChild(form);
     redirecting = true;
-    form.submit(); // ← redirects to PayFast
+    form.submit();
 
   } catch (err) {
     const message = err.message || 'Unknown error';
@@ -213,6 +211,7 @@ async function initiatePayFastRedirect(user) {
     }
   }
 }
+
 function openPaymentModalForContribution(user, contrib, groupName) {
   if (!user || !contrib) return;
   modal.open({
@@ -223,6 +222,7 @@ function openPaymentModalForContribution(user, contrib, groupName) {
     groupName:      groupName,
   });
 }
+
 /* ── Data loading ──────────────────────────────────────────── */
 
 async function loadPendingContributions(userId) {
@@ -257,7 +257,6 @@ async function loadPendingContributions(userId) {
 
     const outstanding = pending.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
-    // Completed payments this period — read from transactions collection
     let completedCount = 0;
     try {
       const txSnap = await getDocs(
@@ -326,7 +325,6 @@ function renderTable(contributions, groupMap) {
     tbody.appendChild(tr);
   });
 
-  // Wire Pay Now buttons
   tbody.querySelectorAll('button[data-contrib-id]').forEach(btn => {
     btn.addEventListener('click', () => {
       const user = auth.currentUser;
