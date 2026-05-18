@@ -368,6 +368,26 @@ export async function saveMinutes() {
 }
 window.saveMinutes = saveMinutes;
 
+//Check there's no duplicate meetings. If there are, don't store new document
+async function meetingSlotTaken(groupId, date, time) {
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.MEETINGS),
+        where('groupId', '==', groupId),
+        where('date',    '==', date),
+        where('time',    '==', time),
+        limit(1)                          // only need to know if at least one exists
+      )
+    );
+    return !snap.empty;
+  } catch (err) {
+    // On error, be conservative: don't block the write, but log it.
+    console.warn('[Meetings] Duplicate check failed:', err.message);
+    return false;
+  }
+}
+
 export function showNotification(message) {
   const banner = document.getElementById('notification-banner');
   const body = document.getElementById('notification-body');
