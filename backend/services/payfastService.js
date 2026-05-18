@@ -53,7 +53,12 @@ class PayFastService {
         pfParamString += `&passphrase=${encodeURIComponent(pfPassphrase.trim()).replace(/%20/g, '+')}`;
     }
 
-    return crypto.createHash('md5').update(pfParamString).digest('hex');
+    // DEBUG: Log the exact string being hashed
+    console.log('🔐 SIGNATURE STRING:', pfParamString);
+    const signature = crypto.createHash('md5').update(pfParamString).digest('hex');
+    console.log('🔐 SIGNATURE OUTPUT:', signature);
+
+    return signature;
 }
 
   /**
