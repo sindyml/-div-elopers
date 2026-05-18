@@ -15,38 +15,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ============================================================
-// MOCK MODE SWITCH
-// ============================================================
-const USE_MOCK = false;
-
-import { mockData } from './mock-data.js';
-
-// Store active callbacks for mock mode to trigger re-renders
-let mockMemberCallbacks = [];
-let mockGroupCallbacks = [];
-
-// ============================================================
 // HELPER FUNCTIONS
 // ============================================================
 
 function getCurrentUserId() {
-    // Hardcoded for testing 
-    //return "5SNBHi5mFqOtAZZKC8st15sKZd62";
-    //return "qCHCRZa8l2TQegqztNlSGSY5cD32";
-    //return "vZhTbL2mrWU5RGUeGMLj6Mbn1kp2";
-    //return "zlBV3VCnFIa7bOdmIbmhxBNr90F2";
-    
-     if (USE_MOCK) {
-         return mockData.currentUserId;
-     }
+
      const currentUser = auth.currentUser;
      return currentUser ? currentUser.uid : null;
 }
 
 async function getCurrentUserRole() {
-    if (USE_MOCK) {
-        return mockData.currentUserRole;
-    }
+
     const currentUserId = getCurrentUserId();
     if (!currentUserId) return null;
     const userDocument = await getDoc(doc(db, 'users', currentUserId));
@@ -59,12 +38,7 @@ async function getCurrentUserRole() {
 // ============================================================
 
 async function getUserGroups(userId) {
-    if (USE_MOCK) {
-        const memberRecords = mockData.members.filter(m => m.uid === userId);
-        const groupIds = memberRecords.map(m => m.groupId);
-        return mockData.groups.filter(group => groupIds.includes(group.id));
-    }
-
+    
     const membersSnapshot = await getDocs(
         query(collectionGroup(db, 'members'), where('uid', '==', userId))
     );
@@ -84,13 +58,6 @@ async function getUserGroups(userId) {
 }
 
 async function getTreasurerGroups(userId) {
-    if (USE_MOCK) {
-        const memberRecords = mockData.members.filter(m =>
-            m.uid === userId && (m.role === 'treasurer' || m.role === 'admin')
-        );
-        const groupIds = memberRecords.map(m => m.groupId);
-        return mockData.groups.filter(group => groupIds.includes(group.id));
-    }
 
     const membersSnapshot = await getDocs(
         query(
@@ -115,10 +82,7 @@ async function getTreasurerGroups(userId) {
 }
 
 async function getGroupById(groupId) {
-    if (USE_MOCK) {
-        const group = mockData.groups.find(g => g.id === groupId);
-        return group || null;
-    }
+
     const groupDocument = await getDoc(doc(db, 'groups', groupId));
     if (!groupDocument.exists()) return null;
     return {
@@ -128,28 +92,13 @@ async function getGroupById(groupId) {
     };
 }
 
-async function getMemberName(userId) {
-    if (USE_MOCK) {
-        return mockData.memberNames[userId] || userId;
-    }
-    const userDocument = await getDoc(doc(db, 'users', userId));
-    if (!userDocument.exists()) return userId;
-    return userDocument.data().name || userDocument.data().displayName || userDocument.data().email || userId;
-}
-
-// ============================================================
-// USER DISPLAY NAME
-// ============================================================
-
 async function getUserDisplayName(userId) {
-    if (USE_MOCK) {
-        return mockData.memberNames[userId] || 'Member';
-    }
+    
     const userDocument = await getDoc(doc(db, 'users', userId));
     if (!userDocument.exists()) return 'Member';
-    return userDocument.data().displayName || userDocument.data().name || userDocument.data().email || 'Member';
+    
+    return userDocument.data().displayName || userDocument.data().email || 'Member';
 }
-
 // ============================================================
 // DISPUTES FUNCTIONS
 // ============================================================
@@ -251,9 +200,7 @@ function listenToNotifications(userId, onNotificationCallback) {
 // ============================================================
 
 async function getContributionsByMember(userId) {
-    if (USE_MOCK) {
-        return mockData.contributions.filter(c => c.userId === userId);
-    }
+
     const contributionsSnapshot = await getDocs(
         query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc'))
     );
@@ -264,9 +211,7 @@ async function getContributionsByMember(userId) {
 }
 
 async function getContributionsByGroup(groupId) {
-    if (USE_MOCK) {
-        return mockData.contributions.filter(c => c.groupId === groupId);
-    }
+
     const contributionsSnapshot = await getDocs(
         query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc'))
     );
@@ -277,15 +222,7 @@ async function getContributionsByGroup(groupId) {
 }
 
 async function updateContributionStatus(contributionId, newStatus) {
-    if (USE_MOCK) {
-        const contribution = mockData.contributions.find(c => c.id === contributionId);
-        if (contribution) {
-            contribution.status = newStatus;
-            mockGroupCallbacks.forEach(callback => callback());
-            mockMemberCallbacks.forEach(callback => callback());
-        }
-        return;
-    }
+
     await updateDoc(doc(db, 'contributions', contributionId), {
         status: newStatus,
         confirmedAt: new Date()
@@ -293,18 +230,7 @@ async function updateContributionStatus(contributionId, newStatus) {
 }
 
 function listenToMemberContributions(userId, onUpdateCallback) {
-    if (USE_MOCK) {
-        const wrappedCallback = () => {
-            const filtered = mockData.contributions.filter(c => c.userId === userId);
-            onUpdateCallback(filtered);
-        };
-        mockMemberCallbacks.push(wrappedCallback);
-        wrappedCallback();
-        return () => {
-            const index = mockMemberCallbacks.indexOf(wrappedCallback);
-            if (index > -1) mockMemberCallbacks.splice(index, 1);
-        };
-    }
+
     const unsubscribe = onSnapshot(
         query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc')),
         (snapshot) => {
@@ -319,18 +245,7 @@ function listenToMemberContributions(userId, onUpdateCallback) {
 }
 
 function listenToGroupContributions(groupId, onUpdateCallback) {
-    if (USE_MOCK) {
-        const wrappedCallback = () => {
-            const filtered = mockData.contributions.filter(c => c.groupId === groupId);
-            onUpdateCallback(filtered);
-        };
-        mockGroupCallbacks.push(wrappedCallback);
-        wrappedCallback();
-        return () => {
-            const index = mockGroupCallbacks.indexOf(wrappedCallback);
-            if (index > -1) mockGroupCallbacks.splice(index, 1);
-        };
-    }
+
     const unsubscribe = onSnapshot(
         query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc')),
         (snapshot) => {
@@ -345,9 +260,7 @@ function listenToGroupContributions(groupId, onUpdateCallback) {
 }
 
 async function getPayoutSchedule(groupId) {
-    if (USE_MOCK) {
-        return mockData.payouts.filter(p => p.groupId === groupId);
-    }
+
     const payoutsSnapshot = await getDocs(
         query(collection(db, 'payouts'), where('groupId', '==', groupId), orderBy('order', 'asc'))
     );
@@ -367,7 +280,6 @@ export {
     getUserGroups,
     getTreasurerGroups,
     getGroupById,
-    getMemberName,
     getUserDisplayName,
     getMemberDisputes,
     createDispute,

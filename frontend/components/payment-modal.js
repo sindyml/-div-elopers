@@ -732,7 +732,7 @@ export class PaymentModal {
     this._showScreen('confirm');
   }
 
-  /* ── Pay Action ────────────────────────────────────────────── */
+  /* ── Pay Action (FIXED: uses initiatePayment from paymentService) ── */
 
   async _handlePay() {
     const payBtn = this._root.querySelector('#pm-pay-btn');
@@ -764,7 +764,6 @@ export class PaymentModal {
       const user = auth.currentUser;
       const userEmail = user?.email || '';
       const userName  = user?.displayName || '';
-      const authToken = user ? await user.getIdToken() : '';
 
       console.log('[PaymentModal] Initiating payment for:', {
         amount: total,
@@ -772,34 +771,18 @@ export class PaymentModal {
         groupId,
       });
 
-      // Call real backend API to initiate PayFast payment
-      const response = await fetch('/api/payments/initiate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          amount: total,
-          contributionId: contributionId,
-          groupId: groupId,
-          groupName: groupName,
-          userEmail: userEmail,
-          userName: userName,
-          metadata: {
-            paymentMethod: this._selectedMethod
-          }
-        })
+      // ✅ USE the imported initiatePayment function (which calls Render backend)
+      const result = await initiatePayment({
+        amount: total,
+        contributionId: contributionId,
+        groupId: groupId,
+        groupName: groupName,
+        userEmail: userEmail,
+        userName: userName,
+        metadata: {
+          paymentMethod: this._selectedMethod
+        }
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Payment initiation failed');
-      }
-
-      const result = await response.json();
-      
-      // REMOVED THE DUPLICATE initiatePayment CALL HERE
 
       this._paymentId = result.paymentId;
 
@@ -860,7 +843,7 @@ export class PaymentModal {
     this._populateForm();
   }
 
-  /* ── Status Polling ────────────────────────────────────────── */
+  /* ── Status Polling (FIXED: uses getPaymentStatus from paymentService) ── */
 
   _startPolling() {
     this._pollCount            = 0;
@@ -904,16 +887,8 @@ export class PaymentModal {
     );
 
     try {
-      const authToken = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-      const response = await fetch(`/api/payments/status/${this._paymentId}`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch status');
-      }
-
-      const statusData = await response.json();
+      // ✅ USE the imported getPaymentStatus function (which calls Render backend)
+      const statusData = await getPaymentStatus(this._paymentId);
       this._consecutiveNetErrors = 0; // reset on a successful request
 
       if (statusData.status === 'completed') {

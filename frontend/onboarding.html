@@ -236,6 +236,7 @@
     collection, query, where, getDocs, addDoc, setDoc, doc, serverTimestamp
   } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
   import { COLLECTIONS, ROLES } from './js/constants.js';
+  import { checkPendingInvites } from './js/groupService.js';
 
   let currentUser = null;
 
@@ -248,8 +249,23 @@
     const memSnap = await getDocs(
       query(collection(db, COLLECTIONS.MEMBERSHIPS), where('uid', '==', user.uid))
     );
+
     if (!memSnap.empty) {
       window.location.href = 'dashboard.html';
+      return;
+    }
+
+    // Also check for pending invites - if they have an invite, let them go to dashboard to accept it
+    if (user.email) {
+      try {
+        const invites = await checkPendingInvites(user);
+        if (invites && invites.length > 0) {
+          console.log("[Onboarding] User has pending invites, skipping to dashboard");
+          window.location.href = 'dashboard.html';
+        }
+      } catch (err) {
+        console.warn("[Onboarding] Failed to check for invites:", err.message);
+      }
     }
   });
 

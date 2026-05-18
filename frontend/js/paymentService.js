@@ -7,6 +7,9 @@
 
 import { auth } from './firebase-config.js';
 
+// ✅ ADD THIS LINE - Your Render backend URL
+const API_BASE_URL = 'https://div-elopers.onrender.com';
+
 /**
  * Get Firebase ID token for the current user.
  * @returns {Promise<string>}
@@ -46,7 +49,8 @@ export async function initiatePayment({
 }) {
   const token = await getAuthToken();
 
-  const response = await fetch('/api/payments/initiate', {
+  // ✅ CHANGE THIS: Add API_BASE_URL
+  const response = await fetch(`${API_BASE_URL}/api/payments/initiate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,7 +84,8 @@ export async function initiatePayment({
 export async function getPaymentStatus(paymentId) {
   const token = await getAuthToken();
 
-  const response = await fetch(`/api/payments/status/${paymentId}`, {
+  // ✅ CHANGE THIS: Add API_BASE_URL
+  const response = await fetch(`${API_BASE_URL}/api/payments/status/${paymentId}`, {
     headers: {
       'Authorization': `Bearer ${token}`
     }
@@ -103,7 +108,8 @@ export async function getPaymentStatus(paymentId) {
 export async function verifyPayment(paymentId) {
   const token = await getAuthToken();
 
-  const response = await fetch('/api/payments/verify', {
+  // ✅ CHANGE THIS: Add API_BASE_URL
+  const response = await fetch(`${API_BASE_URL}/api/payments/verify`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

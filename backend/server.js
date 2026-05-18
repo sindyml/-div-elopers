@@ -19,22 +19,40 @@ function setCORSHeaders(res) {
 // ── Firebase Admin ────────────────────────────────────────────────────────────
 if (!admin.apps.length) {
   try {
-    if (process.env.FIREBASE_PROJECT_ID) {
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId:  process.env.FIREBASE_PROJECT_ID,
-      });
-      console.log('✅ Firebase Admin initialized');
-    } else {
-      admin.initializeApp({ projectId: 'demo-project' });
-      console.log('⚠️  Firebase Admin in demo mode (no real auth)');
+    let credentials = null;
+    
+    // Check for Render secret file first
+    const renderSecretPath = '/etc/secrets/service-account-key.json';
+    if (fs.existsSync(renderSecretPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(renderSecretPath, 'utf8'));
+      credentials = admin.credential.cert(serviceAccount);
+      console.log('✅ Firebase Admin initialized from Render secret file');
     }
+    // Fallback to local file for development
+    else {
+      const localPath = path.join(__dirname, '..', 'service-account-key.json');
+      if (fs.existsSync(localPath)) {
+        const serviceAccount = require(localPath);
+        credentials = admin.credential.cert(serviceAccount);
+        console.log('✅ Firebase Admin initialized from local file');
+      }
+    }
+    
+    if (credentials) {
+      admin.initializeApp({
+        credential: credentials,
+        projectId: process.env.FIREBASE_PROJECT_ID || 'stokvel-database'
+      });
+    } else {
+      console.warn('⚠️ No Firebase credentials found. Running in demo mode.');
+      admin.initializeApp({ projectId: 'demo-project' });
+    }
+    
   } catch (err) {
-    console.warn('⚠️  Firebase Admin init failed:', err.message);
+    console.warn('⚠️ Firebase Admin init failed:', err.message);
+    admin.initializeApp({ projectId: 'demo-project' });
   }
 }
-
-const db = admin.firestore();
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 const paymentRoutes = require('./api/payments/index.js');
@@ -208,52 +226,44 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(config));
     return;
   }
-  
-// ──────────────────────────────────────────────────────────────
-// API: /api/set-user-role - Set custom claims for a user
-// ──────────────────────────────────────────────────────────────
-if (urlPath === '/api/set-user-role' && req.method === 'POST') {
-  setCORSHeaders(res);
-  
-  let body = '';
-  req.on('data', chunk => { body += chunk; });
-  req.on('end', async () => {
-    try {
-      const { uid, role } = JSON.parse(body);
-      
-      // Verify the requesting user is authenticated (optional security)
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized' }));
-        return;
+
+  /* ── API: /api/set-user-role - Set custom claims for a user ── */
+  if (urlPath === '/api/set-user-role' && req.method === 'POST') {
+    setCORSHeaders(res);
+    
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { uid, role } = JSON.parse(body);
+        
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+        
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        
+        await admin.auth().setCustomUserClaims(uid, { role: role });
+        
+        await db.collection('users').doc(uid).update({
+          role: role,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: `Role ${role} set for user ${uid}` }));
+      } catch (error) {
+        console.error('Error setting role:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message }));
       }
-      
-      const token = authHeader.split('Bearer ')[1];
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      
-      // Only allow admins to set roles (optional - for production)
-      // For now, allow any authenticated user
-      
-      // Set custom claim
-      await admin.auth().setCustomUserClaims(uid, { role: role });
-      
-      // Update Firestore
-      await db.collection('users').doc(uid).update({
-        role: role,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true, message: `Role ${role} set for user ${uid}` }));
-    } catch (error) {
-      console.error('Error setting role:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error.message }));
-    }
-  });
-  return;
-}
+    });
+    return;
+  }
 
   /* ────────────────────────────────────────────────────────────────────────────
      Static file serving
