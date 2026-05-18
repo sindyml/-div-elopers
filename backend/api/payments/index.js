@@ -185,9 +185,70 @@ async function getPaymentStatus(req, res) {
       paymentId: paymentId,
       status:    payment.status,
       amount:    payment.amount,
-      currency:  payment.currency
+      currency:  payment.currency,
+      payfastPaymentId: payment.payfastPaymentId || null,
+      transactionId: payment.payfastPaymentId || null
     });
   } catch (error) {
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+async function verifyPayment(req, res) {
+  try {
+    const { paymentId } = req.body;
+    if (!paymentId) {
+      sendJSON(res, 400, { error: 'Payment ID is required' });
+      return;
+    }
+
+    const paymentDoc = await db.collection('transactions').doc(paymentId).get();
+
+    if (!paymentDoc.exists) {
+      sendJSON(res, 404, { error: 'Payment not found' });
+      return;
+    }
+
+    const payment = paymentDoc.data();
+    sendJSON(res, 200, {
+      success: true,
+      status: payment.status,
+      paymentId: paymentId,
+      payfastPaymentId: payment.payfastPaymentId || null
+    });
+  } catch (error) {
+    console.error('Payment verification error:', error);
+    sendJSON(res, 500, { error: 'Internal server error' });
+  }
+}
+
+async function getPaymentHistory(req, res) {
+  try {
+    const userId = req.params.userId;
+    const limit = parseInt(req.query.limit) || 50;
+    const status = req.query.status;
+
+    let query = db.collection('transactions')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .limit(Math.min(limit, 100));
+
+    if (status) {
+      query = query.where('status', '==', status);
+    }
+
+    const snapshot = await query.get();
+    const payments = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+
+    sendJSON(res, 200, {
+      payments,
+      count: payments.length
+    });
+  } catch (error) {
+    console.error('Get payment history error:', error);
     sendJSON(res, 500, { error: 'Internal server error' });
   }
 }
@@ -211,18 +272,31 @@ async function handleRequest(req, res) {
     req.params = { paymentId: statusMatch[1] };
   }
 
+  const historyMatch = url.match(/^\/history\/(.+)$/);
+  if (historyMatch) {
+    req.params = { userId: historyMatch[1] };
+    const queryStr = req.url.split('?')[1];
+    if (queryStr) {
+      req.query = Object.fromEntries(new URLSearchParams(queryStr));
+    }
+  }
+
   if (method === 'GET' && url === '/test') {
     await testEndpoint(req, res);
   } else if (method === 'POST' && url === '/notify') {
     await handleNotify(req, res);
   } else if (method === 'POST' && url === '/initiate') {
     await authenticateUser(req, res, () => initiatePayment(req, res));
+  } else if (method === 'POST' && url === '/verify') {
+    await authenticateUser(req, res, () => verifyPayment(req, res));
   } else if (method === 'GET' && url === '/return') {
     await handleReturn(req, res);
   } else if (method === 'GET' && url === '/cancel') {
     await handleCancel(req, res);
   } else if (method === 'GET' && statusMatch) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));
+  } else if (method === 'GET' && historyMatch) {
+    await authenticateUser(req, res, () => getPaymentHistory(req, res));
   } else {
     sendJSON(res, 404, { error: `Endpoint not found: ${method} ${url}` });
   }

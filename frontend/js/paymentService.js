@@ -7,8 +7,8 @@
 
 import { auth } from './firebase-config.js';
 
-// ✅ ADD THIS LINE - Your Render backend URL
-const API_BASE_URL = 'https://div-elopers.onrender.com';
+// ✅ Dynamic API_BASE_URL for sandbox/local testing
+const API_BASE_URL = window.location.origin;
 
 /**
  * Get Firebase ID token for the current user.
