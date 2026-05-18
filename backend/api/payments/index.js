@@ -60,8 +60,7 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    const rawName = groupName ? `${groupName} - Contribution` : 'Stokvel Contribution';
-    const itemName = rawName.replace(/[^a-zA-Z0-9 .,_-]/g, '').trim().substring(0, 100);
+    const itemName = 'Stokvel Contribution';
 
     // Fields in this exact order — do NOT change order
     const paymentData = {
