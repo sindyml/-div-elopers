@@ -10,8 +10,11 @@ async function authenticateUser(req, res, next) {
     
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
-    next();
+
+    // Support both sync and async next()
+    return await next();
   } catch (error) {
+    console.error('Authentication error:', error.message);
     res.status(401).json({ error: 'Invalid token' });
   }
 }
