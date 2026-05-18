@@ -17,7 +17,7 @@ function sendJSON(res, statusCode, data) {
 // POST /api/payouts/disburse - Treasurer releases payout
 async function disbursePayout(req, res) {
   try {
-    const { groupId, memberId, amount, reference } = req.body;
+    const { groupId, memberId, amount, payoutId, reference } = req.body;
     const userId = req.user.uid;
 
     // Process payout
@@ -25,6 +25,7 @@ async function disbursePayout(req, res) {
       groupId,
       memberId,
       amount: parseFloat(amount),
+      payoutId,
       reference,
       processedBy: userId
     });
