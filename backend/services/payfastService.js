@@ -53,11 +53,11 @@ class PayFastService {
 
   /**
    * Generate PayFast payment data for a transaction
+   * SIMPLIFIED VERSION - only essential fields for sandbox
    */
   generatePaymentData({
     amount,
     itemName,
-    itemDescription = '',
     userId,
     paymentId,
     returnUrl,
@@ -80,43 +80,33 @@ class PayFastService {
       throw new Error('Item name is required');
     }
 
-    // Build payment data object
+    // MINIMAL payment data - only what PayFast requires
     const paymentData = {
       merchant_id: this.merchantId,
       merchant_key: this.merchantKey,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
-      name_first: firstName || 'StokPal',
+      name_first: firstName || 'Test',
       name_last: lastName || 'User',
-      email_address: email || 'test@stokpal.co.za',
+      email_address: email || 'test@example.com',
       m_payment_id: paymentId,
       amount: parseFloat(amount).toFixed(2),
-      item_name: itemName,
-      item_description: itemDescription || 'Stokvel Contribution',
-      custom_str1: userId || ''
+      item_name: itemName
     };
 
-    // Remove empty fields before generating signature
-    const cleanedData = {};
-    for (let key in paymentData) {
-      if (paymentData[key] !== '' && paymentData[key] !== undefined && paymentData[key] !== null) {
-        cleanedData[key] = paymentData[key];
-      }
-    }
-
-    console.log('📦 Payment Data (cleaned):', JSON.stringify(cleanedData, null, 2));
+    console.log('📦 Payment Data (minimal):', JSON.stringify(paymentData, null, 2));
 
     // Generate signature
-    const signature = this.generateSignature(cleanedData);
+    const signature = this.generateSignature(paymentData);
 
     const result = {
-      ...cleanedData,
+      ...paymentData,
       signature: signature,
       paymentUrl: this.baseUrl
     };
 
-    console.log('✅ Final payment data ready, signature length:', signature.length);
+    console.log('✅ Final payment data ready, signature:', signature.substring(0, 16) + '...');
     
     return result;
   }
@@ -255,7 +245,7 @@ class PayFastService {
         amount: parseFloat(itnData.amount_gross),
         amountFee: parseFloat(itnData.amount_fee || 0),
         amountNet: parseFloat(itnData.amount_net || 0),
-        userId: itnData.custom_str1,
+        userId: itnData.custom_str1 || '',
         merchantId: itnData.merchant_id,
         signature: itnData.signature,
         timestamp: new Date().toISOString()
