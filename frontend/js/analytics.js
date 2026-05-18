@@ -186,6 +186,7 @@ async function generatePayoutsReport(groupId) {
   const data = payoutsSnap.docs.map(doc => {
     const p = doc.data();
     const today = new Date().toISOString().split('T')[0];
+    const isPast = p.payoutDate < today;
 
     let statusText = 'Upcoming';
     if (p.status === 'completed') {
@@ -199,6 +200,7 @@ async function generatePayoutsReport(groupId) {
       Member: p.userDisplayName,
       Date: p.payoutDate,
       Amount: 'R ' + p.amount.toLocaleString('en-ZA'),
+     
       Status: statusText
     };
   });
