@@ -1,6 +1,7 @@
 // backend/api/payouts/index.js
 const admin = require('firebase-admin');
 const paymentService = require('../../services/paymentService');
+const { authenticateUser } = require('../../middleware/auth');
 
 const db = admin.firestore();
 
@@ -13,17 +14,10 @@ function sendJSON(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-// TEMPORARY: Bypass auth for testing
-async function authenticateUser(req, res, next) {
-  // For testing - bypass authentication
-  req.user = { uid: 'test-user-123', isAdmin: true };
-  next();
-}
-
 // POST /api/payouts/disburse - Treasurer releases payout
 async function disbursePayout(req, res) {
   try {
-    const { groupId, memberId, amount, reference } = req.body;
+    const { groupId, memberId, amount, payoutId, reference } = req.body;
     const userId = req.user.uid;
 
     // Process payout
@@ -31,6 +25,7 @@ async function disbursePayout(req, res) {
       groupId,
       memberId,
       amount: parseFloat(amount),
+      payoutId,
       reference,
       processedBy: userId
     });
@@ -102,6 +97,7 @@ async function getHistory(req, res) {
     sendJSON(res, 500, { error: 'Internal server error' });
   }
 }
+
 // Main handler
 async function handleRequest(req, res) {
   const method = req.method;

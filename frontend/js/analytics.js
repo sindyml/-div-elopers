@@ -188,12 +188,20 @@ async function generatePayoutsReport(groupId) {
     const today = new Date().toISOString().split('T')[0];
     const isPast = p.payoutDate < today;
 
+    let statusText = 'Upcoming';
+    if (p.status === 'completed') {
+      statusText = 'Paid';
+    } else if (p.payoutDate < today) {
+      statusText = 'Overdue';
+    }
+
     return {
       Order: p.order,
       Member: p.userDisplayName,
       Date: p.payoutDate,
       Amount: 'R ' + p.amount.toLocaleString('en-ZA'),
-      Status: isPast ? 'Paid' : 'Upcoming'
+     
+      Status: statusText
     };
   });
 
