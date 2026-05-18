@@ -29,6 +29,25 @@ async function authenticateUser(req, res, next) {
   }
 }
 
+// ✅ This is the correct PayFast signature method
+function generateSignature(data) {
+  const paramString = Object.keys(data)
+    .map(key => {
+      // Replace spaces with + and encode special chars but NOT slashes/colons in URLs
+      const value = String(data[key])
+        .trim()
+        .replace(/\+/g, ' '); // normalize first
+      return `${key}=${encodeURIComponent(value).replace(/%20/g, '+')}`;
+    })
+    .join('&');
+
+  console.log('🔐 SIGNATURE PARAM STRING:', paramString);
+  return {
+    paramString,
+    signature: crypto.createHash('md5').update(paramString).digest('hex')
+  };
+}
+
 async function initiatePayment(req, res) {
   try {
     const { amount, contributionId, groupId, groupName, metadata } = req.body;
@@ -47,11 +66,11 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    // Sanitize item_name — strip special characters PayFast rejects
+    // Sanitize item_name
     const rawName = groupName ? `${groupName} - Contribution` : 'Stokvel Contribution';
     const itemName = rawName.replace(/[^a-zA-Z0-9 .,_-]/g, '').trim().substring(0, 100);
 
-    // Payment fields in this exact order — do NOT sort
+    // ✅ PayFast requires these fields in THIS exact order
     const paymentData = {
       merchant_id:  '10000100',
       merchant_key: '46f0cd694581a',
@@ -63,14 +82,7 @@ async function initiatePayment(req, res) {
       item_name:    itemName,
     };
 
-    // Build signature string — same order as fields above
-    const pfParamString = Object.keys(paymentData)
-      .map(key => `${key}=${encodeURIComponent(String(paymentData[key]))}`)
-      .join('&');
-
-    console.log('🔐 SIGNATURE STRING:', pfParamString);
-
-    const signature = crypto.createHash('md5').update(pfParamString).digest('hex');
+    const { paramString, signature } = generateSignature(paymentData);
     paymentData.signature = signature;
 
     console.log('🔐 SIGNATURE:', signature);
@@ -92,8 +104,8 @@ async function initiatePayment(req, res) {
     });
 
     sendJSON(res, 200, {
-      success:    true,
-      paymentId:  paymentId,
+      success:     true,
+      paymentId:   paymentId,
       paymentData: {
         ...paymentData,
         paymentUrl: 'https://sandbox.payfast.co.za/eng/process'
