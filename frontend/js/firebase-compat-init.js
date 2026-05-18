@@ -1,39 +1,26 @@
 // js/firebase-compat-init.js
+// ─────────────────────────────────────────────────────────────
+// FETCH FIREBASE CONFIG FROM API
+// ─────────────────────────────────────────────────────────────
 
-(function () {
-  /* global firebase */
-
-  // Make sure Firebase compat SDK is loaded
-  if (
-    typeof firebase === 'undefined' ||
-    typeof firebase.initializeApp !== 'function'
-  ) {
-    console.error('[firebase-compat-init] Firebase compat SDK not loaded.');
-    return;
-  }
-
-  // Prevent duplicate initialization
-  if (firebase.apps && firebase.apps.length > 0) {
-    return;
-  }
-
-  // FETCH FROM RENDER BACKEND - NOT RELATIVE PATH
-  fetch('https://div-elopers.onrender.com/api/getFirebaseConfig')
-    .then((res) => {
-      if (!res.ok) {
-        throw new Error('Firebase config request failed');
+(function() {
+  // Use relative path for portability across environments
+  fetch('/api/getFirebaseConfig')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
       }
-      return res.json();
+      return response.json();
     })
-    .then((firebaseConfig) => {
-      firebase.initializeApp(firebaseConfig);
-      console.log('[firebase-compat-init] Firebase initialized successfully.');
-    })
-    .catch((e) => {
-      console.error(
-        '[firebase-compat-init] Failed to initialize Firebase:',
-        e
-      );
-    });
+    .then(config => {
+      // Initialize Firebase Compat SDK
+      firebase.initializeApp(config);
+      console.log("✅ Firebase Compat initialized via API config");
 
+      // Dispatch a custom event so other scripts know Firebase is ready
+      window.dispatchEvent(new CustomEvent('firebase-compat-ready'));
+    })
+    .catch(error => {
+      console.error('❌ Failed to load Firebase config:', error);
+    });
 })();

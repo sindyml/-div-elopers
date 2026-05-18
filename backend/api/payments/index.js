@@ -1,6 +1,7 @@
 // backend/api/payments/index.js - PayFast Payment API
 const admin = require('firebase-admin');
 const payfastService = require('../../services/payfastService');
+const { authenticateUser } = require('../../middleware/auth');
 
 const db = admin.firestore();
 
@@ -11,56 +12,11 @@ function sendJSON(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
-// Authentication middleware
-async function authenticateUser(req, res, next) {
-  const isTestEnv = process.env.NODE_ENV === 'test';
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: false };
-        return next();
-      }
-      sendJSON(res, 401, { error: 'Authentication required' });
-      return;
-    }
-
-    const token = authHeader.split('Bearer ')[1];
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      req.user = {
-        uid: decodedToken.uid,
-        isAdmin: decodedToken.isAdmin === true || decodedToken.admin === true
-      };
-      next();
-    } catch (error) {
-      if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: false };
-        next();
-        return;
-      }
-      sendJSON(res, 401, { error: 'Invalid authentication token' });
-    }
-  } catch (error) {
-    if (isTestEnv) {
-      req.user = { uid: 'test-user-123', isAdmin: false };
-      next();
-      return;
-    }
-    sendJSON(res, 401, { error: 'Authentication failed' });
-  }
-}
-
 // POST /initiate - Create PayFast payment
 async function initiatePayment(req, res) {
   try {
     const { amount, contributionId, groupId, groupName, metadata, userEmail, userName } = req.body;
-    const userId = req.user ? req.user.uid : null;
-
-    if (!userId) {
-      sendJSON(res, 401, { error: 'Unauthorized' });
-      return;
-    }
+    const userId = req.user.uid;
 
     if (!amount || amount <= 0) {
       sendJSON(res, 400, { error: 'Invalid amount' });
@@ -68,10 +24,8 @@ async function initiatePayment(req, res) {
     }
 
     // Check PayFast configuration
-    if (!process.env.PAYFAST_MERCHANT_ID || !process.env.PAYFAST_MERCHANT_KEY) {
-      console.error('❌ PayFast credentials missing in environment variables');
-      sendJSON(res, 503, { error: 'Payment gateway not configured' });
-      return;
+    if (!process.env.PAYFAST_MERCHANT_ID && payfastService.merchantId === '10000100') {
+      console.warn('⚠️ Using PayFast sandbox credentials');
     }
 
     // Create payment record in Firestore
@@ -478,8 +432,6 @@ async function handleRequest(req, res) {
   if (historyMatch) {
     req.params = { userId: historyMatch[1] };
   }
-
-  console.log(`[Payment API] Request details: method=${method}, url=${url}, params=${JSON.stringify(req.params)}`);
 
   // Parse query parameters
   if (req.url.includes('?')) {
