@@ -43,7 +43,6 @@ class PayFastService {
       pfParamString += `&passphrase=${encodeURIComponent(pfPassphrase.trim()).replace(/%20/g, '+')}`;
     }
 
-    // DEBUG: Log the exact string being hashed
     console.log('🔐 SIGNATURE STRING:', pfParamString);
     const signature = crypto.createHash('md5').update(pfParamString).digest('hex');
     console.log('🔐 SIGNATURE OUTPUT:', signature);
@@ -53,19 +52,15 @@ class PayFastService {
 
   /**
    * Generate PayFast payment data for a transaction
-   * SIMPLIFIED VERSION - only essential fields for sandbox
+   * ULTRA MINIMAL - only the 7 required fields
    */
   generatePaymentData({
     amount,
     itemName,
-    userId,
     paymentId,
     returnUrl,
     cancelUrl,
-    notifyUrl,
-    email = '',
-    firstName = '',
-    lastName = ''
+    notifyUrl
   }) {
     // Validate required fields
     if (!this.merchantId || !this.merchantKey) {
@@ -80,22 +75,19 @@ class PayFastService {
       throw new Error('Item name is required');
     }
 
-    // MINIMAL payment data - only what PayFast requires
+    // ONLY the 7 fields PayFast absolutely requires
     const paymentData = {
       merchant_id: this.merchantId,
       merchant_key: this.merchantKey,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       notify_url: notifyUrl,
-      name_first: firstName || 'Test',
-      name_last: lastName || 'User',
-      email_address: email || 'test@example.com',
       m_payment_id: paymentId,
       amount: parseFloat(amount).toFixed(2),
       item_name: itemName
     };
 
-    console.log('📦 Payment Data (minimal):', JSON.stringify(paymentData, null, 2));
+    console.log('📦 ULTRA MINIMAL Payment Data:', JSON.stringify(paymentData, null, 2));
 
     // Generate signature
     const signature = this.generateSignature(paymentData);
@@ -160,7 +152,6 @@ class PayFastService {
 
       console.log('📡 Validating ITN with PayFast...');
 
-      // Send validation request to PayFast
       const response = await axios.post(
         this.validateUrl,
         pfParamString,
@@ -220,7 +211,6 @@ class PayFastService {
     try {
       console.log('🔄 Processing ITN...');
       
-      // Step 1: Verify signature
       if (!this.verifyITNSignature(itnData)) {
         return {
           success: false,
@@ -228,7 +218,6 @@ class PayFastService {
         };
       }
 
-      // Step 2: Validate with PayFast server (optional but recommended)
       const isValid = await this.validateITN(itnData);
       if (!isValid) {
         return {
@@ -237,7 +226,6 @@ class PayFastService {
         };
       }
 
-      // Step 3: Extract payment information
       const paymentInfo = {
         paymentId: itnData.m_payment_id,
         payfastPaymentId: itnData.pf_payment_id,
