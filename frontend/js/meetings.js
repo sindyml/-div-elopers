@@ -126,10 +126,7 @@ export function startMeetingListener(role) {
 
   if (!currentGroupId) return;
 
-//to stop new meeting notifications firing for existing meetings when the page loads, add "initialLoadDone"
-let initialLoadDone = false;
-
-const meetingsQuery = query(
+  const meetingsQuery = query(
     collection(db, COLLECTIONS.MEETINGS),
     where('groupId', '==', currentGroupId),
     orderBy('date', 'asc'),
@@ -142,14 +139,13 @@ const meetingsQuery = query(
         const meeting = { id: change.doc.id, ...change.doc.data() };
         if (change.type === 'added') {
           renderMeeting(meeting, role);
-          if (initialLoadDone && !change.doc.metadata.hasPendingWrites) {
+          if (!change.doc.metadata.hasPendingWrites) {
             showNotification(`New meeting scheduled: "${meeting.title || 'Untitled'}" on ${formatDate(meeting.date)}`);
           }
         }
         if (change.type === 'modified') {
           const el = document.querySelector(`[data-meeting-id="${meeting.id}"]`);
-          if (el) el.remove();
-          renderMeeting(meeting, role); //re-insert correct list after edits
+          if (el) el.replaceWith(buildMeetingItem(meeting, role));
         }
         if (change.type === 'removed') {
           const el = document.querySelector(`[data-meeting-id="${meeting.id}"]`);
@@ -157,7 +153,6 @@ const meetingsQuery = query(
           updateUpcomingCount();
         }
       });
-      initialLoadDone = true;
     },
     (err) => {
       console.error('Meeting listener error:', err);
