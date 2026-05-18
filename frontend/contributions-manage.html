@@ -24,27 +24,29 @@
         </header>
 
         <!-- PENDING DISPUTES section -->
-        <section id="pending-disputes-section">
-            <h2>PENDING DISPUTES</h2>
+        <section id="pending-disputes-section" aria-labelledby="disputes-heading">
+            <h2 id="disputes-heading">PENDING DISPUTES</h2>
             <button id="viewPendingDisputesBtn" class="btn btn--primary">View Pending Disputes</button>
-            <section id="pendingDisputesContainer">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Member</th>
-                            <th>Group</th>
-                            <th>Amount</th>
-                            <th>Deadline</th>
-                            <th>Reason</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="pendingDisputesTableBody"></tbody>
-                </table>
-            </section>
+            <article id="pendingDisputesContainer" class="card" style="margin-top: var(--space-4);">
+                <div class="data-table-wrapper">
+                    <table class="data-table" aria-label="Pending disputes table">
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Group</th>
+                                <th>Amount</th>
+                                <th>Deadline</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingDisputesTableBody"></tbody>
+                    </table>
+                </div>
+            </article>
         </section>
 
-        <section id="manageContent"></section>
+        <section id="manageContent" aria-live="polite"></section>
     </main>
 
     <footer id="footer-root"></footer>
