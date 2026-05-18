@@ -106,8 +106,8 @@ const server = http.createServer((req, res) => {
   /* ────────────────────────────────────────────────────────────────────────────
      /api/payments/* - Payment endpoints
      ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/payments/')) {
-    const paymentPath = urlPath.replace('/api/payments', '');
+  if (urlPath === '/api/payments' || urlPath.startsWith('/api/payments/')) {
+    const paymentPath = req.url.replace('/api/payments', '') || '/';
     
     const fakeReq = { method: req.method, url: paymentPath, headers: req.headers, body: null, params: {}, query: {}, user: null };
     const fakeRes = {
@@ -150,8 +150,8 @@ const server = http.createServer((req, res) => {
   /* ────────────────────────────────────────────────────────────────────────────
      /api/disputes/* - Dispute endpoints
      ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/disputes/')) {
-    const disputePath = urlPath.replace('/api/disputes', '');
+  if (urlPath === '/api/disputes' || urlPath.startsWith('/api/disputes/')) {
+    const disputePath = urlPath.replace('/api/disputes', '') || '/';
 
     if (req.method === 'POST') {
       let body = '';
@@ -189,8 +189,8 @@ const server = http.createServer((req, res) => {
   /* ────────────────────────────────────────────────────────────────────────────
      /api/contributions/* - Contribution endpoints
      ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/contributions/')) {
-    const contribPath = urlPath.replace('/api/contributions', '');
+  if (urlPath === '/api/contributions' || urlPath.startsWith('/api/contributions/')) {
+    const contribPath = urlPath.replace('/api/contributions', '') || '/';
 
     if (req.method === 'POST') {
       let body = '';
@@ -228,8 +228,8 @@ const server = http.createServer((req, res) => {
   /* ────────────────────────────────────────────────────────────────────────────
      /api/payouts/* - Payout endpoints
      ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/payouts/')) {
-    const payoutPath = urlPath.replace('/api/payouts', '');
+  if (urlPath === '/api/payouts' || urlPath.startsWith('/api/payouts/')) {
+    const payoutPath = urlPath.replace('/api/payouts', '') || '/';
     
     const processRequest = (fakeReq, fakeRes) => { payoutRoutes(fakeReq, fakeRes); };
     

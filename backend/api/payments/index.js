@@ -29,18 +29,17 @@ async function authenticateUser(req, res, next) {
   }
 }
 
-// ✅ CORRECT: Sort keys alphabetically as PayFast requires
+// ✅ FIXED: uses URLSearchParams so + matches exactly what browser form sends
 function generateSignature(data) {
-  const paramString = Object.keys(data)
-    .sort() // alphabetical order required by PayFast
-    .filter(key => data[key] !== '' && data[key] != null)
-    .map(key => `${key}=${encodeURIComponent(String(data[key]).trim())}`)
-    .join('&');
+  const paramString = new URLSearchParams(
+    Object.fromEntries(Object.keys(data).map(k => [k, String(data[k]).trim()]))
+  ).toString();
 
   console.log('🔐 SIGNATURE PARAM STRING:', paramString);
-  const signature = crypto.createHash('md5').update(paramString).digest('hex');
-  console.log('🔐 SIGNATURE:', signature);
-  return { paramString, signature };
+  return {
+    paramString,
+    signature: crypto.createHash('md5').update(paramString).digest('hex')
+  };
 }
 
 async function initiatePayment(req, res) {
@@ -61,24 +60,29 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    // Simple clean item name - no special characters
     const itemName = 'Stokvel Contribution';
 
-    // PayFast will sort these alphabetically when verifying
+    // Determine base URL dynamically for sandbox/local testing
+    const host = req.headers.host || 'localhost:8080';
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const baseUrl = `${protocol}://${host}`;
+
+    // Fields in this exact order — do NOT change order
     const paymentData = {
-      amount:       parseFloat(amount).toFixed(2),
-      cancel_url:   `https://div-elopers.onrender.com/payment-cancel.html?paymentId=${paymentId}`,
-      item_name:    itemName,
-      m_payment_id: paymentId,
       merchant_id:  '10000100',
       merchant_key: '46f0cd694581a',
-      notify_url:   'https://div-elopers.onrender.com/api/payments/notify',
-      return_url:   `https://div-elopers.onrender.com/payment-return.html?paymentId=${paymentId}`,
+      return_url:   `${baseUrl}/payment-return.html?paymentId=${paymentId}`,
+      cancel_url:   `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`,
+      notify_url:   `${baseUrl}/api/payments/notify`,
+      m_payment_id: paymentId,
+      amount:       parseFloat(amount).toFixed(2),
+      item_name:    itemName,
     };
 
     const { signature } = generateSignature(paymentData);
     paymentData.signature = signature;
 
+    console.log('🔐 SIGNATURE:', signature);
     console.log('📦 PAYMENT DATA:', paymentData);
 
     await paymentRef.set({
@@ -115,6 +119,7 @@ async function initiatePayment(req, res) {
 async function handleNotify(req, res) {
   try {
     console.log('📡 PayFast ITN received:', req.body);
+
     const { m_payment_id, payment_status, amount_gross, pf_payment_id } = req.body;
 
     if (!m_payment_id) {
@@ -181,6 +186,13 @@ async function getPaymentStatus(req, res) {
     }
 
     const payment = paymentDoc.data();
+
+    // Check ownership
+    if (!req.user.isAdmin && payment.userId !== req.user.uid) {
+      sendJSON(res, 403, { error: 'Forbidden: You do not have permission to view this payment' });
+      return;
+    }
+
     sendJSON(res, 200, {
       paymentId: paymentId,
       status:    payment.status,
@@ -210,6 +222,13 @@ async function verifyPayment(req, res) {
     }
 
     const payment = paymentDoc.data();
+
+    // Check ownership
+    if (!req.user.isAdmin && payment.userId !== req.user.uid) {
+      sendJSON(res, 403, { error: 'Forbidden: You do not have permission to verify this payment' });
+      return;
+    }
+
     sendJSON(res, 200, {
       success: true,
       status: payment.status,
@@ -225,6 +244,13 @@ async function verifyPayment(req, res) {
 async function getPaymentHistory(req, res) {
   try {
     const userId = req.params.userId;
+
+    // Check ownership
+    if (!req.user.isAdmin && userId !== req.user.uid) {
+      sendJSON(res, 403, { error: 'Forbidden: You do not have permission to view this history' });
+      return;
+    }
+
     const limit = parseInt(req.query.limit) || 50;
     const status = req.query.status;
 
@@ -263,42 +289,42 @@ async function testEndpoint(req, res) {
 
 async function handleRequest(req, res) {
   const method = req.method;
-  const url = req.url.split('?')[0];
+  const fullUrl = req.url;
+  const urlPath = fullUrl.split('?')[0].replace(/\/$/, '') || '/';
+  const queryStr = fullUrl.split('?')[1] || '';
 
-  console.log(`📡 Payment API request: ${method} ${url}`);
+  req.query = Object.fromEntries(new URLSearchParams(queryStr));
 
-  const statusMatch = url.match(/^\/status\/(.+)$/);
+  console.log(`📡 Payment API request: ${method} ${urlPath}`);
+
+  const statusMatch = urlPath.match(/^\/status\/(.+)$/);
   if (statusMatch) {
     req.params = { paymentId: statusMatch[1] };
   }
 
-  const historyMatch = url.match(/^\/history\/(.+)$/);
+  const historyMatch = urlPath.match(/^\/history\/(.+)$/);
   if (historyMatch) {
     req.params = { userId: historyMatch[1] };
-    const queryStr = req.url.split('?')[1];
-    if (queryStr) {
-      req.query = Object.fromEntries(new URLSearchParams(queryStr));
-    }
   }
 
-  if (method === 'GET' && url === '/test') {
+  if (method === 'GET' && urlPath === '/test') {
     await testEndpoint(req, res);
-  } else if (method === 'POST' && url === '/notify') {
+  } else if (method === 'POST' && urlPath === '/notify') {
     await handleNotify(req, res);
-  } else if (method === 'POST' && url === '/initiate') {
+  } else if (method === 'POST' && urlPath === '/initiate') {
     await authenticateUser(req, res, () => initiatePayment(req, res));
-  } else if (method === 'POST' && url === '/verify') {
+  } else if (method === 'POST' && urlPath === '/verify') {
     await authenticateUser(req, res, () => verifyPayment(req, res));
-  } else if (method === 'GET' && url === '/return') {
+  } else if (method === 'GET' && urlPath === '/return') {
     await handleReturn(req, res);
-  } else if (method === 'GET' && url === '/cancel') {
+  } else if (method === 'GET' && urlPath === '/cancel') {
     await handleCancel(req, res);
   } else if (method === 'GET' && statusMatch) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));
   } else if (method === 'GET' && historyMatch) {
     await authenticateUser(req, res, () => getPaymentHistory(req, res));
   } else {
-    sendJSON(res, 404, { error: `Endpoint not found: ${method} ${url}` });
+    sendJSON(res, 404, { error: `Endpoint not found: ${method} ${urlPath}` });
   }
 }
 

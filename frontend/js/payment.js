@@ -163,18 +163,18 @@ async function initiatePayFastRedirect(user) {
 
     const { paymentData } = result;
 
-    // ✅ Send fields in alphabetical order to match signature
-   const PAYFAST_FIELDS = [
-  'amount',
-  'cancel_url',
-  'item_name',
-  'm_payment_id',
-  'merchant_id',
-  'merchant_key',
-  'notify_url',
-  'return_url',
-  'signature'
-   ];
+    // ✅ FIXED: Only send exact PayFast fields — excludes paymentUrl and anything else
+    const PAYFAST_FIELDS = [
+      'merchant_id',
+      'merchant_key',
+      'return_url',
+      'cancel_url',
+      'notify_url',
+      'm_payment_id',
+      'amount',
+      'item_name',
+      'signature'
+    ];
 
     const form = document.createElement('form');
     form.method = 'POST';

@@ -1,0 +1,41 @@
+
+> stockpal-app@1.0.0 start
+> node backend/server.js
+
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+⚠️ No Firebase credentials found. Running in demo mode.
+✅ Payment Service initialized (Firestore mode)
+
+✅ StokPal server running → http://localhost:8080
+💳 Payment API:   http://localhost:8080/api/payments/
+📦 Payout API:    http://localhost:8080/api/payouts/
+📡 Payment API request: POST /notify
+📡 PayFast ITN received: { m_payment_id: 'test_id' }
+(node:151361) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ITN processing error: Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:287:15)
+    at async GoogleAuth._GoogleAuth_determineClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:834:32)
+    at async GoogleAuth.getClient (/app/node_modules/google-gax/node_modules/google-auth-library/build/src/auth/googleauth.js:698:20)
+    at async GrpcClient._getCredentials (/app/node_modules/google-gax/build/src/grpc.js:145:24)
+    at async GrpcClient.createStub (/app/node_modules/google-gax/build/src/grpc.js:318:23)
+Caused by: Error
+    at /app/node_modules/@google-cloud/firestore/build/src/index.js:1040:27
+    at /app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:110:30
+    at NoopContextManager.with (/app/node_modules/@opentelemetry/api/build/src/context/NoopContextManager.js:14:19)
+    at ContextAPI.with (/app/node_modules/@opentelemetry/api/build/src/api/context.js:51:46)
+    at NoopTracer.startActiveSpan (/app/node_modules/@opentelemetry/api/build/src/trace/NoopTracer.js:54:31)
+    at ProxyTracer.startActiveSpan (/app/node_modules/@opentelemetry/api/build/src/trace/ProxyTracer.js:27:24)
+    at EnabledTraceUtil.startActiveSpan (/app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:102:28)
+    at Firestore.getAll (/app/node_modules/@google-cloud/firestore/build/src/index.js:1031:32)
+    at /app/node_modules/@google-cloud/firestore/build/src/reference/document-reference.js:182:36
+    at /app/node_modules/@google-cloud/firestore/build/src/telemetry/enabled-trace-util.js:110:30
+📡 Payment API request: GET /status/test123
+📡 Payment API request: POST /initiate
+📡 Payment API request: POST /notify
+📡 PayFast ITN received: {}
+📡 Payment API request: GET /status/test
+📡 Payment API request: POST /verify
+📡 Payment API request: GET /history/user123
+📡 Payment API request: POST /initiate
+📡 Payment API request: POST /initiate
