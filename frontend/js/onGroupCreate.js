@@ -1,16 +1,19 @@
 // frontend/js/onGroupCreate.js
 import { db } from './firebase-config.js';
 import {
+    collection,
     doc,
     getDoc,
     getDocs,
-    collection,
+    addDoc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    writeBatch,
     query,
     where,
-    orderBy,
-    writeBatch,
-    Timestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+    orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ============================================================
 // HELPER FUNCTIONS
@@ -36,7 +39,8 @@ function getPayoutDate(deadlineDate) {
 
 async function getMemberName(userId) {
     try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
+        const userDocRef = doc(db, 'users', userId);
+        const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
             return userDoc.data().displayName || userDoc.data().name || userDoc.data().email || userId;
         }
@@ -44,74 +48,89 @@ async function getMemberName(userId) {
     return userId;
 }
 
-/**
- * Get the group creation date from the group document
- * @param {Object} groupData - The group document data
- * @returns {Date} The group creation date
- */
 function getGroupCreationDate(groupData) {
+    console.log('[DEBUG] getGroupCreationDate - groupData.createdAt:', groupData.createdAt);
     if (!groupData.createdAt) {
-        console.warn('No createdAt field in group document, using current date');
+        console.warn('[DEBUG] No createdAt field, using current date');
         return new Date();
     }
     
-    // Handle Firestore Timestamp or ISO string
     if (typeof groupData.createdAt.toDate === 'function') {
-        return groupData.createdAt.toDate();
+        const date = groupData.createdAt.toDate();
+        console.log('[DEBUG] Converted Firestore timestamp to Date:', date);
+        return date;
     }
-    return new Date(groupData.createdAt);
+    const date = new Date(groupData.createdAt);
+    console.log('[DEBUG] Converted ISO string to Date:', date);
+    return date;
 }
 
 // ============================================================
-// HANDLE GROUP CREATION (admin only at group creation)
-// Called by Person 3 after group is created
+// HANDLE GROUP CREATION
 // ============================================================
 export async function handleGroupCreation(groupId) {
-    console.log(`handleGroupCreation called for group ${groupId}`);
+    console.log('========== [DEBUG] handleGroupCreation START ==========');
+    console.log('[DEBUG] groupId:', groupId);
     
-    // Get group details
-    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    // Step 1: Get group details
+    console.log('[DEBUG] Step 1: Fetching group document...');
+    const groupRef = doc(db, 'groups', groupId);
+    const groupDoc = await getDoc(groupRef);
+    console.log('[DEBUG] groupDoc.exists:', groupDoc.exists());
+    
     if (!groupDoc.exists()) {
-        console.error(`Group ${groupId} not found`);
+        console.error('[ERROR] Group not found:', groupId);
         return;
     }
     
     const groupData = groupDoc.data();
-    const contributionAmount = groupData.contributionAmount;
-    const groupCreatedAt = getGroupCreationDate(groupData);
+    console.log('[DEBUG] groupData:', JSON.stringify(groupData, null, 2));
     
-    // Get members from members subcollection (only admin at this point)
-    const membersSnapshot = await getDocs(collection(db, 'groups', groupId, 'members'));
+    const contributionAmount = groupData.contributionAmount;
+    console.log('[DEBUG] contributionAmount:', contributionAmount);
+    
+    const groupCreatedAt = getGroupCreationDate(groupData);
+    console.log('[DEBUG] groupCreatedAt:', groupCreatedAt.toISOString());
+    
+    // Step 2: Get members from members subcollection
+    console.log('[DEBUG] Step 2: Fetching members from subcollection...');
+    const membersRef = collection(db, 'groups', groupId, 'members');
+    const membersSnapshot = await getDocs(membersRef);
+    
+    console.log('[DEBUG] membersSnapshot.size:', membersSnapshot.size);
     
     const members = membersSnapshot.docs.map(doc => ({
         uid: doc.data().uid,
         role: doc.data().role,
         joinedAt: doc.data().joinedAt
     }));
+    console.log('[DEBUG] members:', JSON.stringify(members, null, 2));
     
     if (members.length === 0) {
-        console.error(`No members found for group ${groupId}`);
+        console.error('[ERROR] No members found for group', groupId);
         return;
     }
     
     const memberCount = members.length;
     const payoutAmount = contributionAmount * (memberCount - 1);
+    console.log('[DEBUG] memberCount:', memberCount);
+    console.log('[DEBUG] payoutAmount:', payoutAmount);
     
-    console.log(`Group ${groupId}: ${memberCount} members, Contribution: ${contributionAmount}, Payout: ${payoutAmount}`);
+    // Step 3: Create contributions (12 months)
+    console.log('[DEBUG] Step 3: Creating contributions...');
+    let contributionsCreated = 0;
+    const contributionsRef = collection(db, 'contributions');
     
-    const batch = writeBatch(db);
-
-    // ============================================================
-    // CREATE CONTRIBUTIONS for all members (12 months)
-    // ============================================================
     for (const member of members) {
+        console.log(`[DEBUG] Creating contributions for member: ${member.uid}`);
         for (let i = 0; i < 12; i++) {
             const monthsToAdd = i + 1;
             const deadlineDate = getDeadlineDate(groupCreatedAt, monthsToAdd);
             const dateStr = deadlineDate.toISOString().split('T')[0];
             
-            const contribRef = doc(collection(db, 'contributions'));
-            batch.set(contribRef, {
+            console.log(`[DEBUG]   Month ${i+1}: deadlineDate = ${dateStr}`);
+            
+            await addDoc(contributionsRef, {
                 userId: member.uid,
                 groupId: groupId,
                 amount: contributionAmount,
@@ -121,24 +140,32 @@ export async function handleGroupCreation(groupId) {
                 evidenceUrl: null,
                 createdAt: Timestamp.now()
             });
+            contributionsCreated++;
         }
     }
     
-    // ============================================================
-    // CREATE PAYOUTS for all members
-    // ============================================================
+    console.log(`[DEBUG] Created ${contributionsCreated} contributions for group ${groupId}`);
+    
+    // Step 4: Create payouts
+    console.log('[DEBUG] Step 4: Creating payouts...');
+    let payoutsCreated = 0;
+    const payoutsRef = collection(db, 'payouts');
+    
     for (let i = 0; i < members.length; i++) {
         const member = members[i];
         const order = i + 1;
+        console.log(`[DEBUG] Creating payout for member ${member.uid}, order: ${order}`);
+        
         const userDisplayName = await getMemberName(member.uid);
+        console.log(`[DEBUG]   userDisplayName: ${userDisplayName}`);
         
         const monthsToAdd = order;
         const deadlineForPayout = getDeadlineDate(groupCreatedAt, monthsToAdd);
         const payoutDate = getPayoutDate(deadlineForPayout);
         const payoutDateStr = payoutDate.toISOString().split('T')[0];
+        console.log(`[DEBUG]   payoutDate: ${payoutDateStr}`);
         
-        const payoutRef = doc(collection(db, 'payouts'));
-        batch.set(payoutRef, {
+        await addDoc(payoutsRef, {
             groupId: groupId,
             userId: member.uid,
             userDisplayName: userDisplayName,
@@ -147,23 +174,26 @@ export async function handleGroupCreation(groupId) {
             amount: payoutAmount,
             createdAt: Timestamp.now()
         });
+        payoutsCreated++;
     }
     
-    await batch.commit();
-    console.log(`Initialized group ${groupId} with contributions and payouts.`);
+    console.log(`[DEBUG] Created ${payoutsCreated} payouts for group ${groupId}`);
+    console.log('========== [DEBUG] handleGroupCreation COMPLETE ==========');
 }
 
 // ============================================================
-// HANDLE MEMBER JOIN (called when user accepts invite)
-// Called by Person 3 after adding member to members subcollection
+// HANDLE MEMBER JOIN
 // ============================================================
 export async function handleMemberJoin(groupId, userId) {
-    console.log(`handleMemberJoin called for group ${groupId}, user ${userId}`);
+    console.log('========== [DEBUG] handleMemberJoin START ==========');
+    console.log('[DEBUG] groupId:', groupId);
+    console.log('[DEBUG] userId:', userId);
     
     // Get group details
-    const groupDoc = await getDoc(doc(db, 'groups', groupId));
+    const groupRef = doc(db, 'groups', groupId);
+    const groupDoc = await getDoc(groupRef);
     if (!groupDoc.exists()) {
-        console.error(`Group ${groupId} not found`);
+        console.error(`[ERROR] Group ${groupId} not found`);
         return;
     }
     
@@ -171,10 +201,13 @@ export async function handleMemberJoin(groupId, userId) {
     const contributionAmount = groupData.contributionAmount;
     const groupCreatedAt = getGroupCreationDate(groupData);
     
-    // Get all members from members subcollection (sorted by join order)
-    const membersSnapshot = await getDocs(
-        query(collection(db, 'groups', groupId, 'members'), orderBy('joinedAt', 'asc'))
-    );
+    console.log('[DEBUG] contributionAmount:', contributionAmount);
+    console.log('[DEBUG] groupCreatedAt:', groupCreatedAt);
+    
+    // Get all members sorted by join order
+    const membersRef = collection(db, 'groups', groupId, 'members');
+    const q = query(membersRef, orderBy('joinedAt', 'asc'));
+    const membersSnapshot = await getDocs(q);
     
     const members = membersSnapshot.docs.map(doc => ({
         uid: doc.data().uid,
@@ -185,22 +218,20 @@ export async function handleMemberJoin(groupId, userId) {
     const memberCount = members.length;
     const payoutAmount = contributionAmount * (memberCount - 1);
     
-    console.log(`Group ${groupId}: Now ${memberCount} members, Payout amount: ${payoutAmount}`);
+    console.log('[DEBUG] memberCount:', memberCount);
+    console.log('[DEBUG] payoutAmount:', payoutAmount);
     
-    const batch = writeBatch(db);
-
-    // ============================================================
-    // CREATE CONTRIBUTIONS for the new member (12 months)
-    // ============================================================
+    // Create contributions for new member
     const newMember = members.find(m => m.uid === userId);
     if (newMember) {
+        console.log(`[DEBUG] Creating 12 contributions for new member ${userId}`);
+        const contributionsRef = collection(db, 'contributions');
         for (let i = 0; i < 12; i++) {
             const monthsToAdd = i + 1;
             const deadlineDate = getDeadlineDate(groupCreatedAt, monthsToAdd);
             const dateStr = deadlineDate.toISOString().split('T')[0];
             
-            const contribRef = doc(collection(db, 'contributions'));
-            batch.set(contribRef, {
+            await addDoc(contributionsRef, {
                 userId: newMember.uid,
                 groupId: groupId,
                 amount: contributionAmount,
@@ -211,21 +242,26 @@ export async function handleMemberJoin(groupId, userId) {
                 createdAt: Timestamp.now()
             });
         }
+        console.log(`[DEBUG] Created contributions for new member ${userId}`);
     }
     
-    // ============================================================
-    // RECALCULATE ALL PAYOUTS (delete existing and recreate with correct order and amount)
-    // ============================================================
-    // Delete existing payouts for this group
-    const existingPayouts = await getDocs(
-        query(collection(db, 'payouts'), where('groupId', '==', groupId))
-    );
+    // Recalculate payouts
+    console.log('[DEBUG] Recalculating payouts...');
+    const payoutsRef = collection(db, 'payouts');
+    const payoutsQuery = query(payoutsRef, where('groupId', '==', groupId));
+    const existingPayouts = await getDocs(payoutsQuery);
     
+    console.log(`[DEBUG] Found ${existingPayouts.size} existing payouts to delete`);
+    
+    const batch = writeBatch(db);
     existingPayouts.docs.forEach(doc => {
         batch.delete(doc.ref);
     });
+    await batch.commit();
     
-    // Create new payouts for all members with correct order and amount
+    console.log('[DEBUG] Deleted existing payouts');
+    
+    // Create new payouts
     for (let i = 0; i < members.length; i++) {
         const member = members[i];
         const order = i + 1;
@@ -236,8 +272,7 @@ export async function handleMemberJoin(groupId, userId) {
         const payoutDate = getPayoutDate(deadlineForPayout);
         const payoutDateStr = payoutDate.toISOString().split('T')[0];
         
-        const payoutRef = doc(collection(db, 'payouts'));
-        batch.set(payoutRef, {
+        await addDoc(payoutsRef, {
             groupId: groupId,
             userId: member.uid,
             userDisplayName: userDisplayName,
@@ -246,8 +281,9 @@ export async function handleMemberJoin(groupId, userId) {
             amount: payoutAmount,
             createdAt: Timestamp.now()
         });
+        console.log(`[DEBUG] Created payout for ${member.uid}, order ${order}, amount ${payoutAmount}`);
     }
     
-    await batch.commit();
-    console.log(`Re-synced payouts and contributions for group ${groupId} after member join.`);
+    console.log(`[DEBUG] Recreated ${members.length} payouts for group ${groupId}`);
+    console.log('========== [DEBUG] handleMemberJoin COMPLETE ==========');
 }
