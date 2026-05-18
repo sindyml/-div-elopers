@@ -54,7 +54,7 @@ async function authenticateUser(req, res, next) {
 // POST /initiate - Create PayFast payment
 async function initiatePayment(req, res) {
   try {
-    const { amount, contributionId, groupId, groupName, metadata, userEmail, userName } = req.body;
+    const { amount, contributionId, groupId, groupName, metadata } = req.body;
     const userId = req.user ? req.user.uid : null;
 
     if (!userId) {
@@ -67,110 +67,59 @@ async function initiatePayment(req, res) {
       return;
     }
 
-    // Check PayFast configuration
-    if (!process.env.PAYFAST_MERCHANT_ID || !process.env.PAYFAST_MERCHANT_KEY) {
-      console.error('❌ PayFast credentials missing in environment variables');
-      sendJSON(res, 503, { error: 'Payment gateway not configured' });
-      return;
-    }
-
     // Create payment record in Firestore
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    // FORCE CORRECT URLs - Hardcoded for testing
+    // Build URLs for PayFast
     const baseUrl = 'https://div-elopers.onrender.com';
     const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
     const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
     const notifyUrl = `${baseUrl}/api/payments/notify`;
 
-    console.log('🔍 USING HARDCODED URLs:', { returnUrl, cancelUrl, notifyUrl });
+    console.log('🔍 USING URLs:', { returnUrl, cancelUrl, notifyUrl });
 
-    // Generate PayFast payment data
-    try {
-      const itemName = groupName
-        ? `${groupName} - Contribution`
-        : 'Stokvel Contribution';
+    const itemName = groupName
+      ? `${groupName} - Contribution`
+      : 'Stokvel Contribution';
 
-      // Split name if provided
-      let firstName = '';
-      let lastName = '';
-      if (userName) {
-        const nameParts = userName.trim().split(' ');
-        firstName = nameParts[0] || '';
-        lastName = nameParts.slice(1).join(' ') || '';
-      }
+    // Use the ultra-minimal payfastService (no name/email fields)
+    const paymentData = payfastService.generatePaymentData({
+      amount: amount,
+      itemName: itemName,
+      paymentId: paymentId,
+      returnUrl: returnUrl,
+      cancelUrl: cancelUrl,
+      notifyUrl: notifyUrl
+    });
 
-      // TEMPORARY: Build payment data directly to bypass any service issues
-      const paymentData = {
-        merchant_id: '10000100',
-        merchant_key: '46f0cd694581a',
-        return_url: returnUrl,
-        cancel_url: cancelUrl,
-        notify_url: notifyUrl,
-        name_first: firstName || 'Test',
-        name_last: lastName || 'User',
-        email_address: userEmail || 'test@example.com',
-        m_payment_id: paymentId,
-        amount: parseFloat(amount).toFixed(2),
-        item_name: itemName
-      };
+    console.log('📦 Payment Data from service:', JSON.stringify(paymentData, null, 2));
 
-      // Generate signature manually
-      const crypto = require('crypto');
-      const sortedKeys = Object.keys(paymentData).sort();
-      let signatureString = '';
-      for (const key of sortedKeys) {
-        if (paymentData[key] !== '' && paymentData[key] !== undefined && paymentData[key] !== null) {
-          signatureString += `${key}=${encodeURIComponent(paymentData[key].toString().trim()).replace(/%20/g, '+')}&`;
-        }
-      }
-      signatureString = signatureString.slice(0, -1);
-      const signature = crypto.createHash('md5').update(signatureString).digest('hex');
-      
-      paymentData.signature = signature;
-      
-      const finalPaymentData = {
-        ...paymentData,
-        paymentUrl: 'https://sandbox.payfast.co.za/eng/process'
-      };
+    // Store payment in Firestore
+    await paymentRef.set({
+      id: paymentId,
+      userId: userId,
+      contributionId: contributionId || null,
+      groupId: groupId || null,
+      amount: amount,
+      currency: 'ZAR',
+      status: 'pending',
+      type: 'payment',
+      provider: 'payfast',
+      metadata: metadata || {},
+      paymentData: {
+        itemName: itemName
+      },
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
-      console.log('🔐 GENERATED SIGNATURE:', signature);
-      console.log('🔐 SIGNATURE STRING:', signatureString);
-
-      // Store payment in Firestore
-      await paymentRef.set({
-        id: paymentId,
-        userId: userId,
-        contributionId: contributionId || null,
-        groupId: groupId || null,
-        amount: amount,
-        currency: 'ZAR',
-        status: 'pending',
-        type: 'payment',
-        provider: 'payfast',
-        metadata: metadata || {},
-        paymentData: {
-          itemName: itemName
-        },
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      sendJSON(res, 200, {
-        success: true,
-        paymentId: paymentId,
-        paymentData: finalPaymentData,
-        message: 'Payment initiated. Redirect user to PayFast.'
-      });
-
-    } catch (error) {
-      console.error('PayFast payment generation error:', error);
-      sendJSON(res, 500, {
-        error: 'Failed to generate payment data',
-        message: error.message
-      });
-    }
+    sendJSON(res, 200, {
+      success: true,
+      paymentId: paymentId,
+      paymentData: paymentData,
+      message: 'Payment initiated. Redirect user to PayFast.'
+    });
 
   } catch (error) {
     console.error('Payment initiation error:', error);
@@ -183,7 +132,6 @@ async function handleNotify(req, res) {
   try {
     console.log('📡 PayFast ITN received:', req.body);
 
-    // Process ITN with PayFast service
     const result = await payfastService.processITN(req.body);
 
     if (!result.success) {
@@ -195,7 +143,6 @@ async function handleNotify(req, res) {
     const paymentInfo = result.data;
     const paymentId = paymentInfo.paymentId;
 
-    // Get payment record from Firestore
     const paymentRef = db.collection('transactions').doc(paymentId);
     const paymentDoc = await paymentRef.get();
 
@@ -207,7 +154,6 @@ async function handleNotify(req, res) {
 
     const payment = paymentDoc.data();
 
-    // Verify amount matches
     if (!payfastService.verifyAmount(paymentInfo.amount, payment.amount)) {
       console.error('Amount mismatch:', {
         received: paymentInfo.amount,
@@ -217,7 +163,6 @@ async function handleNotify(req, res) {
       return;
     }
 
-    // Update payment record
     await paymentRef.update({
       status: paymentInfo.paymentStatus,
       payfastPaymentId: paymentInfo.payfastPaymentId,
@@ -231,7 +176,6 @@ async function handleNotify(req, res) {
         : null
     });
 
-    // If payment is completed, update contribution status
     if (paymentInfo.paymentStatus === 'completed' && payment.contributionId) {
       try {
         await db.collection('contributions').doc(payment.contributionId).update({
@@ -244,7 +188,6 @@ async function handleNotify(req, res) {
       }
     }
 
-    // Log webhook event
     try {
       await db.collection('webhookEvents').add({
         type: 'payfast_itn',
@@ -259,7 +202,6 @@ async function handleNotify(req, res) {
       console.log('Note: Could not log webhook to Firestore');
     }
 
-    // Respond to PayFast - MUST be 200 OK
     sendJSON(res, 200, { received: true });
 
   } catch (error) {
@@ -480,7 +422,6 @@ async function handleRequest(req, res) {
 
   console.log(`📡 Payment API request: ${method} ${url}`);
 
-  // Extract params from URL
   const statusMatch = url.match(/^\/status\/(.+)$/);
   if (statusMatch) {
     req.params = { paymentId: statusMatch[1] };
@@ -493,7 +434,6 @@ async function handleRequest(req, res) {
 
   console.log(`[Payment API] Request details: method=${method}, url=${url}, params=${JSON.stringify(req.params)}`);
 
-  // Parse query parameters
   if (req.url.includes('?')) {
     const urlObj = new URL(req.url, `http://${req.headers.host}`);
     req.query = Object.fromEntries(urlObj.searchParams);
@@ -501,7 +441,6 @@ async function handleRequest(req, res) {
     req.query = {};
   }
 
-  // Route to appropriate handler
   if (method === 'GET' && url === '/test') {
     await testEndpoint(req, res);
   }
@@ -531,5 +470,4 @@ async function handleRequest(req, res) {
   }
 }
 
-// Export the handler
 module.exports = handleRequest;
