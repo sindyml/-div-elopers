@@ -69,6 +69,30 @@
       margin-top: var(--space-1);
     }
 
+    /* Analytics Panel Enhancements */
+    .report-container {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .report-header-display {
+      border-bottom: 2px solid var(--color-primary);
+      padding-bottom: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+    .report-stat {
+      transition: transform 0.2s;
+    }
+
+    .report-stat:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
     @media print {
       body * { visibility: hidden; }
       #report-print-area, #report-print-area * { visibility: visible; }
@@ -134,7 +158,7 @@
     </div>
 
     <div id="report-print-area" class="report-container">
-      <div id="report-header" style="margin-bottom: var(--space-6); display: none;">
+      <div id="report-header" class="report-header-display" style="display: none;">
          <h2 id="report-title-display">Report Title</h2>
          <p id="report-metadata-display" class="report-stat__label"></p>
       </div>

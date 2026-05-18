@@ -57,12 +57,12 @@
             getCurrentUserRole,
             getTreasurerGroups,
             getUserDisplayName,
-            updateContributionStatus,
             listenToGroupContributions,
             getPendingDisputes,
-            approveDispute,
             rejectDispute
         } from './js/contributions.js';
+        import { confirmContribution } from './js/contributionService.js';
+        import { approveDispute } from './js/disputeService.js';
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -100,10 +100,19 @@
                 approveBtn.textContent = 'Approve';
                 approveBtn.classList.add('btn', 'btn--success', 'btn--sm');
                 approveBtn.addEventListener('click', async () => {
-                    await approveDispute(dispute.id, dispute.contributionId);
-                    alert('Dispute approved. Contribution status updated to confirmed.');
-                    loadPendingDisputes(); // Refresh
-                    loadManagePage(); // Refresh contribution table
+                    try {
+                        approveBtn.disabled = true;
+                        approveBtn.textContent = '...';
+                        await approveDispute(dispute.id, dispute.contributionId);
+                        alert('Dispute approved. Contribution status updated to confirmed.');
+                        loadPendingDisputes(); // Refresh
+                        loadManagePage(); // Refresh contribution table
+                    } catch (err) {
+                        console.error('Dispute approval failed:', err);
+                        alert('Error: ' + err.message);
+                        approveBtn.disabled = false;
+                        approveBtn.textContent = 'Approve';
+                    }
                 });
                 
                 const rejectBtn = document.createElement('button');
@@ -262,7 +271,17 @@
                         confirmButton.textContent = 'Confirm';
                         confirmButton.classList.add('btn', 'confirm');
                         confirmButton.addEventListener('click', async () => {
-                            await updateContributionStatus(contribution.id, 'confirmed');
+                            try {
+                                confirmButton.disabled = true;
+                                confirmButton.textContent = '...';
+                                await confirmContribution(contribution.id);
+                                alert('Contribution confirmed successfully');
+                            } catch (err) {
+                                console.error('Confirmation failed:', err);
+                                alert('Error: ' + err.message);
+                                confirmButton.disabled = false;
+                                confirmButton.textContent = 'Confirm';
+                            }
                         });
 
                         const missButton = document.createElement('button');

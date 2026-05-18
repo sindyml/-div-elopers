@@ -36,7 +36,8 @@
             getUserGroups,
             getCurrentUserRole
         } from './js/contributions.js';
-        import { doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { disbursePayout } from './js/payoutService.js';
+        import { doc, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -247,7 +248,9 @@ saveBtn.addEventListener('click', async () => {
                 const table = document.createElement('table');
                 const thead = document.createElement('thead');
                 const headerRow = document.createElement('tr');
-                const headers = ['Order', 'Member Name', 'Payout Date', 'Amount'];
+
+                // Add Status and Action columns
+                const headers = ['Order', 'Member Name', 'Payout Date', 'Amount', 'Status', 'Action'];
                 headers.forEach(text => {
                     const th = document.createElement('th');
                     th.textContent = text;
@@ -262,15 +265,63 @@ saveBtn.addEventListener('click', async () => {
                     const orderCell = row.insertCell(0);
                     orderCell.setAttribute('data-label', 'Order');
                     orderCell.textContent = payout.order;
+
                     const nameCell = row.insertCell(1);
                     nameCell.setAttribute('data-label', 'Member Name');
                     nameCell.textContent = payout.userDisplayName;
+
                     const dateCell = row.insertCell(2);
                     dateCell.setAttribute('data-label', 'Payout Date');
                     dateCell.textContent = payout.payoutDate;
+
                     const amountCell = row.insertCell(3);
                     amountCell.setAttribute('data-label', 'Amount');
                     amountCell.textContent = `R${payout.amount}`;
+
+                    const statusCell = row.insertCell(4);
+                    statusCell.setAttribute('data-label', 'Status');
+                    const status = payout.status || 'pending';
+                    statusCell.textContent = status === 'completed' ? '✅ Paid' : '⏳ Pending';
+
+                    const actionCell = row.insertCell(5);
+                    actionCell.setAttribute('data-label', 'Action');
+
+                    if ((userRole === 'Treasurer' || userRole === 'Admin') && status !== 'completed') {
+                        const disburseBtn = document.createElement('button');
+                        disburseBtn.textContent = '💸 Disburse';
+                        disburseBtn.classList.add('btn', 'btn--primary', 'btn--sm');
+                        disburseBtn.addEventListener('click', async () => {
+                            if (confirm(`Confirm disbursement of R${payout.amount} to ${payout.userDisplayName}?`)) {
+                                try {
+                                    disburseBtn.disabled = true;
+                                    disburseBtn.textContent = 'Processing...';
+
+                                    const result = await disbursePayout({
+                                        groupId: groupId,
+                                        memberId: payout.userId,
+                                        amount: payout.amount,
+                                        payoutId: payout.id,
+                                        reference: `STOKPAL_PAYOUT_${payout.order}_${groupId.substring(0,5)}`
+                                    });
+
+                                    if (result.success) {
+                                        alert('Payout disbursed successfully!');
+                                        refreshDisplay(groupId);
+                                    }
+                                } catch (err) {
+                                    console.error('Disbursement failed:', err);
+                                    alert('Error: ' + err.message);
+                                    disburseBtn.disabled = false;
+                                    disburseBtn.textContent = '💸 Disburse';
+                                }
+                            }
+                        });
+                        actionCell.appendChild(disburseBtn);
+                    } else if (status === 'completed') {
+                        actionCell.textContent = '—';
+                    } else {
+                        actionCell.textContent = '—';
+                    }
                 });
                 table.appendChild(tbody);
                 container.appendChild(table);
