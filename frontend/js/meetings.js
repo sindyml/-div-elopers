@@ -58,13 +58,17 @@ auth.onAuthStateChanged(async (user) => {
 });
 
 export function applyRoleUI(role) {
-  const scheduleCard = document.querySelector('section[aria-labelledby="schedule-heading"]');
   if (role === ROLES.MEMBER) {
-    if (scheduleCard) {
-      scheduleCard.hidden = true;
-      const layout = document.querySelector('section.meetings-layout');
-      if (layout) layout.style.gridTemplateColumns = '1fr';
-    }
+    // Hide the form and the "Treasurer & Admin only" role badge
+    const form = document.getElementById('schedule-form');
+    if (form) form.hidden = true;
+
+    const roleNote = document.querySelector('section[aria-labelledby="schedule-heading"] p.role-note');
+    if (roleNote) roleNote.hidden = true;
+
+    // Reveal the member-only informational notice
+    const notice = document.getElementById('member-schedule-notice');
+    if (notice) notice.removeAttribute('hidden');
   }
 
   const timeInput = document.getElementById('meeting-time');
@@ -368,7 +372,7 @@ export async function saveMinutes() {
 }
 window.saveMinutes = saveMinutes;
 
-//Check there's no duplicate meetings. If there are, don't store new document
+// Check there's no duplicate meetings. If there are, don't store new document
 async function meetingSlotTaken(groupId, date, time) {
   try {
     const snap = await getDocs(
@@ -439,3 +443,4 @@ document.addEventListener('click', (e) => {
 window.addEventListener('beforeunload', () => {
   if (_unsubscribe) _unsubscribe();
 });
+

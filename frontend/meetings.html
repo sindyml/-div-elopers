@@ -206,6 +206,21 @@
           </menu>
         </form>
 
+        <!--
+          id="member-schedule-notice" — applyRoleUI() in meetings.js removes
+          the hidden attribute when role === ROLES.MEMBER, and hides the form
+          and role-note above so only this message is visible to members.
+          role="note" / hidden — starts hidden; revealed for members only.
+        -->
+        <p id="member-schedule-notice" class="member-notice" role="note" hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Only admins and treasurers can schedule meetings. To request a meeting,
+          please contact your group admin.
+        </p>
+
       </section><!-- /schedule card -->
 
 
@@ -223,7 +238,7 @@
           <!--
             id="upcoming-count"  — updateUpcomingCount() in meetings.js
                                    writes the live count here via .textContent.
-            <o> is the correct element for a script-computed value.
+            <output> is the correct element for a script-computed value.
             for="schedule-form"  — associates this output with the form
                                    whose submissions change the count.
           -->
@@ -440,3 +455,4 @@
 
 </body>
 </html>
+

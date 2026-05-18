@@ -122,6 +122,26 @@ p.role-note {
   margin-bottom: 1.25rem;
 }
 
+/* ── Member schedule notice ─────────────────────────── */
+p.member-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  background: var(--green-light);
+  border: 1px solid #A8D5BF;
+  border-radius: var(--r-md);
+  padding: 0.875rem 1rem;
+  line-height: 1.55;
+}
+
+p.member-notice svg {
+  color: var(--green);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
 /* ── Form & fieldset ────────────────────────────────── */
 fieldset {
   border: none;
