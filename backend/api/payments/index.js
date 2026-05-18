@@ -78,27 +78,19 @@ async function initiatePayment(req, res) {
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
 
-    // Build URLs for PayFast
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const protocol = process.env.BASE_URL
-      ? null
-      : ((typeof forwardedProto === 'string' && forwardedProto.split(',')[0]) || (req.socket && req.socket.encrypted ? 'https' : 'http'));
-    const host = process.env.BASE_URL
-      ? null
-      : (req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080');
-    const baseUrl = process.env.BASE_URL || `${protocol}://${host}`;
+    // FORCE CORRECT URLs - Hardcoded for testing
+    const baseUrl = 'https://div-elopers.onrender.com';
     const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
     const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
     const notifyUrl = `${baseUrl}/api/payments/notify`;
+
+    console.log('🔍 USING HARDCODED URLs:', { returnUrl, cancelUrl, notifyUrl });
 
     // Generate PayFast payment data
     try {
       const itemName = groupName
         ? `${groupName} - Contribution`
         : 'Stokvel Contribution';
-      const itemDescription = contributionId
-        ? `Contribution ID: ${contributionId}`
-        : 'Stokvel payment';
 
       // Split name if provided
       let firstName = '';
@@ -109,19 +101,42 @@ async function initiatePayment(req, res) {
         lastName = nameParts.slice(1).join(' ') || '';
       }
 
-      const paymentData = payfastService.generatePaymentData({
-        amount: amount,
-        itemName: itemName,
-        itemDescription: itemDescription,
-        userId: userId,
-        paymentId: paymentId,
-        returnUrl: returnUrl,
-        cancelUrl: cancelUrl,
-        notifyUrl: notifyUrl,
-        email: userEmail || '',
-        firstName: firstName,
-        lastName: lastName
-      });
+      // TEMPORARY: Build payment data directly to bypass any service issues
+      const paymentData = {
+        merchant_id: '10000100',
+        merchant_key: '46f0cd694581a',
+        return_url: returnUrl,
+        cancel_url: cancelUrl,
+        notify_url: notifyUrl,
+        name_first: firstName || 'Test',
+        name_last: lastName || 'User',
+        email_address: userEmail || 'test@example.com',
+        m_payment_id: paymentId,
+        amount: parseFloat(amount).toFixed(2),
+        item_name: itemName
+      };
+
+      // Generate signature manually
+      const crypto = require('crypto');
+      const sortedKeys = Object.keys(paymentData).sort();
+      let signatureString = '';
+      for (const key of sortedKeys) {
+        if (paymentData[key] !== '' && paymentData[key] !== undefined && paymentData[key] !== null) {
+          signatureString += `${key}=${encodeURIComponent(paymentData[key].toString().trim()).replace(/%20/g, '+')}&`;
+        }
+      }
+      signatureString = signatureString.slice(0, -1);
+      const signature = crypto.createHash('md5').update(signatureString).digest('hex');
+      
+      paymentData.signature = signature;
+      
+      const finalPaymentData = {
+        ...paymentData,
+        paymentUrl: 'https://sandbox.payfast.co.za/eng/process'
+      };
+
+      console.log('🔐 GENERATED SIGNATURE:', signature);
+      console.log('🔐 SIGNATURE STRING:', signatureString);
 
       // Store payment in Firestore
       await paymentRef.set({
@@ -136,8 +151,7 @@ async function initiatePayment(req, res) {
         provider: 'payfast',
         metadata: metadata || {},
         paymentData: {
-          itemName: itemName,
-          itemDescription: itemDescription
+          itemName: itemName
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -146,7 +160,7 @@ async function initiatePayment(req, res) {
       sendJSON(res, 200, {
         success: true,
         paymentId: paymentId,
-        paymentData: paymentData,
+        paymentData: finalPaymentData,
         message: 'Payment initiated. Redirect user to PayFast.'
       });
 
@@ -257,8 +271,6 @@ async function handleNotify(req, res) {
 // GET /return - Handle user return from PayFast (success page)
 async function handleReturn(req, res) {
   try {
-    // This is just a placeholder - actual redirect happens on frontend
-    // PayFast will redirect user here with payment details
     sendJSON(res, 200, {
       message: 'Payment return acknowledged. Check payment status.',
       note: 'Frontend should poll /status endpoint to verify payment'
