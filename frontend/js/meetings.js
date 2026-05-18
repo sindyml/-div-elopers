@@ -110,13 +110,14 @@ window.closeMemberBanner = closeMemberBanner;
 ═══════════════════════════════════════════════════════════ */
 async function checkMemberRequestStatus(uid) {
   try {
-    const q    = query(
+    const q = query(
       collection(db, 'meetingRequests'),
       where('requestedBy', '==', uid),
       where('memberNotified', '==', false)
     );
     const snap = await getDocs(q);
-    snap.forEach(async (docSnap) => {
+
+    for (const docSnap of snap.docs) {
       const data = docSnap.data();
       if (data.status === 'accepted' || data.status === 'rejected') {
         showRequestStatusBanner(data.status, data.reason);
@@ -124,7 +125,7 @@ async function checkMemberRequestStatus(uid) {
           memberNotified: true
         });
       }
-    });
+    }
   } catch (err) {
     console.warn('[Meetings] Could not check request status:', err.message);
   }
