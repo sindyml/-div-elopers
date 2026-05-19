@@ -54,6 +54,8 @@ if (!admin.apps.length) {
   }
 }
 
+const db = admin.firestore();
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 const paymentRoutes      = require('./api/payments/index.js');
 const payoutRoutes       = require('./api/payouts/index.js');
@@ -145,87 +147,6 @@ const server = http.createServer((req, res) => {
   }
 
   /* ────────────────────────────────────────────────────────────────────────────
-     /api/contributions/* - Contribution endpoints
-     ──────────────────────────────────────────────────────────────────────────── */
-  /* ────────────────────────────────────────────────────────────────────────────
-     /api/disputes/* - Dispute endpoints
-     ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/disputes/')) {
-    const disputePath = urlPath.replace('/api/disputes', '');
-
-    if (req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        let parsedBody = {};
-        try { parsedBody = body ? JSON.parse(body) : {}; } catch(e) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; }
-        const fakeReq = { method: req.method, url: disputePath, headers: req.headers, body: parsedBody, params: {}, query: {} };
-        const fakeRes = {
-          headersSent: false, statusCode: 200, headers: {},
-          json: (data) => {
-            if (fakeRes.headersSent) return;
-            fakeRes.headersSent = true;
-            setCORSHeaders(res);
-            fakeRes.setHeader('Content-Type', 'application/json');
-            fakeRes.end(JSON.stringify(data));
-          },
-          status: (code) => { fakeRes.statusCode = code; return fakeRes; },
-          setHeader: (key, value) => { fakeRes.headers[key] = value; },
-          end: (data) => {
-            if (fakeRes.headersSent) return;
-            fakeRes.headersSent = true;
-            Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
-            setCORSHeaders(res);
-            res.writeHead(fakeRes.statusCode);
-            res.end(data);
-          }
-        };
-        disputeRoutes(fakeReq, fakeRes);
-      });
-      return;
-    }
-  }
-
-  /* ────────────────────────────────────────────────────────────────────────────
-     /api/contributions/* - Contribution endpoints
-     ──────────────────────────────────────────────────────────────────────────── */
-  if (urlPath.startsWith('/api/contributions/')) {
-    const contribPath = urlPath.replace('/api/contributions', '');
-
-    if (req.method === 'POST') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        let parsedBody = {};
-        try { parsedBody = body ? JSON.parse(body) : {}; } catch(e) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return; }
-        const fakeReq = { method: req.method, url: contribPath, headers: req.headers, body: parsedBody, params: {}, query: {} };
-        const fakeRes = {
-          headersSent: false, statusCode: 200, headers: {},
-          json: (data) => {
-            if (fakeRes.headersSent) return;
-            fakeRes.headersSent = true;
-            setCORSHeaders(res);
-            fakeRes.setHeader('Content-Type', 'application/json');
-            fakeRes.end(JSON.stringify(data));
-          },
-          status: (code) => { fakeRes.statusCode = code; return fakeRes; },
-          setHeader: (key, value) => { fakeRes.headers[key] = value; },
-          end: (data) => {
-            if (fakeRes.headersSent) return;
-            fakeRes.headersSent = true;
-            Object.keys(fakeRes.headers).forEach(k => res.setHeader(k, fakeRes.headers[k]));
-            setCORSHeaders(res);
-            res.writeHead(fakeRes.statusCode);
-            res.end(data);
-          }
-        };
-        contributionRoutes(fakeReq, fakeRes);
-      });
-      return;
-    }
-  }
-
-  /* ────────────────────────────────────────────────────────────────────────────
      /api/payouts/* - Payout endpoints
      ──────────────────────────────────────────────────────────────────────────── */
   if (urlPath.startsWith('/api/payouts/')) {
@@ -307,6 +228,59 @@ const server = http.createServer((req, res) => {
     };
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' });
     res.end(JSON.stringify(config));
+    return;
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/create-checkout-session - Stripe Checkout
+     ──────────────────────────────────────────────────────────────────────────── */
+  if (urlPath === '/api/create-checkout-session' && req.method === 'POST') {
+    setCORSHeaders(res);
+    
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { amount, paymentId, groupName, returnUrl, cancelUrl } = JSON.parse(body);
+        
+        // Verify authentication
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Authentication required' }));
+          return;
+        }
+        
+        const token = authHeader.split('Bearer ')[1];
+        await admin.auth().verifyIdToken(token);
+        
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'zar',
+              product_data: { name: `${groupName} - Contribution` },
+              unit_amount: Math.round(amount * 100),
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          success_url: returnUrl,
+          cancel_url: cancelUrl,
+          metadata: { paymentId }
+        });
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ sessionId: session.id, url: session.url }));
+        
+      } catch (error) {
+        console.error('Stripe checkout error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message }));
+      }
+    });
     return;
   }
 
