@@ -10,6 +10,106 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
+
+    <style>
+        /* ── Neutralise contributions.css's bare `header` rule ──
+           That rule targets every <header> on the page, including
+           #navbar-root which navbar.js owns. Reset it to nothing so
+           only navbar.js's own injected styles apply to the navbar. */
+        #navbar-root {
+            background: none !important;
+            padding: 0 !important;
+            display: block !important;
+            box-shadow: none !important;
+            justify-content: unset !important;
+            align-items: unset !important;
+        }
+
+        /* Restore navbar.js inner layout — contributions.css's bare
+           nav{} rule overrides the injected .navbar__inner flex layout,
+           collapsing the logo/user/sign-out into a narrow left-side box.
+           These rules re-apply what navbar.js expects. */
+        #navbar-root .navbar__inner {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            max-width: 1120px !important;
+            margin: 0 auto !important;
+            padding: 0 1.5rem !important;
+            height: 64px !important;
+            gap: 1rem !important;
+        }
+
+        #navbar-root nav.navbar__links,
+        #navbar-root nav.nav__auth,
+        #navbar-root div.nav__user {
+            display: flex !important;
+            gap: 0.75rem !important;
+            align-items: center !important;
+            flex-direction: row !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Page-header styles matching meetings.css */
+        header.page-header { margin-bottom: 2.5rem; }
+
+        header.page-header p.label {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1D9E75;
+            margin-bottom: 0.5rem;
+        }
+
+        header.page-header h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            line-height: 1.15;
+            margin-bottom: 0.5rem;
+            border: none;
+            padding: 0;
+            color: #1A1A1A;
+        }
+
+        header.page-header p.subtitle {
+            font-size: 1rem;
+            color: #6B7280;
+            max-width: 520px;
+            background: none;
+            padding: 0;
+            text-align: left;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        header.page-header button.primary {
+            margin-top: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            border: 1.5px solid #2A7A5A;
+            padding: 0.65rem 1.5rem;
+            background: #2A7A5A;
+            color: #fff;
+        }
+
+        header.page-header button.primary:hover {
+            background: #225f46;
+            border-color: #225f46;
+        }
+
+        header.page-header button.primary:active { transform: scale(0.98); }
+    </style>
+
 </head>
 <body class="app-layout">
 
