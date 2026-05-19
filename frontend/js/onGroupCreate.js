@@ -6,13 +6,12 @@ import {
     getDoc,
     getDocs,
     addDoc,
-    setDoc,
-    updateDoc,
-    deleteDoc,
+    
     writeBatch,
     query,
     where,
-    orderBy
+    orderBy,
+    Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ============================================================
@@ -111,73 +110,22 @@ export async function handleGroupCreation(groupId) {
         return;
     }
     
-    const memberCount = members.length;
-    const payoutAmount = contributionAmount * (memberCount - 1);
-    console.log('[DEBUG] memberCount:', memberCount);
-    console.log('[DEBUG] payoutAmount:', payoutAmount);
+   // ======================================
+// INITIALIZE ADMIN MEMBER
+// ======================================
+
+const adminMember =
+    members[0];
+
+if (adminMember) {
+
+    await handleMemberJoin(
+        groupId,
+        adminMember.uid
+    );
+}
     
-    // Step 3: Create contributions (12 months)
-    console.log('[DEBUG] Step 3: Creating contributions...');
-    let contributionsCreated = 0;
-    const contributionsRef = collection(db, 'contributions');
-    
-    for (const member of members) {
-        console.log(`[DEBUG] Creating contributions for member: ${member.uid}`);
-        for (let i = 0; i < 12; i++) {
-            const monthsToAdd = i + 1;
-            const deadlineDate = getDeadlineDate(groupCreatedAt, monthsToAdd);
-            const dateStr = deadlineDate.toISOString().split('T')[0];
-            
-            console.log(`[DEBUG]   Month ${i+1}: deadlineDate = ${dateStr}`);
-            
-            await addDoc(contributionsRef, {
-                userId: member.uid,
-                groupId: groupId,
-                amount: contributionAmount,
-                date: dateStr,
-                status: 'pending',
-                paymentEvidence: null,
-                evidenceUrl: null,
-                createdAt: Timestamp.now()
-            });
-            contributionsCreated++;
-        }
-    }
-    
-    console.log(`[DEBUG] Created ${contributionsCreated} contributions for group ${groupId}`);
-    
-    // Step 4: Create payouts
-    console.log('[DEBUG] Step 4: Creating payouts...');
-    let payoutsCreated = 0;
-    const payoutsRef = collection(db, 'payouts');
-    
-    for (let i = 0; i < members.length; i++) {
-        const member = members[i];
-        const order = i + 1;
-        console.log(`[DEBUG] Creating payout for member ${member.uid}, order: ${order}`);
-        
-        const userDisplayName = await getMemberName(member.uid);
-        console.log(`[DEBUG]   userDisplayName: ${userDisplayName}`);
-        
-        const monthsToAdd = order;
-        const deadlineForPayout = getDeadlineDate(groupCreatedAt, monthsToAdd);
-        const payoutDate = getPayoutDate(deadlineForPayout);
-        const payoutDateStr = payoutDate.toISOString().split('T')[0];
-        console.log(`[DEBUG]   payoutDate: ${payoutDateStr}`);
-        
-        await addDoc(payoutsRef, {
-            groupId: groupId,
-            userId: member.uid,
-            userDisplayName: userDisplayName,
-            payoutDate: payoutDateStr,
-            order: order,
-            amount: payoutAmount,
-            createdAt: Timestamp.now()
-        });
-        payoutsCreated++;
-    }
-    
-    console.log(`[DEBUG] Created ${payoutsCreated} payouts for group ${groupId}`);
+   
     console.log('========== [DEBUG] handleGroupCreation COMPLETE ==========');
 }
 
@@ -225,6 +173,25 @@ export async function handleMemberJoin(groupId, userId) {
     const newMember = members.find(m => m.uid === userId);
     if (newMember) {
         console.log(`[DEBUG] Creating 12 contributions for new member ${userId}`);
+        // Prevent duplicate contributions
+
+const existingContributionQuery =
+    query(
+        collection(db, 'contributions'),
+        where('groupId', '==', groupId),
+        where('userId', '==', userId)
+    );
+
+const existingContributions =
+    await getDocs(existingContributionQuery);
+
+if (!existingContributions.empty) {
+
+    console.log(
+        `[DEBUG] Contributions already exist for ${userId}`
+    );
+
+} else {
         const contributionsRef = collection(db, 'contributions');
         for (let i = 0; i < 12; i++) {
             const monthsToAdd = i + 1;
@@ -242,8 +209,9 @@ export async function handleMemberJoin(groupId, userId) {
                 createdAt: Timestamp.now()
             });
         }
-        console.log(`[DEBUG] Created contributions for new member ${userId}`);
+        console.log(`[DEBUG] Created contributions for new member ${userId}`);}
     }
+
     
     // Recalculate payouts
     console.log('[DEBUG] Recalculating payouts...');
