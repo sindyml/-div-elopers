@@ -96,6 +96,9 @@
   <script src="js/firebase-compat-init.js"></script>
 
   <script type="module">
+    // Render backend URL
+    const API_BASE_URL = 'https://div-elopers.onrender.com';
+    
     // Get payment ID from URL (Stripe passes it as ?paymentId=xxx)
     const urlParams = new URLSearchParams(window.location.search);
     let paymentId = urlParams.get('paymentId');
@@ -153,7 +156,7 @@
       
       try {
         const token = await getAuthToken();
-        const response = await fetch('/api/payments/verify', {
+        const response = await fetch(`${API_BASE_URL}/api/payments/verify`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -191,7 +194,7 @@
       async function checkPaymentStatus() {
         try {
           const token = await getAuthToken();
-          const response = await fetch(`/api/payments/status/${paymentId}`, {
+          const response = await fetch(`${API_BASE_URL}/api/payments/status/${paymentId}`, {
             headers: {
               Authorization: `Bearer ${token}`
             }
