@@ -258,95 +258,113 @@ async function loadPendingInvites(user) {
 
     invites.forEach(invite => {
 
-      const wrapper =
-        document.createElement("article");
+   const inviteCard =
+  document.createElement("div");
 
-      wrapper.className =
-        "members-widget__invite-item";
+inviteCard.className =
+  "invite-card";
 
-      // Group name
-      const text =
-        document.createElement("p");
+inviteCard.innerHTML = `
 
-      text.innerHTML = `
-        <strong>${invite.groupName || "Stokvel Group"}</strong>
+  <div class="invite-card__title">
+    📨 Group Invitation
+  </div>
+
+  <div class="invite-card__text">
+    You were invited to join
+    <strong>
+      ${invite.groupName || "Stokvel Group"}
+    </strong>
+  </div>
+
+  <div class="invite-card__actions">
+
+      <button
+        class="invite-btn-accept"
+      >
+        Accept
+      </button>
+
+      <button
+        class="invite-btn-decline"
+      >
+        Decline
+      </button>
+
+  </div>
+`;
+
+const acceptBtn =
+  inviteCard.querySelector(
+    ".invite-btn-accept"
+  );
+
+const declineBtn =
+  inviteCard.querySelector(
+    ".invite-btn-decline"
+  );
+
+// ======================================
+// ACCEPT
+// ======================================
+
+acceptBtn.onclick =
+  async () => {
+
+    try {
+
+      await acceptInvite(
+        invite.id,
+        user
+      );
+
+      inviteCard.innerHTML = `
+        <p>✅ Invite accepted</p>
       `;
 
-      // Buttons container
-      const btnRow =
-        document.createElement("div");
+      // Refresh dashboard stats
+      await loadDashboardData(user);
 
-      btnRow.style.display = "flex";
-      btnRow.style.gap = "0.5rem";
-      btnRow.style.marginTop = "0.5rem";
+    } catch (err) {
 
-      // ACCEPT BUTTON
-      const acceptBtn =
-        document.createElement("button");
+      console.error(err);
 
-      acceptBtn.className =
-        "btn btn--primary btn--sm";
+      alert(
+        "Could not accept invite"
+      );
+    }
+  };
 
-      acceptBtn.textContent = "Accept";
+// ======================================
+// DECLINE
+// ======================================
 
-      acceptBtn.onclick = async () => {
+declineBtn.onclick =
+  async () => {
 
-        try {
+    try {
 
-          await acceptInvite(
-            invite.id,
-            user
-          );
+      await declineInvite(
+        invite.id
+      );
 
-          wrapper.innerHTML = `
-            <p>✅ Invite accepted</p>
-          `;
+      inviteCard.innerHTML = `
+        <p>❌ Invite declined</p>
+      `;
 
-          // refresh dashboard stats
-          await loadDashboardData(user);
+    } catch (err) {
 
-        } catch (err) {
+      console.error(err);
 
-          console.error(err);
+      alert(
+        "Could not decline invite"
+      );
+    }
+  };
 
-          alert("Could not accept invite");
-        }
-      };
-
-      // DECLINE BUTTON
-      const declineBtn =
-        document.createElement("button");
-
-      declineBtn.className =
-        "btn btn--outline btn--sm";
-
-      declineBtn.textContent = "Decline";
-
-      declineBtn.onclick = async () => {
-
-        try {
-
-          await declineInvite(invite.id);
-
-          wrapper.innerHTML = `
-            <p>❌ Invite declined</p>
-          `;
-
-        } catch (err) {
-
-          console.error(err);
-
-          alert("Could not decline invite");
-        }
-      };
-
-      btnRow.appendChild(acceptBtn);
-      btnRow.appendChild(declineBtn);
-
-      wrapper.appendChild(text);
-      wrapper.appendChild(btnRow);
-
-      inviteSection.appendChild(wrapper);
+inviteSection.appendChild(
+  inviteCard
+);
     });
 
   } catch (err) {

@@ -520,3 +520,120 @@
   gap: var(--space-3);
 }
 }
+
+/* =========================================
+   INVITE NOTIFICATIONS
+========================================= */
+
+.invite-card {
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 14px;
+
+  padding: 1rem;
+
+  margin-bottom: 1rem;
+
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.05);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.invite-card:hover {
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.08);
+}
+
+.invite-card__title {
+
+  font-weight: 600;
+
+  margin-bottom: 0.5rem;
+
+  color: #111827;
+}
+
+.invite-card__text {
+
+  font-size: 0.95rem;
+
+  color: #4b5563;
+
+  margin-bottom: 1rem;
+}
+
+.invite-card__actions {
+
+  display: flex;
+
+  gap: 0.75rem;
+}
+
+/* ACCEPT BUTTON */
+
+.invite-btn-accept {
+
+  background: #16a34a;
+
+  color: white;
+
+  border: none;
+
+  border-radius: 10px;
+
+  padding: 0.55rem 1rem;
+
+  cursor: pointer;
+
+  font-weight: 600;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+.invite-btn-accept:hover {
+
+  background: #15803d;
+
+  transform: scale(1.03);
+}
+
+/* DECLINE BUTTON */
+
+.invite-btn-decline {
+
+  background: #dc2626;
+
+  color: white;
+
+  border: none;
+
+  border-radius: 10px;
+
+  padding: 0.55rem 1rem;
+
+  cursor: pointer;
+
+  font-weight: 600;
+
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+.invite-btn-decline:hover {
+
+  background: #b91c1c;
+
+  transform: scale(1.03);
+}

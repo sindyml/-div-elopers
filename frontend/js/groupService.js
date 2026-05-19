@@ -110,29 +110,111 @@ export async function checkPendingInvites(user) {
 }
 
 // Sends an invite and returns inviteId + targetUserId (if the invitee already has an account)
-export async function sendInvite(groupId, inviteeEmail, invitedByUid) {
-  // Check if a user with this email already exists
+// Sends an invite and prevents duplicates
+export async function sendInvite(
+  groupId,
+  inviteeEmail,
+  invitedByUid
+) {
+
+  // ====================================
+  // CHECK FOR EXISTING PENDING INVITE
+  // ====================================
+
+  const existingInviteQuery = query(
+
+    collection(
+      db,
+      COLLECTIONS.INVITES
+    ),
+
+    where(
+      "email",
+      "==",
+      inviteeEmail
+    ),
+
+    where(
+      "groupId",
+      "==",
+      groupId
+    ),
+
+    where(
+      "status",
+      "==",
+      "pending"
+    )
+  );
+
+  const existingInviteSnap =
+    await getDocs(
+      existingInviteQuery
+    );
+
+  // Prevent duplicate invites
+  if (!existingInviteSnap.empty) {
+
+    throw new Error(
+      "This user already has a pending invite for this group."
+    );
+  }
+
+  // ====================================
+  // CHECK IF USER EXISTS
+  // ====================================
+
   let targetUserId = null;
 
   const usersSnap = await getDocs(
-    query(collection(db, COLLECTIONS.USERS || 'users'), where('email', '==', inviteeEmail))
+
+    query(
+
+      collection(
+        db,
+        COLLECTIONS.USERS || "users"
+      ),
+
+      where(
+        "email",
+        "==",
+        inviteeEmail
+      )
+    )
   );
 
   if (!usersSnap.empty) {
-    targetUserId = usersSnap.docs[0].id;
+
+    targetUserId =
+      usersSnap.docs[0].id;
   }
 
-  const inviteRef = await addDoc(collection(db, COLLECTIONS.INVITES), {
-    email: inviteeEmail,
-    groupId: groupId,
-    invitedBy: invitedByUid,
-    status: 'pending',
-    createdAt: serverTimestamp()
-  });
+  // ====================================
+  // CREATE INVITE
+  // ====================================
+
+  const inviteRef =
+    await addDoc(
+
+      collection(
+        db,
+        COLLECTIONS.INVITES
+      ),
+
+      {
+        email: inviteeEmail,
+        groupId,
+        invitedBy: invitedByUid,
+        status: "pending",
+        createdAt: serverTimestamp()
+      }
+    );
 
   return {
+
     inviteId: inviteRef.id,
-    targetUserId // null if user doesn't have an account yet
+
+    targetUserId
   };
 }
 
