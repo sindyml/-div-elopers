@@ -10,6 +10,65 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
+    <style>
+        /* Page-header styles matching meetings.css */
+        header.page-header { margin-bottom: 2.5rem; }
+
+        header.page-header p.label {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1D9E75;
+            margin-bottom: 0.5rem;
+        }
+
+        header.page-header h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            line-height: 1.15;
+            margin-bottom: 0.5rem;
+            border: none;
+            padding: 0;
+            color: #1A1A1A;
+        }
+
+        header.page-header p.subtitle {
+            font-size: 1rem;
+            color: #6B7280;
+            max-width: 520px;
+            background: none;
+            padding: 0;
+            text-align: left;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        header.page-header button.primary {
+            margin-top: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            border: 1.5px solid #2A7A5A;
+            padding: 0.65rem 1.5rem;
+            background: #2A7A5A;
+            color: #fff;
+        }
+
+        header.page-header button.primary:hover {
+            background: #225f46;
+            border-color: #225f46;
+        }
+
+        header.page-header button.primary:active { transform: scale(0.98); }
+    </style>
 </head>
 <body class="app-layout">
 
@@ -17,10 +76,15 @@
 
     <main class="app-main">
         <header class="page-header">
-            <hgroup>
-                <h1 class="page-header__title">Manage Contributions</h1>
-                <p class="page-header__sub">Confirm or flag member payments as Treasurer or Admin.</p>
-            </hgroup>
+            <p class="label">Contributions</p>
+            <h1>Manage <em>Contributions</em></h1>
+            <p class="subtitle">Confirm or flag member payments as Treasurer or Admin.</p>
+            <button type="button" class="primary" onclick="window.location.href='dashboard.html'">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+                    <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back to Dashboard
+            </button>
         </header>
 
         <!-- PENDING DISPUTES section -->
@@ -107,8 +171,8 @@
                         approveBtn.textContent = '...';
                         await approveDispute(dispute.id, dispute.contributionId);
                         alert('Dispute approved. Contribution status updated to confirmed.');
-                        loadPendingDisputes(); // Refresh
-                        loadManagePage(); // Refresh contribution table
+                        loadPendingDisputes();
+                        loadManagePage();
                     } catch (err) {
                         console.error('Dispute approval failed:', err);
                         alert('Error: ' + err.message);
@@ -125,7 +189,7 @@
                     if (reason) {
                         await rejectDispute(dispute.id, reason);
                         alert('Dispute rejected.');
-                        loadPendingDisputes(); // Refresh
+                        loadPendingDisputes();
                     }
                 });
                 
@@ -250,7 +314,6 @@
                         statusCell.textContent = '⏳ Pending';
                     }
 
-                    // Payment Evidence column
                     const evidenceCell = row.insertCell(4);
                     if (contribution.paymentEvidence === 'online') {
                         evidenceCell.textContent = '💳 Online';
