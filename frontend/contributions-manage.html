@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
 
-        <style>
+    <style>
         /* ── Neutralise contributions.css's bare `header` rule ──
            That rule targets every <header> on the page, including
            #navbar-root which navbar.js owns. Reset it to nothing so
@@ -23,6 +23,32 @@
             box-shadow: none !important;
             justify-content: unset !important;
             align-items: unset !important;
+        }
+
+        /* Restore navbar.js inner layout — contributions.css's bare
+           nav{} rule overrides the injected .navbar__inner flex layout,
+           collapsing the logo/user/sign-out into a narrow left-side box.
+           These rules re-apply what navbar.js expects. */
+        #navbar-root .navbar__inner {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            max-width: 1120px !important;
+            margin: 0 auto !important;
+            padding: 0 1.5rem !important;
+            height: 64px !important;
+            gap: 1rem !important;
+        }
+
+        #navbar-root nav.navbar__links,
+        #navbar-root nav.nav__auth,
+        #navbar-root div.nav__user {
+            display: flex !important;
+            gap: 0.75rem !important;
+            align-items: center !important;
+            flex-direction: row !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
 
         /* Page-header styles matching meetings.css */
@@ -83,7 +109,7 @@
 
         header.page-header button.primary:active { transform: scale(0.98); }
     </style>
-    
+
 </head>
 <body class="app-layout">
 
