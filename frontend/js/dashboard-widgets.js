@@ -11,6 +11,8 @@ import {
 } from "./groupService.js";
 import {
   collection,
+  doc,
+  getDoc,
   query,
   where,
   orderBy,
@@ -19,8 +21,7 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
-  updateDoc,
-  doc
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { COLLECTIONS, ROLES } from "./constants.js";
 
@@ -28,7 +29,7 @@ import { COLLECTIONS, ROLES } from "./constants.js";
    MODULE-LEVEL STATE
    ══════════════════════════════════════════════════════════ */
 let selectedGroupId    = null;
-let allGroupIds        = [];        // ← tracks every group the user belongs to
+let allGroupIds        = [];
 let userRole           = null;
 let currentUser        = null;
 let unsubMeetings      = null;
@@ -449,6 +450,7 @@ async function loadGroups(uid) {
       button.classList.add('group-list-btn--active');
 
       selectedGroupId = group.id;
+      window.selectedGroupId = group.id;
       userRole        = role || await getUserRoleInGroup(group.id, uid);
       await loadMembers(group.id, group.name);
 
@@ -725,36 +727,32 @@ async function loadPayoutWidget(uid, groupIds) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   CHAT BOT UI  — Gemini Agent version
-   Passes groupId, uid, and groupIds to the server so the
-   agent can call Firestore tools with the right context.
+   CLIENT‑SIDE CHAT WIDGET (group‑aware, no dashboard selection needed)
    ══════════════════════════════════════════════════════════ */
 export function mountChatWidget() {
-  // Inject styles
-  if (!document.getElementById('chat-widget-styles')) {
+  // Remove any existing widget to avoid duplicates
+  const oldFab = document.querySelector('.chat-fab');
+  const oldPanel = document.querySelector('.chat-panel');
+  if (oldFab) oldFab.remove();
+  if (oldPanel) oldPanel.remove();
+
+  // Inject styles (only once)
+  if (!document.getElementById('chat-widget-styles-client')) {
     const style = document.createElement('style');
-    style.id = 'chat-widget-styles';
+    style.id = 'chat-widget-styles-client';
     style.textContent = `
       .chat-fab {
-        position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000;
+        position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 10000;
         width: 3.5rem; height: 3.5rem; border-radius: 50%;
         background: var(--color-primary, #16a34a); color: #fff;
         border: none; cursor: pointer; display: flex; align-items: center;
         justify-content: center; font-size: 1.4rem;
         box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease;
       }
-      .chat-fab:hover  { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
-      .chat-fab:active { transform: scale(0.96); }
-      .chat-fab__badge {
-        position: absolute; top: -4px; right: -4px;
-        background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: 700;
-        line-height: 1; padding: 2px 5px; border-radius: 999px; display: none;
-      }
-      .chat-fab__badge--show { display: block; }
-
+      .chat-fab:hover { transform: scale(1.08); }
       .chat-panel {
-        position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 999;
+        position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 9999;
         width: min(420px, calc(100vw - 2rem));
         height: min(560px, calc(100dvh - 7rem));
         background: var(--color-surface, #fff);
@@ -765,7 +763,6 @@ export function mountChatWidget() {
         transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1), opacity 0.18s ease;
       }
       .chat-panel--open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-
       .chat-panel__header {
         display: flex; align-items: center; gap: 0.65rem; padding: 0.9rem 1rem;
         background: var(--color-primary, #16a34a); color: #fff; flex-shrink: 0;
@@ -773,40 +770,25 @@ export function mountChatWidget() {
       .chat-panel__avatar {
         width: 2rem; height: 2rem; border-radius: 50%;
         background: rgba(255,255,255,0.25); display: flex;
-        align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0;
+        align-items: center; justify-content: center; font-size: 1rem;
       }
       .chat-panel__title { font-size: 0.95rem; font-weight: 600; flex: 1; }
-      .chat-panel__subtitle { font-size: 0.72rem; opacity: 0.82; }
-      .chat-panel__agent-badge {
-        font-size: 0.65rem; font-weight: 700; background: rgba(255,255,255,0.2);
-        border: 1px solid rgba(255,255,255,0.4); border-radius: 999px;
-        padding: 2px 8px; letter-spacing: 0.04em; flex-shrink: 0;
-      }
       .chat-panel__close {
         background: none; border: none; color: #fff; cursor: pointer;
-        padding: 0.25rem; border-radius: 0.4rem; line-height: 1; font-size: 1.1rem;
-        opacity: 0.8; transition: opacity 0.15s; flex-shrink: 0;
+        font-size: 1.1rem; opacity: 0.8;
       }
-      .chat-panel__close:hover { opacity: 1; }
-
       .chat-panel__messages {
         flex: 1; overflow-y: auto; padding: 1rem;
         display: flex; flex-direction: column; gap: 0.65rem;
-        scroll-behavior: smooth; overscroll-behavior: contain;
       }
-      .chat-panel__messages::-webkit-scrollbar { width: 4px; }
-      .chat-panel__messages::-webkit-scrollbar-track { background: transparent; }
-      .chat-panel__messages::-webkit-scrollbar-thumb { background: var(--color-border, #d1d5db); border-radius: 4px; }
-
-      .chat-msg { display: flex; gap: 0.5rem; align-items: flex-end; animation: chat-msg-in 0.2s ease both; }
-      @keyframes chat-msg-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+      .chat-msg { display: flex; gap: 0.5rem; align-items: flex-end; }
       .chat-msg--user { flex-direction: row-reverse; }
       .chat-msg__bubble {
         max-width: 78%; padding: 0.6rem 0.85rem; border-radius: 1rem;
-        font-size: 0.875rem; line-height: 1.5; word-break: break-word;
+        font-size: 0.875rem; line-height: 1.5;
       }
-      .chat-msg--bot  .chat-msg__bubble {
-        background: var(--color-surface-2, #f3f4f6); color: var(--color-text, #111827);
+      .chat-msg--bot .chat-msg__bubble {
+        background: var(--color-surface-2, #f3f4f6);
         border-bottom-left-radius: 0.25rem;
       }
       .chat-msg--user .chat-msg__bubble {
@@ -817,187 +799,260 @@ export function mountChatWidget() {
         width: 1.75rem; height: 1.75rem; border-radius: 50%;
         background: var(--color-primary, #16a34a); color: #fff;
         font-size: 0.8rem; display: flex; align-items: center;
-        justify-content: center; flex-shrink: 0; align-self: flex-end;
+        justify-content: center; flex-shrink: 0;
       }
-      .chat-msg--user .chat-msg__avatar { background: var(--color-border, #d1d5db); color: var(--color-text-muted, #6b7280); }
-      .chat-msg__time { font-size: 0.68rem; color: var(--color-text-muted, #9ca3af); text-align: right; margin-top: 0.15rem; }
-
-      /* Thinking indicator — shows while agent calls tools */
+      .chat-msg--user .chat-msg__avatar { background: var(--color-border, #d1d5db); color: #6b7280; }
+      .chat-msg__time { font-size: 0.68rem; color: #9ca3af; text-align: right; margin-top: 0.15rem; }
       .chat-thinking {
-        display: flex; gap: 0.5rem; align-items: flex-end;
-      }
-      .chat-thinking__bubble {
-        display: flex; flex-direction: column; gap: 4px;
+        display: flex; gap: 0.5rem; align-items: center;
         padding: 0.65rem 0.85rem;
         background: var(--color-surface-2, #f3f4f6);
         border-radius: 1rem; border-bottom-left-radius: 0.25rem;
-        font-size: 0.78rem; color: var(--color-text-muted, #6b7280);
+        width: fit-content;
       }
-      .chat-thinking__dots { display: flex; gap: 4px; }
       .chat-thinking__dot {
         width: 7px; height: 7px; border-radius: 50%;
-        background: var(--color-text-muted, #9ca3af);
-        animation: typing-bounce 1.2s ease-in-out infinite;
+        background: #9ca3af; animation: pulse 1.2s ease infinite;
+        display: inline-block;
       }
       .chat-thinking__dot:nth-child(2) { animation-delay: 0.2s; }
       .chat-thinking__dot:nth-child(3) { animation-delay: 0.4s; }
-      @keyframes typing-bounce { 0%,60%,100% { transform:translateY(0); } 30% { transform:translateY(-5px); } }
-      .chat-thinking__label { font-size: 0.72rem; opacity: 0.75; }
-
+      @keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
       .chat-panel__footer {
         display: flex; gap: 0.5rem; padding: 0.75rem 1rem;
         border-top: 1px solid var(--color-border, #e5e7eb);
-        background: var(--color-surface, #fff); flex-shrink: 0;
+        background: var(--color-surface, #fff);
       }
       .chat-panel__input {
         flex: 1; border: 1px solid var(--color-border, #d1d5db);
-        border-radius: 1.5rem; padding: 0.55rem 1rem; font-size: 0.875rem;
-        outline: none; resize: none; font-family: inherit; line-height: 1.4;
-        max-height: 120px; overflow-y: auto;
+        border-radius: 1.5rem; padding: 0.55rem 1rem;
+        font-size: 0.875rem; outline: none;
         background: var(--color-surface-2, #f9fafb);
-        transition: border-color 0.15s; color: var(--color-text, #111827);
       }
-      .chat-panel__input:focus { border-color: var(--color-primary, #16a34a); background: var(--color-surface, #fff); }
+      .chat-panel__input:focus { border-color: var(--color-primary, #16a34a); }
       .chat-panel__send {
         width: 2.4rem; height: 2.4rem; border-radius: 50%;
-        background: var(--color-primary, #16a34a); color: #fff; border: none;
-        cursor: pointer; display: flex; align-items: center; justify-content: center;
-        font-size: 1rem; flex-shrink: 0; align-self: flex-end;
-        transition: background 0.15s, transform 0.1s;
+        background: var(--color-primary, #16a34a); color: #fff;
+        border: none; cursor: pointer; display: flex;
+        align-items: center; justify-content: center;
       }
-      .chat-panel__send:hover    { background: var(--color-primary-dark, #15803d); }
-      .chat-panel__send:active   { transform: scale(0.93); }
       .chat-panel__send:disabled { opacity: 0.5; cursor: not-allowed; }
-
-      .chat-welcome {
-        display: flex; flex-direction: column; align-items: center;
-        justify-content: center; gap: 0.5rem; height: 100%;
-        color: var(--color-text-muted, #6b7280); text-align: center; padding: 1.5rem;
+      .chat-welcome__chips {
+        display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;
       }
-      .chat-welcome__icon { font-size: 2.5rem; }
-      .chat-welcome__title { font-size: 0.95rem; font-weight: 600; color: var(--color-text, #374151); }
-      .chat-welcome__sub { font-size: 0.82rem; }
-      .chat-welcome__chips { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-top: 0.5rem; }
       .chat-welcome__chip {
         background: var(--color-surface-2, #f3f4f6);
-        border: 1px solid var(--color-border, #e5e7eb); border-radius: 1rem;
-        padding: 0.35rem 0.75rem; font-size: 0.78rem; cursor: pointer; transition: background 0.15s;
-      }
-      .chat-welcome__chip:hover { background: var(--color-primary-light, #dcfce7); border-color: var(--color-primary, #16a34a); }
-
-      @media (max-width: 480px) {
-        .chat-panel { bottom: 0; right: 0; width: 100vw; height: 100dvh; border-radius: 0; }
-        .chat-fab   { bottom: 1rem; right: 1rem; }
+        border: 1px solid var(--color-border, #e5e7eb);
+        border-radius: 1rem; padding: 0.35rem 0.75rem;
+        font-size: 0.78rem; cursor: pointer;
       }
     `;
     document.head.appendChild(style);
   }
 
-  // ── Build DOM ──────────────────────────────────────────
+  // Create FAB and panel
   const fab = document.createElement('button');
   fab.className = 'chat-fab';
   fab.setAttribute('aria-label', 'Open AI assistant');
-  fab.setAttribute('aria-expanded', 'false');
-  fab.innerHTML = `🤖<span class="chat-fab__badge" id="chat-fab-badge">1</span>`;
+  fab.innerHTML = '🤖';
+  document.body.appendChild(fab);
 
   const panel = document.createElement('div');
   panel.className = 'chat-panel';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'AI assistant');
   panel.innerHTML = `
     <div class="chat-panel__header">
       <div class="chat-panel__avatar">🌿</div>
-      <div style="flex:1;min-width:0">
-        <div class="chat-panel__title">Stokpal Assistant</div>
-        <div class="chat-panel__subtitle">Powered by Gemini · Live data access</div>
-      </div>
-      <span class="chat-panel__agent-badge">AGENT</span>
-      <button class="chat-panel__close" aria-label="Close chat">✕</button>
+      <div class="chat-panel__title">Stokpal Assistant</div>
+      <button class="chat-panel__close">✕</button>
     </div>
-    <div class="chat-panel__messages" id="chat-messages" role="log" aria-live="polite">
-      <div class="chat-welcome" id="chat-welcome">
-        <div class="chat-welcome__icon">🌿</div>
-        <p class="chat-welcome__title">Hi! I'm your Stokpal AI Agent.</p>
-        <p class="chat-welcome__sub">I can look up your real group data — balances, payouts, meetings, and more.</p>
+    <div class="chat-panel__messages" id="chat-messages-client">
+      <div class="chat-welcome" id="chat-welcome-client">
+        <p>Hi! I'm your Stokpal AI Agent.</p>
         <div class="chat-welcome__chips">
           <button class="chat-welcome__chip" data-prompt="What is our group balance?">💰 Group balance</button>
-          <button class="chat-welcome__chip" data-prompt="When is the next payout and whose turn is it?">📅 Next payout</button>
+          <button class="chat-welcome__chip" data-prompt="When is the next payout?">📅 Next payout</button>
           <button class="chat-welcome__chip" data-prompt="Show me my contribution history">📋 My contributions</button>
           <button class="chat-welcome__chip" data-prompt="When is the next meeting?">🗓 Next meeting</button>
-          <button class="chat-welcome__chip" data-prompt="Who are the members of my group?">👥 Members</button>
+          <button class="chat-welcome__chip" data-prompt="Who are the members?">👥 Members</button>
+          <button class="chat-welcome__chip" data-prompt="Show full payout schedule">📊 Full schedule</button>
         </div>
       </div>
     </div>
     <div class="chat-panel__footer">
-      <textarea
-        class="chat-panel__input"
-        id="chat-input"
-        rows="1"
-        placeholder="Ask anything about your stokvel…"
-        aria-label="Chat message"
-      ></textarea>
-      <button class="chat-panel__send" id="chat-send" aria-label="Send message">➤</button>
+      <textarea class="chat-panel__input" id="chat-input-client" rows="1" placeholder="Ask anything..."></textarea>
+      <button class="chat-panel__send" id="chat-send-client">➤</button>
     </div>
   `;
-
-  document.body.appendChild(fab);
   document.body.appendChild(panel);
 
-  // ── References ─────────────────────────────────────────
-  const messagesEl = panel.querySelector('#chat-messages');
-  const inputEl    = panel.querySelector('#chat-input');
-  const sendBtn    = panel.querySelector('#chat-send');
+  // DOM references
+  const messagesEl = panel.querySelector('#chat-messages-client');
+  const inputEl    = panel.querySelector('#chat-input-client');
+  const sendBtn    = panel.querySelector('#chat-send-client');
   const closeBtn   = panel.querySelector('.chat-panel__close');
-  const welcomeEl  = panel.querySelector('#chat-welcome');
-  const badgeEl    = fab.querySelector('#chat-fab-badge');
+  const welcomeDiv = panel.querySelector('#chat-welcome-client');
 
-  let isOpen      = false;
-  let isStreaming = false;
-  let chatHistory = [];
+  let isOpen = false;
+  let busy = false;
+  let currentGroupId = null;
+  let userGroups = [];   // store { id, name }
+  let awaitingGroupSelection = false;
 
-  badgeEl.classList.add('chat-fab__badge--show');
-
-  // ── Open / close ───────────────────────────────────────
-  function openPanel() {
-    isOpen = true;
-    panel.classList.add('chat-panel--open');
-    fab.setAttribute('aria-expanded', 'true');
-    badgeEl.classList.remove('chat-fab__badge--show');
-    inputEl.focus();
-    scrollToBottom(false);
+  // Helper: fetch user's groups using existing getUserGroups function
+  async function fetchUserGroups(uid) {
+    try {
+      const groups = await getUserGroups(uid);
+      userGroups = groups.map(g => ({ id: g.id, name: g.name }));
+      return userGroups;
+    } catch (err) {
+      console.error('Failed to fetch groups for chat:', err);
+      return [];
+    }
   }
 
-  function closePanel() {
-    isOpen = false;
-    panel.classList.remove('chat-panel--open');
-    fab.setAttribute('aria-expanded', 'false');
+  // Helper: get active group ID (from chat state, then fallback to dashboard)
+  function getActiveGroupId() {
+    if (currentGroupId) return currentGroupId;
+    if (window.selectedGroupId) return window.selectedGroupId;
+    const activeBtn = document.querySelector('.group-list-btn--active');
+    if (activeBtn && activeBtn.dataset.groupId) return activeBtn.dataset.groupId;
+    return null;
   }
 
-  fab.addEventListener('click', () => isOpen ? closePanel() : openPanel());
-  closeBtn.addEventListener('click', closePanel);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) closePanel(); });
+  // Set active group and also update dashboard if possible
+  function setActiveGroup(groupId) {
+    currentGroupId = groupId;
+    window.selectedGroupId = groupId;
+    // Also try to highlight the dashboard button (optional)
+    const btn = document.querySelector(`.group-list-btn[data-group-id="${groupId}"]`);
+    if (btn && !btn.classList.contains('group-list-btn--active')) {
+      btn.click(); // This will trigger dashboard's group selection logic
+    }
+  }
 
-  // ── Scroll ─────────────────────────────────────────────
-  function scrollToBottom(smooth = true) {
-    requestAnimationFrame(() => {
-      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+  function fmtRandChat(amount) {
+    return 'R ' + (Number(amount) || 0).toLocaleString('en-ZA');
+  }
+
+  function fmtDateChat(value) {
+    if (!value) return 'Not set';
+    if (value.toDate) value = value.toDate();
+    if (value instanceof Date) return value.toLocaleDateString('en-ZA');
+    return String(value);
+  }
+
+  // ── Firestore queries using MODULAR syntax ─────────────────
+  async function getBalance(groupId) {
+    try {
+      const groupRef = doc(db, 'groups', groupId);
+      const snap = await getDoc(groupRef);
+      if (!snap.exists()) return { error: 'Group not found' };
+      const data = snap.data();
+      return { balance: data.totalBalance || data.balance || 0, name: data.name };
+    } catch (err) { return { error: err.message }; }
+  }
+
+  async function getNextPayout(groupId) {
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const payoutsRef = collection(db, 'payouts');
+      const q = query(payoutsRef, where('groupId', '==', groupId), orderBy('order'));
+      const snap = await getDocs(q);
+      if (snap.empty) return { error: 'No payout schedule' };
+      let payouts = snap.docs.map(d => {
+        let data = d.data();
+        if (data.payoutDate?.toDate) data.payoutDate = data.payoutDate.toDate().toISOString().slice(0,10);
+        return data;
+      });
+      let upcoming = payouts.find(p => p.payoutDate >= today);
+      let target = upcoming || payouts[payouts.length-1];
+      if (!target) return { error: 'No payout info' };
+      return {
+        date: fmtDateChat(target.payoutDate),
+        recipient: target.userDisplayName || 'member',
+        amount: target.amount || 0,
+        order: target.order,
+        note: upcoming ? null : 'All payouts passed'
+      };
+    } catch (err) { return { error: err.message }; }
+  }
+
+  async function getFullSchedule(groupId) {
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const payoutsRef = collection(db, 'payouts');
+      const q = query(payoutsRef, where('groupId', '==', groupId), orderBy('order'));
+      const snap = await getDocs(q);
+      if (snap.empty) return [];
+      return snap.docs.map(d => {
+        let data = d.data();
+        let pd = data.payoutDate;
+        if (pd?.toDate) pd = pd.toDate().toISOString().slice(0,10);
+        return { order: data.order, name: data.userDisplayName, date: fmtDateChat(pd), amount: data.amount, isPast: (pd||'') < today };
+      });
+    } catch (err) { return { error: err.message }; }
+  }
+
+  async function getMyContributions(groupId, uid) {
+    try {
+      const contribRef = collection(db, 'contributions');
+      const q = query(
+        contribRef,
+        where('userId', '==', uid),
+        where('groupId', '==', groupId),
+        orderBy('date', 'desc'),
+        limit(10)
+      );
+      const snap = await getDocs(q);
+      let records = [], total = 0;
+      snap.forEach(d => {
+        let data = d.data();
+        let amt = Number(data.amount) || 0;
+        if (data.status === 'confirmed') total += amt;
+        records.push({ amount: amt, date: fmtDateChat(data.date), status: data.status });
+      });
+      return { contributions: records, total };
+    } catch (err) { return { error: err.message }; }
+  }
+
+  async function getNextMeeting(groupId) {
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const meetingsRef = collection(db, 'meetings');
+      const q = query(
+        meetingsRef,
+        where('groupId', '==', groupId),
+        where('date', '>=', today),
+        orderBy('date'),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) return { error: 'No upcoming meetings' };
+      const m = snap.docs[0].data();
+      let dateDisplay = fmtDateChat(m.date);
+      if (m.time) dateDisplay += ` at ${m.time}`;
+      return { title: m.title || 'Meeting', date: dateDisplay, location: m.location || 'TBD' };
+    } catch (err) { return { error: err.message }; }
+  }
+
+  async function getMembers(groupId) {
+    try {
+      const membersRef = collection(db, 'groups', groupId, 'members');
+      const snap = await getDocs(membersRef);
+      return snap.docs.map(d => ({ name: d.data().displayName || 'Member', role: d.data().role }));
+    } catch (err) { return { error: err.message }; }
+  }
+
+  function chatEscapeHtml(str) {
+    return String(str).replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
     });
   }
 
-  // ── Auto-grow textarea ─────────────────────────────────
-  inputEl.addEventListener('input', () => {
-    inputEl.style.height = 'auto';
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
-  });
-
-  // ── Render helpers ─────────────────────────────────────
-  function nowLabel() {
-    return new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function removeWelcome() {
-    if (welcomeEl && welcomeEl.parentNode === messagesEl) welcomeEl.remove();
-  }
+  function removeWelcome() { if (welcomeDiv && welcomeDiv.parentNode) welcomeDiv.remove(); }
 
   function appendMessage(role, text) {
     removeWelcome();
@@ -1006,140 +1061,227 @@ export function mountChatWidget() {
     wrap.innerHTML = `
       <div class="chat-msg__avatar">${role === 'user' ? '👤' : '🌿'}</div>
       <div>
-        <div class="chat-msg__bubble">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
-        <div class="chat-msg__time">${nowLabel()}</div>
-      </div>`;
+        <div class="chat-msg__bubble">${chatEscapeHtml(text).replace(/\n/g,'<br>')}</div>
+        <div class="chat-msg__time">${new Date().toLocaleTimeString()}</div>
+      </div>
+    `;
     messagesEl.appendChild(wrap);
-    scrollToBottom();
-    return wrap;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  function showThinking(label = 'Thinking…') {
-    removeWelcome();
-    const wrap = document.createElement('div');
-    wrap.className = 'chat-thinking';
-    wrap.id        = 'chat-thinking-indicator';
-    wrap.innerHTML = `
-      <div class="chat-msg__avatar">🌿</div>
-      <div class="chat-thinking__bubble">
-        <div class="chat-thinking__dots">
-          <div class="chat-thinking__dot"></div>
-          <div class="chat-thinking__dot"></div>
-          <div class="chat-thinking__dot"></div>
-        </div>
-        <span class="chat-thinking__label" id="chat-thinking-label">${label}</span>
-      </div>`;
-    messagesEl.appendChild(wrap);
-    scrollToBottom();
-    return wrap;
-  }
-
-  function updateThinkingLabel(label) {
-    const labelEl = document.getElementById('chat-thinking-label');
-    if (labelEl) labelEl.textContent = label;
+  function showThinking() {
+    const existing = document.getElementById('chat-thinking');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.id = 'chat-thinking';
+    div.className = 'chat-thinking';
+    div.innerHTML = `<div class="chat-thinking__dot"></div><div class="chat-thinking__dot"></div><div class="chat-thinking__dot"></div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
   function removeThinking() {
-    document.getElementById('chat-thinking-indicator')?.remove();
+    document.getElementById('chat-thinking')?.remove();
   }
 
-  // ── Send logic ─────────────────────────────────────────
-  const CHAT_PROXY = '/api/chat';
+  function isSwitchGroupIntent(message) {
+    const lower = message.toLowerCase();
+    return /(switch|change|select|choose) (to )?group/i.test(lower) ||
+           /which group/i.test(lower) ||
+           /list groups/i.test(lower) ||
+           /different group/i.test(lower);
+  }
+
+  function formatGroupList() {
+    if (userGroups.length === 0) return "You don't belong to any groups yet. Ask an admin to invite you.";
+    return userGroups.map((g, i) => `${i+1}. ${g.name}`).join('\n');
+  }
+
+  async function handleGroupSelectionReply(message, uid) {
+    if (!awaitingGroupSelection) return null;
+    const trimmed = message.trim();
+    // Try to match by number
+    const numMatch = trimmed.match(/^\d+$/);
+    if (numMatch) {
+      const idx = parseInt(numMatch[0], 10) - 1;
+      if (idx >= 0 && idx < userGroups.length) {
+        const selected = userGroups[idx];
+        setActiveGroup(selected.id);
+        awaitingGroupSelection = false;
+        return `✅ Switched to group **${selected.name}**. How can I help you with this group?`;
+      } else {
+        return `❌ Invalid number. Please choose a number between 1 and ${userGroups.length}.`;
+      }
+    }
+    // Try to match by name
+    const matched = userGroups.find(g => g.name.toLowerCase() === trimmed.toLowerCase());
+    if (matched) {
+      setActiveGroup(matched.id);
+      awaitingGroupSelection = false;
+      return `✅ Switched to group **${matched.name}**. How can I help you?`;
+    }
+    // If not a valid selection, remind
+    return `Please type the **number** or the **exact name** of the group you want to use.\n${formatGroupList()}`;
+  }
+
+  async function buildReply(message, uid) {
+    // First, handle pending group selection
+    if (awaitingGroupSelection) {
+      const result = await handleGroupSelectionReply(message, uid);
+      if (result) return result;
+    }
+
+    const lower = message.toLowerCase();
+
+    // Switch group intent
+    if (isSwitchGroupIntent(message)) {
+      if (userGroups.length === 0) {
+        return "You don't belong to any groups yet. Ask an admin to invite you.";
+      }
+      awaitingGroupSelection = true;
+      return `Please select a group:\n${formatGroupList()}\n\nType the number or the group name.`;
+    }
+
+    // If no group selected yet, force selection first
+    const groupId = getActiveGroupId();
+    if (!groupId) {
+      if (userGroups.length === 0) {
+        return "You don't belong to any groups. Please ask an admin to invite you.";
+      }
+      awaitingGroupSelection = true;
+      return `Before I can answer that, please select a group:\n${formatGroupList()}\n\nType the number or the group name.`;
+    }
+
+    // Normal question answering
+    if (/(balance|how much money)/.test(lower)) {
+      const res = await getBalance(groupId);
+      if (res.error) return `⚠️ ${res.error}`;
+      return `💰 **${res.name}** balance: **${fmtRandChat(res.balance)}**`;
+    }
+    if (/(next payout|whose turn)/.test(lower)) {
+      const res = await getNextPayout(groupId);
+      if (res.error) return `⚠️ ${res.error}`;
+      let msg = `📅 Next payout: **${res.date}**\n👤 ${res.recipient} (slot #${res.order})\n💰 ${fmtRandChat(res.amount)}`;
+      if (res.note) msg += `\n_${res.note}_`;
+      return msg;
+    }
+    if (/(full schedule|all payouts)/.test(lower)) {
+      const list = await getFullSchedule(groupId);
+      if (list.error) return `⚠️ ${list.error}`;
+      if (!list.length) return "📊 No payout schedule.";
+      return "📊 **Full schedule:**\n" + list.map(p => `  ${p.isPast ? '✅' : '🔜'} #${p.order} — ${p.name} · ${p.date} · ${fmtRandChat(p.amount)}`).join('\n');
+    }
+    if (/(my contribution|paid in)/.test(lower)) {
+      const res = await getMyContributions(groupId, uid);
+      if (res.error) return `⚠️ ${res.error}`;
+      if (!res.contributions.length) return "📋 No contributions yet.";
+      let lines = res.contributions.map(c => `  • ${fmtRandChat(c.amount)} on ${c.date} [${c.status}]`);
+      return `📋 **Your contributions** (confirmed total: ${fmtRandChat(res.total)}):\n` + lines.join('\n');
+    }
+    if (/(meeting|next meeting)/.test(lower)) {
+      const res = await getNextMeeting(groupId);
+      if (res.error) return `⚠️ ${res.error}`;
+      return `🗓 **${res.title}**\n📍 ${res.date} · ${res.location}`;
+    }
+    if (/(member|who is in)/.test(lower)) {
+      const members = await getMembers(groupId);
+      if (members.error) return `⚠️ ${members.error}`;
+      if (!members.length) return "👥 No members found.";
+      return "👥 **Members:**\n" + members.map(m => `  • ${m.name} [${m.role}]`).join('\n');
+    }
+    if (/(help|what can you do)/.test(lower)) {
+      return `💡 I can answer questions about your stokvel group:\n- "What is our balance?"\n- "When is the next payout?"\n- "Show my contributions"\n- "Full payout schedule"\n- "Next meeting"\n- "Who are the members?"\n- "Switch group" or "change group"\nJust ask naturally!`;
+    }
+    if (/(hi|hello|hey|sawubona)/.test(lower)) {
+      const groupName = userGroups.find(g => g.id === groupId)?.name || 'your group';
+      return `👋 Sawubona! I'm your Stokpal Assistant. Currently active group: **${groupName}**.\nAsk me about balance, payouts, contributions, meetings, members, or type "help".`;
+    }
+    return "🤔 I didn't understand. Try asking about balance, next payout, full schedule, my contributions, next meeting, members, or 'switch group'.";
+  }
 
   async function sendMessage(text) {
-    text = text.trim();
-    if (!text || isStreaming) return;
-
-    isStreaming       = true;
-    sendBtn.disabled  = true;
-    inputEl.value     = '';
-    inputEl.style.height = 'auto';
-
-    chatHistory.push({ role: 'user', content: text });
+    if (!text.trim() || busy) return;
+    busy = true;
+    sendBtn.disabled = true;
+    removeWelcome();
     appendMessage('user', text);
-
-    const userName  = currentUser?.displayName || currentUser?.email || 'a member';
-    const systemCtx = [
-      `You are a helpful AI agent for Stokpal, a South African stokvel management app.`,
-      `The user is ${userName}.`,
-      `Always use your available tools to fetch live data before answering questions about balances,`,
-      `payouts, meetings, contributions, or members. Never say you cannot access the data.`,
-      `Amounts are in South African Rand (ZAR). Be concise, warm, and helpful.`,
-      `Format currency as "R X,XXX" — e.g. "R 4,200".`,
-    ].join(' ');
-
-    showThinking('Thinking…');
-
-    // Simulate label updates since we don't get streaming events from our proxy
-    const thinkingTimer = setTimeout(() => updateThinkingLabel('Checking your data…'), 1500);
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    showThinking();
 
     try {
-      const res = await fetch(CHAT_PROXY, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system:   systemCtx,
-          messages: chatHistory,
-          // ── Agent context — critical for tool execution ──
-          groupId:  selectedGroupId,
-          uid:      currentUser?.uid || null,
-          groupIds: allGroupIds,
-        }),
-      });
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error('Not logged in');
 
-      clearTimeout(thinkingTimer);
-      removeThinking();
-
-      if (!res.ok) {
-        let friendlyMsg = 'Something went wrong. Please try again.';
-        if (res.status === 401 || res.status === 403) {
-          friendlyMsg = '🔑 Authentication error — the API key needs to be configured on the server.';
-        } else if (res.status === 429) {
-          friendlyMsg = '⏳ Too many requests — please wait a moment and try again.';
-        } else if (res.status >= 500) {
-          friendlyMsg = '🛠 The assistant server is having issues. Try again shortly.';
-        }
-        appendMessage('bot', friendlyMsg);
-        chatHistory.pop();
-      } else {
-        const data  = await res.json();
-        const reply = data.content?.map(b => b.text || '').join('') || "Sorry, I didn't get a response.";
-        chatHistory.push({ role: 'assistant', content: reply });
-        appendMessage('bot', reply);
+      // Ensure we have user groups loaded
+      if (userGroups.length === 0) {
+        await fetchUserGroups(uid);
       }
-    } catch (err) {
-      clearTimeout(thinkingTimer);
+
+      const reply = await buildReply(text, uid);
       removeThinking();
-      const msg = !navigator.onLine
-        ? '📶 You appear to be offline. Please check your connection.'
-        : '⚠️ Could not reach the assistant. Make sure your server is running.';
-      appendMessage('bot', msg);
-      chatHistory.pop();
-      console.warn('[Agent Chat] Fetch failed:', err.message);
+      appendMessage('bot', reply);
+    } catch (err) {
+      removeThinking();
+      appendMessage('bot', '❌ An error occurred. Please try again.');
+      console.error(err);
     } finally {
-      isStreaming       = false;
-      sendBtn.disabled  = false;
-      inputEl.focus();
+      busy = false;
+      sendBtn.disabled = false;
     }
   }
 
-  // ── Event listeners ────────────────────────────────────
+  // Event listeners
+  fab.addEventListener('click', () => {
+    isOpen = !isOpen;
+    panel.classList.toggle('chat-panel--open', isOpen);
+    if (isOpen) {
+      inputEl.focus();
+      // If no group selected, immediately prompt after a short delay
+      if (!getActiveGroupId() && userGroups.length > 0 && !awaitingGroupSelection) {
+        setTimeout(() => {
+          if (isOpen && !busy && messagesEl.querySelector('.chat-welcome')) {
+            sendMessage("switch group");
+          }
+        }, 500);
+      }
+    }
+  });
+  closeBtn.addEventListener('click', () => {
+    isOpen = false;
+    panel.classList.remove('chat-panel--open');
+  });
   sendBtn.addEventListener('click', () => sendMessage(inputEl.value));
-
   inputEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputEl.value); }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(inputEl.value);
+    }
+  });
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 80) + 'px';
+  });
+  panel.addEventListener('click', (e) => {
+    if (e.target.classList?.contains('chat-welcome__chip')) {
+      sendMessage(e.target.dataset.prompt);
+    }
   });
 
-  panel.querySelectorAll('.chat-welcome__chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const prompt = chip.dataset.prompt;
-      if (prompt) sendMessage(prompt);
+  // Initialise: fetch user groups when the widget is mounted
+  if (auth.currentUser) {
+    fetchUserGroups(auth.currentUser.uid).then(() => {
+      // If a group is already selected via dashboard, use it
+      const existingGroup = getActiveGroupId();
+      if (existingGroup) {
+        setActiveGroup(existingGroup);
+      }
     });
-  });
+  }
 }
 
 /* ══════════════════════════════════════════════════════════
-   AUTH STATE HANDLER
+   AUTH STATE HANDLER (main entry point)
    ══════════════════════════════════════════════════════════ */
 auth.onAuthStateChanged(async (user) => {
   if (!user) return;
@@ -1148,7 +1290,7 @@ auth.onAuthStateChanged(async (user) => {
   await showInviteBanners(user);
 
   const groupIds     = await loadGroups(user.uid);
-  allGroupIds        = groupIds;   // ← store for the agent
+  allGroupIds        = groupIds;
 
   const groupDetails = await Promise.all(groupIds.map(id => getGroupDetails(id)));
   const groupMap     = {};
@@ -1158,5 +1300,6 @@ auth.onAuthStateChanged(async (user) => {
   startContributionListener(user.uid, groupMap);
   await loadPayoutWidget(user.uid, groupIds);
 
+  // Mount the floating chat widget
   mountChatWidget();
 });
