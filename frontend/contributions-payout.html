@@ -214,6 +214,17 @@ saveBtn.addEventListener('click', async () => {
             const groupHeading = document.createElement('h2');
             groupHeading.textContent = `Group: ${groupName}`;
             headerContainer.appendChild(groupHeading);
+
+            // Back to Contributions button (visible to all users)
+            const backBtn = document.createElement('button');
+            backBtn.type = 'button';
+            backBtn.classList.add('btn', 'btn--secondary');
+            backBtn.style.marginLeft = '1rem';
+            backBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+              <path d="M12 7H2M7 2L2 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg> Back to Contributions`;
+            backBtn.addEventListener('click', () => { window.location.href = 'contributions-my.html'; });
+            headerContainer.appendChild(backBtn);
             
             // Check if user is Treasurer or Admin to show Edit button
             const userRole = await getCurrentUserRole();
