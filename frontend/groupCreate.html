@@ -122,24 +122,7 @@
 
           </div>
 
-          <!-- PAYOUT ORDER -->
-          <div class="form-group">
-
-            <label
-              for="payout"
-              class="form-label"
-            >
-              Payout Order
-            </label>
-
-            <input
-              type="text"
-              id="payout"
-              class="form-input"
-              placeholder="Comma-separated member UIDs"
-            />
-
-          </div>
+     
 
           <!-- FREQUENCY -->
           <div class="form-group">
@@ -215,15 +198,12 @@
     from "./js/firebase-config.js";
 
     import {
-      collection,
-      addDoc,
-      doc,
-      setDoc,
-      getDoc,
-      writeBatch,
-      serverTimestamp,
-      Timestamp
-    }
+  collection,
+  addDoc,
+  doc,
+  setDoc,
+  serverTimestamp
+}
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     import {
@@ -313,47 +293,13 @@
                 .value
             );
 
-          const payout =
-            document.getElementById("payout")
-              .value;
+         
 
           const frequency =
             document.getElementById("frequency")
               .value;
 
-          // ===================================
-          // PAYOUT ORDER
-          // ===================================
-
-          let payoutOrder = [];
-
-          if (payout) {
-
-            payoutOrder =
-              [
-                ...new Set(
-                  payout
-                    .split(",")
-                    .map(p => p.trim())
-                    .filter(Boolean)
-                )
-              ];
-
-            // Validate UIDs
-            if (
-              payoutOrder.some(
-                uid => uid.length < 3
-              )
-            ) {
-
-              showMsg(
-                "Invalid payout order.",
-                "error"
-              );
-
-              return;
-            }
-          }
+        
 
           showMsg(
             "Creating group...",
@@ -374,7 +320,7 @@
                 contributionAmount:
                   amount,
 
-                payoutOrder,
+                
 
                 totalBalance: 0,
 
