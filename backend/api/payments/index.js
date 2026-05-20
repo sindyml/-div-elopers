@@ -31,7 +31,7 @@ async function authenticateUser(req, res, next) {
 // POST /create-checkout-session - Stripe Checkout
 async function createStripeCheckoutSession(req, res) {
   try {
-    const { amount, groupName, contributionId, groupId, returnUrl, cancelUrl } = req.body;
+    const { amount, groupName, contributionId, groupId, returnUrl, cancelUrl, paymentId } = req.body;
     const userId = req.user ? req.user.uid : null;
 
     if (!userId) {
@@ -44,11 +44,11 @@ async function createStripeCheckoutSession(req, res) {
       return;
     }
 
-    // Create a payment document FIRST to get a valid ID
-    const paymentRef = db.collection('transactions').doc();
-    const paymentId = paymentRef.id;
+    // Use payment ID from frontend or generate one
+    const finalPaymentId = paymentId || db.collection('transactions').doc().id;
+    const paymentRef = db.collection('transactions').doc(finalPaymentId);
 
-    console.log('📝 Creating payment record with ID:', paymentId);
+    console.log('📝 Creating payment record with ID:', finalPaymentId);
 
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -65,12 +65,12 @@ async function createStripeCheckoutSession(req, res) {
       mode: 'payment',
       success_url: returnUrl,
       cancel_url: cancelUrl,
-      metadata: { paymentId, userId, contributionId, groupId }
+      metadata: { paymentId: finalPaymentId, userId, contributionId, groupId }
     });
 
-    // Save the transaction with the payment ID
+    // Save the transaction
     await paymentRef.set({
-      id: paymentId,
+      id: finalPaymentId,
       userId: userId,
       contributionId: contributionId || null,
       groupId: groupId || null,
@@ -86,7 +86,7 @@ async function createStripeCheckoutSession(req, res) {
 
     sendJSON(res, 200, {
       success: true,
-      paymentId: paymentId,
+      paymentId: finalPaymentId,
       sessionId: session.id,
       url: session.url
     });
