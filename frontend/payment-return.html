@@ -40,11 +40,12 @@
     const API_BASE_URL = 'https://div-elopers.onrender.com';
     let paymentId = localStorage.getItem('pendingPaymentId');
     let attempts = 0;
+    const maxAttempts = 60;
 
     async function checkStatus() {
       attempts++;
       
-      // Wait for Firebase
+      // Wait for Firebase auth
       if (!firebase.auth().currentUser && attempts < 20) {
         setTimeout(checkStatus, 500);
         return;
@@ -81,12 +82,17 @@
             return;
           }
         }
+        
+        if (response.status === 404 && attempts < maxAttempts) {
+          // Payment not yet created, keep polling
+          setTimeout(checkStatus, 2000);
+          return;
+        }
       } catch(e) {
         console.log('Polling error:', e);
       }
       
-      // Try again if not timeout (45 attempts = 90 seconds)
-      if (attempts < 45) {
+      if (attempts < maxAttempts) {
         setTimeout(checkStatus, 2000);
       } else {
         document.getElementById('title').innerHTML = 'Check your dashboard later';
