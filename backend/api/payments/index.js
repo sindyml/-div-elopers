@@ -28,6 +28,73 @@ async function authenticateUser(req, res, next) {
   }
 }
 
+// POST /webhook - Stripe webhook (must come before JSON body parsing routes)
+async function handleStripeWebhook(req, res) {
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET is not set');
+    sendJSON(res, 500, { error: 'Webhook secret not configured' });
+    return;
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    sendJSON(res, 400, { error: `Webhook Error: ${err.message}` });
+    return;
+  }
+
+  console.log(`📩 Stripe webhook received: ${event.type}`);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const { paymentId, userId, contributionId, groupId } = session.metadata || {};
+
+    console.log('✅ checkout.session.completed — paymentId:', paymentId);
+
+    if (!paymentId) {
+      console.error('❌ No paymentId in session metadata');
+      sendJSON(res, 200, { received: true }); // Still 200 so Stripe doesn't retry
+      return;
+    }
+
+    try {
+      // 1. Update the transaction record to completed
+      await db.collection('transactions').doc(paymentId).update({
+        status: 'completed',
+        stripePaymentIntentId: session.payment_intent,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log('✅ Transaction updated to completed:', paymentId);
+
+      // 2. Update the linked contribution to paid
+      if (contributionId) {
+        await db.collection('contributions').doc(contributionId).update({
+          status: 'paid',
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          transactionId: paymentId
+        });
+        console.log('✅ Contribution updated to paid:', contributionId);
+      }
+
+    } catch (err) {
+      console.error('❌ Firestore update failed:', err);
+      // Return 500 so Stripe will retry the webhook
+      sendJSON(res, 500, { error: 'Database update failed' });
+      return;
+    }
+  }
+
+  // For all other event types, just acknowledge receipt
+  sendJSON(res, 200, { received: true });
+}
+
 // POST /create-checkout-session - Stripe Checkout
 async function createStripeCheckoutSession(req, res) {
   try {
@@ -68,7 +135,7 @@ async function createStripeCheckoutSession(req, res) {
       metadata: { paymentId: finalPaymentId, userId, contributionId, groupId }
     });
 
-    // Save the transaction
+    // Save the transaction as pending
     await paymentRef.set({
       id: finalPaymentId,
       userId: userId,
@@ -126,7 +193,8 @@ async function testEndpoint(req, res) {
   sendJSON(res, 200, {
     message: 'Payment API is working!',
     timestamp: new Date().toISOString(),
-    provider: 'stripe'
+    provider: 'stripe',
+    webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET
   });
 }
 
@@ -146,6 +214,11 @@ async function handleRequest(req, res) {
   if (method === 'GET' && url === '/test') {
     await testEndpoint(req, res);
   }
+  else if (method === 'POST' && url === '/webhook') {
+    // NOTE: raw body must be attached as req.rawBody before this handler is called.
+    // See server-setup note below.
+    await handleStripeWebhook(req, res);
+  }
   else if (method === 'POST' && url === '/create-checkout-session') {
     await authenticateUser(req, res, () => createStripeCheckoutSession(req, res));
   }
@@ -158,3 +231,41 @@ async function handleRequest(req, res) {
 }
 
 module.exports = handleRequest;
+
+/*
+ * ─────────────────────────────────────────────────────────────
+ * SERVER SETUP NOTE (in your main server.js / app.js)
+ * ─────────────────────────────────────────────────────────────
+ * Stripe webhook verification requires the raw (unparsed) request
+ * body. Add this middleware BEFORE express.json() so the webhook
+ * route gets the raw buffer attached as req.rawBody:
+ *
+ *   app.use((req, res, next) => {
+ *     if (req.originalUrl.includes('/api/payments/webhook')) {
+ *       let data = '';
+ *       req.on('data', chunk => { data += chunk; });
+ *       req.on('end', () => {
+ *         req.rawBody = data;
+ *         next();
+ *       });
+ *     } else {
+ *       next();
+ *     }
+ *   });
+ *
+ *   app.use(express.json()); // normal JSON parsing for all other routes
+ *
+ * ─────────────────────────────────────────────────────────────
+ * STRIPE DASHBOARD SETUP
+ * ─────────────────────────────────────────────────────────────
+ * 1. Go to Stripe Dashboard → Developers → Webhooks
+ * 2. Add endpoint: https://div-elopers.onrender.com/api/payments/webhook
+ * 3. Select event: checkout.session.completed
+ * 4. Copy the Signing Secret → add to your env as STRIPE_WEBHOOK_SECRET
+ *
+ * ─────────────────────────────────────────────────────────────
+ * LOCAL TESTING
+ * ─────────────────────────────────────────────────────────────
+ *   stripe listen --forward-to localhost:3000/api/payments/webhook
+ * (This gives you a temporary STRIPE_WEBHOOK_SECRET for local dev)
+ */
