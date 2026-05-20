@@ -20,33 +20,8 @@ import {
 import { getUserGroups } from './groupService.js';
 import { COLLECTIONS } from './constants.js';
 
-// Helper: Generate a random payment ID
-function generatePaymentId() {
-  return 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Helper: Create transaction in Firestore
-async function createTransaction(userId, contributionId, groupId, amount, paymentId) {
-  try {
-    await addDoc(collection(db, 'transactions'), {
-      id: paymentId,
-      userId: userId,
-      contributionId: contributionId,
-      groupId: groupId,
-      amount: amount,
-      currency: 'ZAR',
-      status: 'pending',
-      type: 'payment',
-      provider: 'stripe',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    return true;
-  } catch (err) {
-    console.error('Failed to create transaction:', err);
-    return false;
-  }
-}
+// API Base URL - Render backend
+const API_BASE_URL = 'https://div-elopers.onrender.com';
 
 /* ── Auth gate ─────────────────────────────────────────────── */
 
@@ -103,27 +78,13 @@ async function initiateStripePayment(user) {
     const selectedContribution = pending[0];
     const groupName = groupMap[selectedContribution.groupId] || selectedContribution.groupId || 'Unknown Group';
     const amount = parseFloat(selectedContribution.amount) || 0;
-    const paymentId = generatePaymentId();
-
-    // Create transaction record
-    const transactionCreated = await createTransaction(
-      user.uid,
-      selectedContribution.id,
-      selectedContribution.groupId,
-      amount,
-      paymentId
-    );
-
-    if (!transactionCreated) {
-      showError('Failed to create payment record. Please try again.');
-      return;
-    }
 
     const authToken = await user.getIdToken();
-    const returnUrl = `${window.location.origin}/payment-return.html?paymentId=${paymentId}&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${window.location.origin}/payment-cancel.html?paymentId=${paymentId}`;
+    const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${window.location.origin}/payment-cancel.html`;
 
-    const response = await fetch('https://div-elopers.onrender.com/api/create-checkout-session', {
+    // Call Stripe checkout endpoint
+    const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -131,8 +92,9 @@ async function initiateStripePayment(user) {
       },
       body: JSON.stringify({
         amount: amount,
-        paymentId: paymentId,
         groupName: groupName,
+        contributionId: selectedContribution.id,
+        groupId: selectedContribution.groupId,
         returnUrl: returnUrl,
         cancelUrl: cancelUrl
       })
@@ -144,7 +106,13 @@ async function initiateStripePayment(user) {
     }
 
     const data = await response.json();
-    localStorage.setItem('pendingPaymentId', paymentId);
+    
+    // Store payment ID for reference
+    if (data.paymentId) {
+      localStorage.setItem('pendingPaymentId', data.paymentId);
+    }
+    
+    // Redirect to Stripe Checkout
     window.location.href = data.url;
 
   } catch (err) {
@@ -262,27 +230,12 @@ function renderTable(contributions, groupMap) {
       if (!user) return;
       
       const amount = parseFloat(btn.dataset.amount);
-      const paymentId = generatePaymentId();
       const groupName = btn.dataset.groupName;
-      
-      const created = await createTransaction(
-        user.uid,
-        btn.dataset.contribId,
-        btn.dataset.groupId,
-        amount,
-        paymentId
-      );
-      
-      if (!created) {
-        showError('Failed to create payment record. Please try again.');
-        return;
-      }
-      
       const authToken = await user.getIdToken();
-      const returnUrl = `${window.location.origin}/payment-return.html?paymentId=${paymentId}&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/payment-cancel.html?paymentId=${paymentId}`;
+      const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${window.location.origin}/payment-cancel.html`;
       
-      const response = await fetch('https://div-elopers.onrender.com/api/create-checkout-session', {
+      const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -290,15 +243,18 @@ function renderTable(contributions, groupMap) {
         },
         body: JSON.stringify({
           amount: amount,
-          paymentId: paymentId,
           groupName: groupName,
+          contributionId: btn.dataset.contribId,
+          groupId: btn.dataset.groupId,
           returnUrl: returnUrl,
           cancelUrl: cancelUrl
         })
       });
       
       const data = await response.json();
-      localStorage.setItem('pendingPaymentId', paymentId);
+      if (data.paymentId) {
+        localStorage.setItem('pendingPaymentId', data.paymentId);
+      }
       window.location.href = data.url;
     });
   });
