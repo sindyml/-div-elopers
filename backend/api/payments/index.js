@@ -232,40 +232,4 @@ async function handleRequest(req, res) {
 
 module.exports = handleRequest;
 
-/*
- * ─────────────────────────────────────────────────────────────
- * SERVER SETUP NOTE (in your main server.js / app.js)
- * ─────────────────────────────────────────────────────────────
- * Stripe webhook verification requires the raw (unparsed) request
- * body. Add this middleware BEFORE express.json() so the webhook
- * route gets the raw buffer attached as req.rawBody:
- *
- *   app.use((req, res, next) => {
- *     if (req.originalUrl.includes('/api/payments/webhook')) {
- *       let data = '';
- *       req.on('data', chunk => { data += chunk; });
- *       req.on('end', () => {
- *         req.rawBody = data;
- *         next();
- *       });
- *     } else {
- *       next();
- *     }
- *   });
- *
- *   app.use(express.json()); // normal JSON parsing for all other routes
- *
- * ─────────────────────────────────────────────────────────────
- * STRIPE DASHBOARD SETUP
- * ─────────────────────────────────────────────────────────────
- * 1. Go to Stripe Dashboard → Developers → Webhooks
- * 2. Add endpoint: https://div-elopers.onrender.com/api/payments/webhook
- * 3. Select event: checkout.session.completed
- * 4. Copy the Signing Secret → add to your env as STRIPE_WEBHOOK_SECRET
- *
- * ─────────────────────────────────────────────────────────────
- * LOCAL TESTING
- * ─────────────────────────────────────────────────────────────
- *   stripe listen --forward-to localhost:3000/api/payments/webhook
- * (This gives you a temporary STRIPE_WEBHOOK_SECRET for local dev)
- */
+
