@@ -1,6 +1,5 @@
-// backend/api/payments/index.js - Payment API (Stripe + PayFast)
+// backend/api/payments/index.js - Stripe Payment API
 const admin = require('firebase-admin');
-const crypto = require('crypto');
 
 const db = admin.firestore();
 
@@ -29,85 +28,6 @@ async function authenticateUser(req, res, next) {
   }
 }
 
-// Generate signature for PayFast
-function generateSignature(data) {
-  const paramString = Object.keys(data)
-    .sort()
-    .filter(key => data[key] !== '' && data[key] != null)
-    .map(key => `${key}=${encodeURIComponent(String(data[key]).trim())}`)
-    .join('&');
-
-  console.log('🔐 SIGNATURE PARAM STRING:', paramString);
-  const signature = crypto.createHash('md5').update(paramString).digest('hex');
-  console.log('🔐 SIGNATURE:', signature);
-  return { paramString, signature };
-}
-
-// POST /initiate - Create payment (PayFast version - kept for reference)
-async function initiatePaymentPayFast(req, res) {
-  try {
-    const { amount, contributionId, groupId, groupName, metadata } = req.body;
-    const userId = req.user ? req.user.uid : null;
-
-    if (!userId) {
-      sendJSON(res, 401, { error: 'Unauthorized' });
-      return;
-    }
-
-    if (!amount || amount <= 0) {
-      sendJSON(res, 400, { error: 'Invalid amount' });
-      return;
-    }
-
-    const paymentRef = db.collection('transactions').doc();
-    const paymentId = paymentRef.id;
-    const itemName = groupName ? `${groupName} - Contribution` : 'Stokvel Contribution';
-
-    const paymentData = {
-      amount:       parseFloat(amount).toFixed(2),
-      cancel_url:   `https://div-elopers.onrender.com/payment-cancel.html?paymentId=${paymentId}`,
-      item_name:    itemName,
-      m_payment_id: paymentId,
-      merchant_id:  '10000100',
-      merchant_key: '46f0cd694581a',
-      notify_url:   'https://div-elopers.onrender.com/api/payments/notify',
-      return_url:   `https://div-elopers.onrender.com/payment-return.html?paymentId=${paymentId}`,
-    };
-
-    const { signature } = generateSignature(paymentData);
-    paymentData.signature = signature;
-
-    await paymentRef.set({
-      id:             paymentId,
-      userId:         userId,
-      contributionId: contributionId || null,
-      groupId:        groupId || null,
-      amount:         amount,
-      currency:       'ZAR',
-      status:         'pending',
-      type:           'payment',
-      provider:       'payfast',
-      metadata:       metadata || {},
-      createdAt:      admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt:      admin.firestore.FieldValue.serverTimestamp()
-    });
-
-    sendJSON(res, 200, {
-      success:     true,
-      paymentId:   paymentId,
-      paymentData: {
-        ...paymentData,
-        paymentUrl: 'https://sandbox.payfast.co.za/eng/process'
-      },
-      message: 'Payment initiated. Redirect user to PayFast.'
-    });
-
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
-
 // POST /create-checkout-session - Stripe Checkout
 async function createStripeCheckoutSession(req, res) {
   try {
@@ -127,6 +47,8 @@ async function createStripeCheckoutSession(req, res) {
     // Create a payment document FIRST to get a valid ID
     const paymentRef = db.collection('transactions').doc();
     const paymentId = paymentRef.id;
+
+    console.log('📝 Creating payment record with ID:', paymentId);
 
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -174,37 +96,6 @@ async function createStripeCheckoutSession(req, res) {
     sendJSON(res, 500, { error: error.message });
   }
 }
-// POST /verify - Verify payment (for Stripe return)
-async function verifyPayment(req, res) {
-  try {
-    const { paymentId } = req.body;
-
-    if (!paymentId) {
-      sendJSON(res, 400, { error: 'Payment ID required' });
-      return;
-    }
-
-    const paymentDoc = await db.collection('transactions').doc(paymentId).get();
-
-    if (!paymentDoc.exists) {
-      sendJSON(res, 404, { error: 'Payment not found' });
-      return;
-    }
-
-    const payment = paymentDoc.data();
-
-    sendJSON(res, 200, {
-      success: payment.status === 'completed',
-      status: payment.status,
-      paymentId: paymentId,
-      amount: payment.amount
-    });
-
-  } catch (error) {
-    console.error('Verify payment error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
 
 // GET /status/:paymentId - Check payment status
 async function getPaymentStatus(req, res) {
@@ -225,6 +116,7 @@ async function getPaymentStatus(req, res) {
       currency: payment.currency
     });
   } catch (error) {
+    console.error('Status check error:', error);
     sendJSON(res, 500, { error: 'Internal server error' });
   }
 }
@@ -236,12 +128,6 @@ async function testEndpoint(req, res) {
     timestamp: new Date().toISOString(),
     provider: 'stripe'
   });
-}
-
-// POST /webhook - Stripe webhook (for future use)
-async function handleWebhook(req, res) {
-  // TODO: Implement Stripe webhook to update payment status
-  sendJSON(res, 200, { received: true });
 }
 
 // Main request handler
@@ -260,26 +146,8 @@ async function handleRequest(req, res) {
   if (method === 'GET' && url === '/test') {
     await testEndpoint(req, res);
   }
-  else if (method === 'POST' && url === '/initiate') {
-    await authenticateUser(req, res, () => initiatePaymentPayFast(req, res));
-  }
   else if (method === 'POST' && url === '/create-checkout-session') {
     await authenticateUser(req, res, () => createStripeCheckoutSession(req, res));
-  }
-  else if (method === 'POST' && url === '/verify') {
-    await authenticateUser(req, res, () => verifyPayment(req, res));
-  }
-  else if (method === 'POST' && url === '/webhook') {
-    await handleWebhook(req, res);
-  }
-  else if (method === 'POST' && url === '/notify') {
-    await authenticateUser(req, res, () => handleNotify(req, res));
-  }
-  else if (method === 'GET' && url === '/return') {
-    await handleReturn(req, res);
-  }
-  else if (method === 'GET' && url === '/cancel') {
-    await authenticateUser(req, res, () => handleCancel(req, res));
   }
   else if (method === 'GET' && statusMatch) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));
@@ -287,30 +155,6 @@ async function handleRequest(req, res) {
   else {
     sendJSON(res, 404, { error: `Endpoint not found: ${method} ${url}` });
   }
-}
-
-// Keep existing handlers for reference
-async function handleNotify(req, res) {
-  sendJSON(res, 200, { received: true });
-}
-
-async function handleReturn(req, res) {
-  sendJSON(res, 200, { message: 'Payment return acknowledged' });
-}
-
-async function handleCancel(req, res) {
-  const paymentId = req.query.paymentId;
-  if (paymentId) {
-    try {
-      await db.collection('transactions').doc(paymentId).update({
-        status: 'cancelled',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    } catch (err) {
-      console.warn('Could not cancel payment:', err.message);
-    }
-  }
-  sendJSON(res, 200, { message: 'Payment cancelled' });
 }
 
 module.exports = handleRequest;
