@@ -1,7 +1,5 @@
 /* ============================================================
    payment.js — Payment Page Controller (payment.html)
-
-   Loads pending contributions and redirects to Stripe Checkout.
    ============================================================ */
 
 import { auth, db } from './firebase-config.js';
@@ -16,10 +14,7 @@ import {
 import { getUserGroups } from './groupService.js';
 import { COLLECTIONS } from './constants.js';
 
-// API Base URL - Render backend
 const API_BASE_URL = 'https://div-elopers.onrender.com';
-
-/* ── Auth gate ─────────────────────────────────────────────── */
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
@@ -32,8 +27,6 @@ onAuthStateChanged(auth, (user) => {
     });
   }
 });
-
-/* ── Make a Payment Button Handler (Stripe) ─────────────────── */
 
 async function initiateStripePayment(user) {
   const btn = document.getElementById('make-payment-btn');
@@ -79,7 +72,6 @@ async function initiateStripePayment(user) {
     const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${window.location.origin}/payment-cancel.html`;
 
-    // Call Stripe checkout endpoint
     const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
       method: 'POST',
       headers: {
@@ -102,13 +94,7 @@ async function initiateStripePayment(user) {
     }
 
     const data = await response.json();
-    
-    // Store payment ID for reference
-    if (data.paymentId) {
-      localStorage.setItem('pendingPaymentId', data.paymentId);
-    }
-    
-    // Redirect to Stripe Checkout
+    localStorage.setItem('pendingPaymentId', data.paymentId);
     window.location.href = data.url;
 
   } catch (err) {
@@ -119,8 +105,6 @@ async function initiateStripePayment(user) {
     }
   }
 }
-
-/* ── Data loading ──────────────────────────────────────────── */
 
 async function loadPendingContributions(userId) {
   showLoading(true);
@@ -181,8 +165,6 @@ async function loadPendingContributions(userId) {
     showError('Failed to load contributions: ' + (err.message || 'Unknown error'));
   }
 }
-
-/* ── Render pending contributions table ────────────────────── */
 
 function renderTable(contributions, groupMap) {
   const tbody = document.getElementById('pending-table-body');
@@ -248,15 +230,11 @@ function renderTable(contributions, groupMap) {
       });
       
       const data = await response.json();
-      if (data.paymentId) {
-        localStorage.setItem('pendingPaymentId', data.paymentId);
-      }
+      localStorage.setItem('pendingPaymentId', data.paymentId);
       window.location.href = data.url;
     });
   });
 }
-
-/* ── Stats ─────────────────────────────────────────────────── */
 
 function updateStats(outstanding, pendingCount, completed) {
   const outstandingEl = document.getElementById('stat-outstanding');
@@ -267,8 +245,6 @@ function updateStats(outstanding, pendingCount, completed) {
   if (pendingCountEl) pendingCountEl.textContent = String(pendingCount);
   if (completedEl) completedEl.textContent = String(completed);
 }
-
-/* ── UI state helpers ──────────────────────────────────────── */
 
 function showLoading(on) {
   const el = document.getElementById('pending-loading');
@@ -295,8 +271,6 @@ function showError(msg) {
     el.classList.add('payment-alert--hidden');
   }
 }
-
-/* ── Security helpers ──────────────────────────────────────── */
 
 function escHtml(str) {
   return String(str)
