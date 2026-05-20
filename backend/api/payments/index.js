@@ -111,7 +111,7 @@ async function initiatePaymentPayFast(req, res) {
 // POST /create-checkout-session - Stripe Checkout
 async function createStripeCheckoutSession(req, res) {
   try {
-    const { amount, paymentId, groupName, returnUrl, cancelUrl } = req.body;
+    const { amount, groupName, contributionId, groupId, returnUrl, cancelUrl } = req.body;
     const userId = req.user ? req.user.uid : null;
 
     if (!userId) {
@@ -123,6 +123,10 @@ async function createStripeCheckoutSession(req, res) {
       sendJSON(res, 400, { error: 'Invalid amount' });
       return;
     }
+
+    // Create a payment document FIRST to get a valid ID
+    const paymentRef = db.collection('transactions').doc();
+    const paymentId = paymentRef.id;
 
     const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -139,30 +143,28 @@ async function createStripeCheckoutSession(req, res) {
       mode: 'payment',
       success_url: returnUrl,
       cancel_url: cancelUrl,
-      metadata: { paymentId, userId }
+      metadata: { paymentId, userId, contributionId, groupId }
     });
 
-    // Create or update transaction record
-    const paymentRef = db.collection('transactions').doc(paymentId);
-    const paymentDoc = await paymentRef.get();
-
-    if (!paymentDoc.exists) {
-      await paymentRef.set({
-        id: paymentId,
-        userId: userId,
-        amount: amount,
-        currency: 'ZAR',
-        status: 'pending',
-        type: 'payment',
-        provider: 'stripe',
-        stripeSessionId: session.id,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
+    // Save the transaction with the payment ID
+    await paymentRef.set({
+      id: paymentId,
+      userId: userId,
+      contributionId: contributionId || null,
+      groupId: groupId || null,
+      amount: amount,
+      currency: 'ZAR',
+      status: 'pending',
+      type: 'payment',
+      provider: 'stripe',
+      stripeSessionId: session.id,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     sendJSON(res, 200, {
       success: true,
+      paymentId: paymentId,
       sessionId: session.id,
       url: session.url
     });
@@ -172,7 +174,6 @@ async function createStripeCheckoutSession(req, res) {
     sendJSON(res, 500, { error: error.message });
   }
 }
-
 // POST /verify - Verify payment (for Stripe return)
 async function verifyPayment(req, res) {
   try {
