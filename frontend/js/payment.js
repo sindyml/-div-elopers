@@ -11,11 +11,7 @@ import {
   query,
   where,
   orderBy,
-  getDocs,
-  doc,
-  updateDoc,
-  addDoc,
-  serverTimestamp
+  getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getUserGroups } from './groupService.js';
 import { COLLECTIONS } from './constants.js';
