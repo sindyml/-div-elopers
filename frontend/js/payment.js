@@ -16,6 +16,11 @@ import { COLLECTIONS } from './constants.js';
 
 const API_BASE_URL = 'https://div-elopers.onrender.com';
 
+// Generate a unique payment ID
+function generatePaymentId() {
+  return 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   loadPendingContributions(user.uid);
@@ -67,10 +72,14 @@ async function initiateStripePayment(user) {
     const selectedContribution = pending[0];
     const groupName = groupMap[selectedContribution.groupId] || selectedContribution.groupId || 'Unknown Group';
     const amount = parseFloat(selectedContribution.amount) || 0;
+    const paymentId = generatePaymentId();
 
     const authToken = await user.getIdToken();
     const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${window.location.origin}/payment-cancel.html`;
+
+    // Store payment ID immediately
+    localStorage.setItem('pendingPaymentId', paymentId);
 
     const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
       method: 'POST',
@@ -84,7 +93,8 @@ async function initiateStripePayment(user) {
         contributionId: selectedContribution.id,
         groupId: selectedContribution.groupId,
         returnUrl: returnUrl,
-        cancelUrl: cancelUrl
+        cancelUrl: cancelUrl,
+        paymentId: paymentId
       })
     });
 
@@ -94,7 +104,6 @@ async function initiateStripePayment(user) {
     }
 
     const data = await response.json();
-    localStorage.setItem('pendingPaymentId', data.paymentId);
     window.location.href = data.url;
 
   } catch (err) {
@@ -209,9 +218,12 @@ function renderTable(contributions, groupMap) {
       
       const amount = parseFloat(btn.dataset.amount);
       const groupName = btn.dataset.groupName;
+      const paymentId = generatePaymentId();
       const authToken = await user.getIdToken();
       const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = `${window.location.origin}/payment-cancel.html`;
+      
+      localStorage.setItem('pendingPaymentId', paymentId);
       
       const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
         method: 'POST',
@@ -225,12 +237,12 @@ function renderTable(contributions, groupMap) {
           contributionId: btn.dataset.contribId,
           groupId: btn.dataset.groupId,
           returnUrl: returnUrl,
-          cancelUrl: cancelUrl
+          cancelUrl: cancelUrl,
+          paymentId: paymentId
         })
       });
       
       const data = await response.json();
-      localStorage.setItem('pendingPaymentId', data.paymentId);
       window.location.href = data.url;
     });
   });
