@@ -38,70 +38,78 @@
 
   <script>
     const API_BASE_URL = 'https://div-elopers.onrender.com';
-    let paymentId = localStorage.getItem('pendingPaymentId');
+    const paymentId = localStorage.getItem('pendingPaymentId');
     let attempts = 0;
     const maxAttempts = 60;
 
-    async function checkStatus() {
-      attempts++;
-      
-      // Wait for Firebase auth
-      if (!firebase.auth().currentUser && attempts < 20) {
-        setTimeout(checkStatus, 500);
-        return;
-      }
-      
-      const user = firebase.auth().currentUser;
-      if (!user) {
-        document.getElementById('title').innerHTML = 'Please log in';
-        document.getElementById('spinner').style.display = 'none';
-        document.getElementById('buttons').style.display = 'block';
-        return;
-      }
-      
-      if (!paymentId) {
-        document.getElementById('title').innerHTML = '✅ Payment Successful!';
-        document.getElementById('spinner').style.display = 'none';
-        document.getElementById('buttons').style.display = 'block';
-        return;
-      }
-      
-      try {
-        const token = await user.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/api/payments/status/${paymentId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.status === 'completed') {
-            document.getElementById('title').innerHTML = '✅ Payment Successful!';
-            document.getElementById('spinner').style.display = 'none';
-            document.getElementById('buttons').style.display = 'block';
-            localStorage.removeItem('pendingPaymentId');
-            return;
-          }
-        }
-        
-        if (response.status === 404 && attempts < maxAttempts) {
-          // Payment not yet created, keep polling
-          setTimeout(checkStatus, 2000);
-          return;
-        }
-      } catch(e) {
-        console.log('Polling error:', e);
-      }
-      
-      if (attempts < maxAttempts) {
-        setTimeout(checkStatus, 2000);
-      } else {
-        document.getElementById('title').innerHTML = 'Check your dashboard later';
-        document.getElementById('spinner').style.display = 'none';
-        document.getElementById('buttons').style.display = 'block';
-      }
+    function showSuccess() {
+      document.getElementById('title').innerHTML = '✅ Payment Successful!';
+      document.getElementById('message').innerHTML = 'Your payment has been confirmed.';
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('buttons').style.display = 'block';
+      localStorage.removeItem('pendingPaymentId');
     }
-    
-    setTimeout(checkStatus, 1000);
+
+    function showTimeout() {
+      document.getElementById('title').innerHTML = 'Taking longer than expected';
+      document.getElementById('message').innerHTML = 'Your payment may still be processing. Check your dashboard in a few minutes.';
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('buttons').style.display = 'block';
+    }
+
+    function showLoginRequired() {
+      document.getElementById('title').innerHTML = 'Please log in';
+      document.getElementById('message').innerHTML = 'You need to be logged in to confirm your payment.';
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('buttons').style.display = 'block';
+    }
+
+    function poll(user) {
+      attempts++;
+
+      if (!paymentId) {
+        showSuccess();
+        return;
+      }
+
+      user.getIdToken()
+        .then(token => fetch(`${API_BASE_URL}/api/payments/status/${paymentId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }))
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'completed') {
+            showSuccess();
+          } else if (attempts < maxAttempts) {
+            setTimeout(() => poll(user), 2000);
+          } else {
+            showTimeout();
+          }
+        })
+        .catch(err => {
+          console.log('Poll error:', err);
+          if (attempts < maxAttempts) {
+            setTimeout(() => poll(user), 2000);
+          } else {
+            showTimeout();
+          }
+        });
+    }
+
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        poll(user);
+      } else {
+        setTimeout(() => {
+          const u = firebase.auth().currentUser;
+          if (u) {
+            poll(u);
+          } else {
+            showLoginRequired();
+          }
+        }, 3000);
+      }
+    });
   </script>
 </body>
 </html>
