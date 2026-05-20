@@ -3,111 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Confirmation | Stockpal</title>
+  <title>Payment Confirmation | StokPal</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #3498db;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 20px auto;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
     .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
     .btn-secondary { background: #95a5a6; }
+    .btn-danger { background: #e74c3c; }
+    .success { color: #27ae60; }
+    .failed { color: #e74c3c; }
   </style>
 </head>
 <body>
-  <div class="spinner" id="spinner"></div>
-  <h2 id="title">Processing your payment...</h2>
-  <p id="message">Please wait while we confirm your payment.</p>
-  <div id="buttons" style="display: none;">
-    <a href="/dashboard.html" class="btn">Go to Dashboard</a>
-    <a href="/payment-history.html" class="btn btn-secondary">View History</a>
+  <div id="content">
+    <h2>Processing...</h2>
+    <p>Please wait.</p>
   </div>
+
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="js/firebase-compat-init.js"></script>
   <script>
-    const API_BASE_URL = 'https://div-elopers.onrender.com';
-    const paymentId = localStorage.getItem('pendingPaymentId');
-    let attempts = 0;
-    const maxAttempts = 60;
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const cancelled = params.get('cancelled');
+    const content = document.getElementById('content');
 
-    function showSuccess() {
-      document.getElementById('title').innerHTML = '✅ Payment Successful!';
-      document.getElementById('message').innerHTML = 'Your payment has been confirmed.';
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('buttons').style.display = 'block';
-      localStorage.removeItem('pendingPaymentId');
+    localStorage.removeItem('pendingPaymentId');
+
+    // If redirected from cancel page
+    if (cancelled === 'true') {
+      content.innerHTML = `
+        <h2 class="failed">❌ Payment Cancelled</h2>
+        <p>Your payment was cancelled. No charge was made.</p>
+        <a href="/payment.html" class="btn btn-danger">Try Again</a>
+        <a href="/dashboard.html" class="btn btn-secondary">Go to Dashboard</a>
+      `;
     }
-    function showTimeout() {
-      document.getElementById('title').innerHTML = 'Taking longer than expected';
-      document.getElementById('message').innerHTML = 'Your payment may still be processing. Check your dashboard in a few minutes.';
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('buttons').style.display = 'block';
+    // If we have a session_id, Stripe redirected here after checkout — treat as success
+    else if (sessionId) {
+      content.innerHTML = `
+        <h2 class="success">✅ Payment Successful!</h2>
+        <p>Your payment has been confirmed. Your dashboard will reflect the update shortly.</p>
+        <a href="/dashboard.html" class="btn">Go to Dashboard</a>
+        <a href="/payment-history.html" class="btn btn-secondary">View History</a>
+      `;
     }
-    function showLoginRequired() {
-      document.getElementById('title').innerHTML = 'Please log in';
-      document.getElementById('message').innerHTML = 'You need to be logged in to confirm your payment.';
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('buttons').style.display = 'block';
+    // No session_id — something went wrong
+    else {
+      content.innerHTML = `
+        <h2 class="failed">⚠️ Something went wrong</h2>
+        <p>We could not confirm your payment. Please check your dashboard or try again.</p>
+        <a href="/payment.html" class="btn btn-danger">Try Again</a>
+        <a href="/dashboard.html" class="btn btn-secondary">Go to Dashboard</a>
+      `;
     }
-
-    function poll(user) {
-      attempts++;
-
-      // No paymentId means nothing to poll — go straight to success
-      if (!paymentId) {
-        showSuccess();
-        return;
-      }
-
-      user.getIdToken()
-        .then(token => fetch(`${API_BASE_URL}/api/payments/status/${paymentId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }))
-        .then(res => res.json())
-        .then(data => {
-          console.log(`[poll attempt ${attempts}] status:`, data.status);
-          if (data.status === 'completed') {
-            showSuccess();
-          } else if (attempts < maxAttempts) {
-            setTimeout(() => poll(user), 2000);
-          } else {
-            showTimeout();
-          }
-        })
-        .catch(err => {
-          console.log('Poll error:', err);
-          if (attempts < maxAttempts) {
-            setTimeout(() => poll(user), 2000);
-          } else {
-            showTimeout();
-          }
-        });
-    }
-
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        poll(user);
-      } else {
-        setTimeout(() => {
-          const u = firebase.auth().currentUser;
-          if (u) {
-            poll(u);
-          } else {
-            showLoginRequired();
-          }
-        }, 3000);
-      }
-    });
   </script>
 </body>
 </html>
