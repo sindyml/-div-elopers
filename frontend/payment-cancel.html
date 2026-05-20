@@ -4,27 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Payment Cancelled | Stockpal</title>
-  <link rel="stylesheet" href="css/styles.css">
   <style>
-    .payment-return-container {
-      max-width: 600px;
-      margin: 100px auto;
-      padding: 40px;
-      text-align: center;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .btn { display: inline-block; padding: 12px 30px; background: #3498db; color: white; text-decoration: none; border-radius: 6px; margin: 5px; }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+    .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
     .btn-secondary { background: #95a5a6; }
   </style>
 </head>
 <body>
-  <div class="payment-return-container">
-    <h1>❌ Payment Cancelled</h1>
-    <p>Your payment was cancelled. No charges were made.</p>
-    <a href="/payment.html" class="btn">Try Again</a>
-    <a href="/dashboard.html" class="btn btn-secondary">Dashboard</a>
-  </div>
+  <h1>❌ Payment Cancelled</h1>
+  <p>Your payment was cancelled. No charges were made.</p>
+  <a href="/payment.html" class="btn">Try Again</a>
+  <a href="/dashboard.html" class="btn btn-secondary">Dashboard</a>
+  
+  <script>
+    // Clear pending payment ID
+    localStorage.removeItem('pendingPaymentId');
+  </script>
 </body>
 </html>
