@@ -31,11 +31,9 @@
     <a href="/dashboard.html" class="btn">Go to Dashboard</a>
     <a href="/payment-history.html" class="btn btn-secondary">View History</a>
   </div>
-
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="js/firebase-compat-init.js"></script>
-
   <script>
     const API_BASE_URL = 'https://div-elopers.onrender.com';
     const paymentId = localStorage.getItem('pendingPaymentId');
@@ -49,14 +47,12 @@
       document.getElementById('buttons').style.display = 'block';
       localStorage.removeItem('pendingPaymentId');
     }
-
     function showTimeout() {
       document.getElementById('title').innerHTML = 'Taking longer than expected';
       document.getElementById('message').innerHTML = 'Your payment may still be processing. Check your dashboard in a few minutes.';
       document.getElementById('spinner').style.display = 'none';
       document.getElementById('buttons').style.display = 'block';
     }
-
     function showLoginRequired() {
       document.getElementById('title').innerHTML = 'Please log in';
       document.getElementById('message').innerHTML = 'You need to be logged in to confirm your payment.';
@@ -67,6 +63,7 @@
     function poll(user) {
       attempts++;
 
+      // No paymentId means nothing to poll — go straight to success
       if (!paymentId) {
         showSuccess();
         return;
@@ -78,6 +75,7 @@
         }))
         .then(res => res.json())
         .then(data => {
+          console.log(`[poll attempt ${attempts}] status:`, data.status);
           if (data.status === 'completed') {
             showSuccess();
           } else if (attempts < maxAttempts) {
