@@ -4,20 +4,65 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Payment Confirmation | StokPal</title>
+
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-    .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
-    .btn-secondary { background: #95a5a6; }
-    .btn-danger { background: #e74c3c; }
-    .success { color: #27ae60; }
-    .failed { color: #e74c3c; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 10px;
+    }
+
+    .btn-secondary {
+      background: #95a5a6;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+    }
+
+    .success {
+      color: #27ae60;
+    }
+
+    .failed {
+      color: #e74c3c;
+    }
   </style>
 </head>
+
 <body>
-  <div id="content">
-    <h2>Processing...</h2>
+
+<main>
+
+  <header>
+    <h1>Payment Status</h1>
+  </header>
+
+  <section
+    id="content"
+    aria-live="polite"
+    aria-labelledby="payment-status-heading"
+  >
+
+    <h2 id="payment-status-heading">
+      Processing...
+    </h2>
+
     <p>Please wait.</p>
-  </div>
+
+  </section>
+
+</main>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
