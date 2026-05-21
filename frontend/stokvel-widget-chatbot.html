@@ -245,63 +245,201 @@
     text-align: center;
     margin-top: 10px;
   }
+
+  .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
 </style>
 
-<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Stokvel AI assistant chatbot widget</h2>
+<h2
+  class="sr-only"
+  style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);"
+>
+  Stokvel AI Assistant Chatbot Widget
+</h2>
 
-<div class="cb-wrap">
-  <div class="cb-shell">
-    <div class="cb-header">
-      <div class="cb-avatar" aria-hidden="true">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<aside
+  class="cb-wrap"
+  aria-labelledby="chatbot-title"
+>
+
+  <section class="cb-shell">
+
+    <header class="cb-header">
+
+      <div
+        class="cb-avatar"
+        aria-hidden="true"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
         </svg>
       </div>
+
       <div class="cb-header-text">
-        <h2>Stokvel Assistant</h2>
-        <p><span class="cb-status-dot"></span> Online · Ready to help</p>
-      </div>
-    </div>
 
-    <div class="cb-messages" id="cb-messages" role="log" aria-live="polite" aria-label="Chat messages">
-      <div class="cb-msg cb-msg--bot">
-        <div class="cb-msg-micro" aria-hidden="true">S</div>
-        <div>
-          <div class="cb-msg-bubble">
-            Sawubona! I'm your Stokvel Assistant. I can help you with contributions, payouts, meeting schedules, group management, and invites. What would you like to know?
-          </div>
-          <div class="cb-chips" id="cb-starter-chips">
-            <button class="cb-chip" data-q="How do I check my contribution balance?">My balance</button>
-            <button class="cb-chip" data-q="When is the next payout?">Next payout</button>
-            <button class="cb-chip" data-q="How do I invite a member to my group?">Invite a member</button>
-            <button class="cb-chip" data-q="How do meetings work?">Meetings</button>
-          </div>
+        <h2 id="chatbot-title">
+          Stokvel Assistant
+        </h2>
+
+        <p role="status">
+          <span
+            class="cb-status-dot"
+            aria-hidden="true"
+          ></span>
+
+          Online · Ready to help
+        </p>
+
+      </div>
+
+    </header>
+
+    <section
+      class="cb-messages"
+      id="cb-messages"
+      role="log"
+      aria-live="polite"
+      aria-label="Chat messages"
+    >
+
+      <article class="cb-msg cb-msg--bot">
+
+        <div
+          class="cb-msg-micro"
+          aria-hidden="true"
+        >
+          S
         </div>
-      </div>
-    </div>
 
-    <div class="cb-footer">
-      <textarea
-        class="cb-input"
-        id="cb-input"
-        placeholder="Ask about contributions, payouts, meetings…"
-        rows="1"
-        aria-label="Type your message"
-      ></textarea>
-      <button class="cb-send" id="cb-send" aria-label="Send message">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-  <p class="cb-disclaimer">Powered by Claude · Responses are for guidance only</p>
-</div>
+        <div>
+
+          <div class="cb-msg-bubble">
+
+            Sawubona! I'm your Stokvel Assistant.
+            I can help you with contributions,
+            payouts, meeting schedules,
+            group management, and invites.
+
+            What would you like to know?
+
+          </div>
+
+          <section
+            class="cb-chips"
+            id="cb-starter-chips"
+            aria-label="Suggested Questions"
+          >
+
+            <button
+              type="button"
+              class="cb-chip"
+              data-q="How do I check my contribution balance?"
+            >
+              My balance
+            </button>
+
+            <button
+              type="button"
+              class="cb-chip"
+              data-q="When is the next payout?"
+            >
+              Next payout
+            </button>
+
+            <button
+              type="button"
+              class="cb-chip"
+              data-q="How do I invite a member to my group?"
+            >
+              Invite a member
+            </button>
+
+            <button
+              type="button"
+              class="cb-chip"
+              data-q="How do meetings work?"
+            >
+              Meetings
+            </button>
+
+          </section>
+
+        </div>
+
+      </article>
+
+    </section>
+
+    <footer class="cb-footer">
+
+      <form
+        id="chatForm"
+        aria-label="Send a message"
+      >
+
+        <label
+          for="cb-input"
+          class="sr-only"
+        >
+          Type your message
+        </label>
+
+        <textarea
+          class="cb-input"
+          id="cb-input"
+          placeholder="Ask about contributions, payouts, meetings…"
+          rows="1"
+        ></textarea>
+
+        <button
+          type="submit"
+          class="cb-send"
+          id="cb-send"
+          aria-label="Send message"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+
+      </form>
+
+    </footer>
+
+  </section>
+
+  <p class="cb-disclaimer">
+    Powered by Claude · Responses are for guidance only
+  </p>
+
+</aside>
 
 <script>
 const messagesEl = document.getElementById('cb-messages');
 const inputEl = document.getElementById('cb-input');
 const sendBtn = document.getElementById('cb-send');
+const chatForm = document.getElementById('chatForm');
+
+// Semantic form submission
+chatForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendMessage(inputEl.value);
+});
 
 const SYSTEM = `You are a friendly, knowledgeable assistant built into a South African stokvel management app. A stokvel is a rotating savings group where members contribute regularly and take turns receiving the full pool (called a payout).
 
@@ -319,112 +457,286 @@ Be warm, concise, and practical. Use South African context naturally. Answer in 
 const history = [];
 let busy = false;
 
+// ========================================
+// APPEND CHAT MESSAGE
+// ========================================
+
 function appendMsg(role, text) {
-  const wrap = document.createElement('div');
-  wrap.className = `cb-msg cb-msg--${role === 'user' ? 'user' : 'bot'}`;
 
-  const micro = document.createElement('div');
-  micro.className = 'cb-msg-micro';
-  micro.setAttribute('aria-hidden', 'true');
-  micro.textContent = role === 'user' ? 'U' : 'S';
+  const wrap =
+    document.createElement('article');
 
-  const bubble = document.createElement('div');
-  bubble.className = 'cb-msg-bubble';
-  bubble.textContent = text;
+  wrap.className =
+    `cb-msg cb-msg--${role === 'user' ? 'user' : 'bot'}`;
+
+  const micro =
+    document.createElement('div');
+
+  micro.className =
+    'cb-msg-micro';
+
+  micro.setAttribute(
+    'aria-hidden',
+    'true'
+  );
+
+  micro.textContent =
+    role === 'user' ? 'U' : 'S';
+
+  const bubble =
+    document.createElement('div');
+
+  bubble.className =
+    'cb-msg-bubble';
+
+  bubble.textContent =
+    text;
 
   wrap.appendChild(micro);
   wrap.appendChild(bubble);
+
   messagesEl.appendChild(wrap);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  messagesEl.scrollTop =
+    messagesEl.scrollHeight;
+
   return wrap;
 }
 
+// ========================================
+// THINKING INDICATOR
+// ========================================
+
 function showThinking() {
-  const wrap = document.createElement('div');
-  wrap.className = 'cb-msg cb-msg--bot';
-  wrap.id = 'cb-thinking-wrap';
 
-  const micro = document.createElement('div');
-  micro.className = 'cb-msg-micro';
-  micro.setAttribute('aria-hidden', 'true');
-  micro.textContent = 'S';
+  const wrap =
+    document.createElement('article');
 
-  const dots = document.createElement('div');
-  dots.className = 'cb-thinking';
-  dots.setAttribute('aria-label', 'Thinking…');
+  wrap.className =
+    'cb-msg cb-msg--bot';
+
+  wrap.id =
+    'cb-thinking-wrap';
+
+  const micro =
+    document.createElement('div');
+
+  micro.className =
+    'cb-msg-micro';
+
+  micro.setAttribute(
+    'aria-hidden',
+    'true'
+  );
+
+  micro.textContent =
+    'S';
+
+  const dots =
+    document.createElement('div');
+
+  dots.className =
+    'cb-thinking';
+
+  dots.setAttribute(
+    'aria-label',
+    'Thinking…'
+  );
+
   for (let i = 0; i < 3; i++) {
-    const d = document.createElement('div');
-    d.className = 'cb-dot';
+
+    const d =
+      document.createElement('div');
+
+    d.className =
+      'cb-dot';
+
     dots.appendChild(d);
   }
 
   wrap.appendChild(micro);
   wrap.appendChild(dots);
+
   messagesEl.appendChild(wrap);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  messagesEl.scrollTop =
+    messagesEl.scrollHeight;
 }
 
 function removeThinking() {
-  const el = document.getElementById('cb-thinking-wrap');
-  if (el) el.remove();
+
+  const el =
+    document.getElementById(
+      'cb-thinking-wrap'
+    );
+
+  if (el) {
+    el.remove();
+  }
 }
 
+// ========================================
+// SEND MESSAGE
+// ========================================
+
 async function sendMessage(text) {
-  if (!text.trim() || busy) return;
+
+  if (!text.trim() || busy) {
+    return;
+  }
+
   busy = true;
   sendBtn.disabled = true;
 
-  const chips = document.getElementById('cb-starter-chips');
-  if (chips) chips.remove();
+  const chips =
+    document.getElementById(
+      'cb-starter-chips'
+    );
+
+  if (chips) {
+    chips.remove();
+  }
 
   appendMsg('user', text);
-  history.push({ role: 'user', content: text });
+
+  history.push({
+    role: 'user',
+    content: text
+  });
+
   inputEl.value = '';
   inputEl.style.height = 'auto';
+
   showThinking();
 
   try {
-    const res = await fetch(window.CHAT_PROXY_URL || 'http://localhost:3001/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: SYSTEM,
-        messages: history
-      })
+
+    const res = await fetch(
+      window.CHAT_PROXY_URL ||
+      'http://localhost:3001/api/chat',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          model:
+            'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: SYSTEM,
+          messages: history
+        })
+      }
+    );
+
+    const data =
+      await res.json();
+
+    const reply =
+      data?.content
+        ?.map(
+          block =>
+            block.text || ''
+        )
+        .join('') ||
+      'Sorry, I could not get a response. Please try again.';
+
+    removeThinking();
+
+    appendMsg(
+      'bot',
+      reply
+    );
+
+    history.push({
+      role: 'assistant',
+      content: reply
     });
-    const data = await res.json();
-    const reply = data?.content?.map(b => b.text || '').join('') || 'Sorry, I could not get a response. Please try again.';
-    removeThinking();
-    appendMsg('bot', reply);
-    history.push({ role: 'assistant', content: reply });
+
   } catch (err) {
+
     removeThinking();
-    appendMsg('bot', 'Something went wrong. Please check your connection and try again.');
+
+    appendMsg(
+      'bot',
+      'Something went wrong. Please check your connection and try again.'
+    );
+
   } finally {
+
     busy = false;
     sendBtn.disabled = false;
   }
 }
 
-sendBtn.addEventListener('click', () => sendMessage(inputEl.value));
+// Optional:
+// Remove the old click handler if you use the form submit handler
+//
+// sendBtn.addEventListener(
+//   'click',
+//   () => sendMessage(inputEl.value)
+// );
 
-inputEl.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage(inputEl.value);
+// ========================================
+// ENTER KEY
+// ========================================
+
+inputEl.addEventListener(
+  'keydown',
+  (e) => {
+
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey
+    ) {
+
+      e.preventDefault();
+
+      sendMessage(
+        inputEl.value
+      );
+    }
   }
-});
+);
 
-inputEl.addEventListener('input', () => {
-  inputEl.style.height = 'auto';
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 80) + 'px';
-});
+// ========================================
+// AUTO RESIZE TEXTAREA
+// ========================================
 
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('cb-chip')) {
-    sendMessage(e.target.dataset.q);
+inputEl.addEventListener(
+  'input',
+  () => {
+
+    inputEl.style.height =
+      'auto';
+
+    inputEl.style.height =
+      Math.min(
+        inputEl.scrollHeight,
+        80
+      ) + 'px';
   }
-});
+);
+
+// ========================================
+// QUICK ACTION CHIPS
+// ========================================
+
+document.addEventListener(
+  'click',
+  (e) => {
+
+    if (
+      e.target.classList.contains(
+        'cb-chip'
+      )
+    ) {
+
+      sendMessage(
+        e.target.dataset.q
+      );
+    }
+  }
+);
 </script>
