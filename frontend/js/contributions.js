@@ -202,7 +202,7 @@ function listenToNotifications(userId, onNotificationCallback) {
 async function getContributionsByMember(userId) {
 
     const contributionsSnapshot = await getDocs(
-        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc'))
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'asc'))
     );
     return contributionsSnapshot.docs.map(document => ({
         id: document.id,
@@ -213,7 +213,7 @@ async function getContributionsByMember(userId) {
 async function getContributionsByGroup(groupId) {
 
     const contributionsSnapshot = await getDocs(
-        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc'))
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'asc'))
     );
     return contributionsSnapshot.docs.map(document => ({
         id: document.id,
@@ -232,7 +232,7 @@ async function updateContributionStatus(contributionId, newStatus) {
 function listenToMemberContributions(userId, onUpdateCallback) {
 
     const unsubscribe = onSnapshot(
-        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'desc')),
+        query(collection(db, 'contributions'), where('userId', '==', userId), orderBy('date', 'asc')),
         (snapshot) => {
             const contributions = snapshot.docs.map(document => ({
                 id: document.id,
@@ -247,7 +247,7 @@ function listenToMemberContributions(userId, onUpdateCallback) {
 function listenToGroupContributions(groupId, onUpdateCallback) {
 
     const unsubscribe = onSnapshot(
-        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'desc')),
+        query(collection(db, 'contributions'), where('groupId', '==', groupId), orderBy('date', 'asc')),
         (snapshot) => {
             const contributions = snapshot.docs.map(document => ({
                 id: document.id,

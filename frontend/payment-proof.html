@@ -419,12 +419,28 @@
       progressWrapper.hidden = false;
 
       try {
-        await uploadPaymentProof(_selectedFile, _txId, user.uid, {
+          const { fileUrl, proofId } = await uploadPaymentProof(_selectedFile, _txId, user.uid, {
           onProgress: (pct) => {
             progressBar.style.width = `${pct}%`;
             progressBar.setAttribute('aria-valuenow', String(pct));
           },
         });
+
+
+        // ============================================
+        // UPDATE THE CONTRIBUTION DIRECTLY - using the returned fileUrl
+        // ============================================
+        if (_txData && _txData.contributionId && fileUrl) {
+          const { doc, updateDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+          const contributionRef = doc(db, 'contributions', _txData.contributionId);
+    
+          await updateDoc(contributionRef, {
+          paymentEvidence: 'proof',
+          evidenceUrl: fileUrl,  // ← Use the returned fileUrl
+          });
+          console.log('✅ Contribution updated with proof evidence:', _txData.contributionId);
+        }
+        // ============================================
 
         progressWrapper.hidden = true;
         progressBar.style.width = '0%';
@@ -501,6 +517,9 @@
       return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
   </script>
+
+<script src="components/navbar.js"></script>
+<script src="components/footer.js"></script>
 
 </body>
 </html>

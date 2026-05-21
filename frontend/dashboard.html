@@ -36,7 +36,9 @@
       <div class="page-header__actions">
         <small id="group-name-badge" class="group-badge">Loading group...</small>
         <a href="payment.html" class="btn btn--primary btn--sm">💳 Make a Payment</a>
+        <!-- Added buttons for Treasurer/Admin roles to manage contributions and view analytics -->
         <a href="contributions-manage.html" id="manageContributionsBtn" class="btn btn--outline btn--sm" style="display: none;">📋 Manage Contributions</a>
+        <a href="analytics-reports.html" id="analyticsBtn" class="btn btn--outline btn--sm" style="display: none;">📊 Analytics Reports</a>
       </div>
       <!-- ADMIN ACTIONS -->
 <div
@@ -356,9 +358,6 @@
       initPaymentReminders
     } from './js/payment-reminders.js';
 
-    import { getCurrentUserRole } from './js/contributions.js';  // ADDED THIS
-
-
     const auth       = getAuth(getApp());
     const container  = document.getElementById('health-score-container');
     const refreshBtn = document.getElementById('health-refresh-btn');
@@ -386,16 +385,19 @@
       }
     }
 
-    onAuthStateChanged(auth, async (user) => { // ADDED 'async'
+    onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       initPaymentReminders(user.uid);
 
-      // ADDED THIS BLOCK
-      const userRole = await getCurrentUserRole();
-      if (userRole === 'Treasurer' || userRole === 'Admin') {
-          const manageBtn = document.getElementById('manageContributionsBtn');
-          if (manageBtn) manageBtn.style.display = 'inline-flex';
-      }
+          // Dynamic import for button
+    const { getCurrentUserRole } = await import('./js/contributions.js');
+    const manageBtn = document.getElementById('manageContributionsBtn');
+    if (manageBtn) {
+        const role = await getCurrentUserRole();
+        if (role === 'Treasurer' || role === 'Admin') {
+            manageBtn.style.display = 'inline-flex';
+        }
+    }
 
       setTimeout(() => renderHealthScore(user.uid), 1200);
       refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));

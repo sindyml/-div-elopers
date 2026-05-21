@@ -3,46 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <title>Group Settings</title>
-  <link rel="stylesheet" href="../styles/theme.css">
-  <link rel="stylesheet" href="../styles/app.css">
-  <link rel="stylesheet" href="../styles/forms.css">
+  <link rel="stylesheet" href="../css/theme.css">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/forms.css">
 </head>
 <body>
 
-<main>
-  <h2>Group Settings</h2>
+<main class="app-main">
+  <header class="page-header">
+    <h1 class="page-header__title">Group Settings</h1>
+  </header>
 
   <!-- Group Info -->
-  <section>
-    <h3>Group Details</h3>
-    <p id="groupName"></p>
-    <p id="groupAmount"></p>
-    <p id="groupFrequency"></p>
+  <section class="card" aria-labelledby="details-heading" style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 id="details-heading" class="widget-section__title">Group Details</h2>
+    </header>
+    <div style="padding: var(--space-5);">
+      <p id="groupName"></p>
+      <p id="groupAmount"></p>
+      <p id="groupFrequency"></p>
+    </div>
   </section>
 
   <!-- Members -->
-  <section>
-    <h3>Members</h3>
-    <ul id="memberList"></ul>
+  <section class="card" aria-labelledby="members-heading" style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 id="members-heading" class="widget-section__title">Members</h2>
+    </header>
+    <div style="padding: var(--space-5);">
+      <ul id="memberList"></ul>
+    </div>
   </section>
 
   <!-- Admin Controls -->
-  <section id="adminSection" hidden>
-    <h3>Admin Controls</h3>
-    <button id="editBtn">Edit Group</button>
-    <button id="deleteBtn">Delete Group</button>
+  <section id="adminSection" class="card" hidden style="margin-bottom: var(--space-6);">
+    <header class="widget-section__header">
+      <h2 class="widget-section__title">Admin Controls</h2>
+    </header>
+    <div style="padding: var(--space-5); display: flex; gap: var(--space-3);">
+      <button id="editBtn" class="btn btn--primary">Edit Group</button>
+      <button id="deleteBtn" class="btn btn--danger">Delete Group</button>
+    </div>
   </section>
 
-  <p id="message"></p>
+  <p id="message" role="status" aria-live="polite"></p>
 
-  <a href="dashboard.html">← Back to Dashboard</a>
+  <nav aria-label="Breadcrumb">
+    <a href="dashboard.html" class="btn btn--ghost">← Back to Dashboard</a>
+  </nav>
 </main>
 
 <script type="module">
 import { db } from "../src/firebase.js";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { listenForAuth } from "../src/auth.js";
-import { deleteGroup } from "../src/groupService.js";
+import {
+  deleteGroup,
+  assignTreasurer,
+  assignAdmin
+} from "../src/groupService.js";
 
 const groupName = document.getElementById("groupName");
 const groupAmount = document.getElementById("groupAmount");
@@ -109,13 +129,122 @@ listenForAuth(async (user) => {
     memberList.innerHTML = "";
 
     memberSnap.forEach(docSnap => {
-      const m = docSnap.data();
 
-      const li = document.createElement("li");
-      li.textContent = `${m.uid} (${m.role})`;
+  const m = docSnap.data();
 
-      memberList.appendChild(li);
-    });
+  const li =
+    document.createElement("li");
+
+  li.style.marginBottom =
+    "1rem";
+
+  li.style.padding =
+    "1rem";
+
+  li.style.border =
+    "1px solid #ccc";
+
+  li.style.borderRadius =
+    "8px";
+
+  li.innerHTML = `
+
+    <strong>${m.uid}</strong>
+
+    <p>
+      Role:
+      <strong>${m.role}</strong>
+    </p>
+
+  `;
+
+  // ====================================
+  // ADMIN ROLE CONTROLS
+  // ====================================
+
+  if (
+  userRole === "admin" &&
+  m.uid !== currentUser.uid
+) {
+
+    const treasurerBtn =
+      document.createElement("button");
+
+    treasurerBtn.textContent =
+      "Make Treasurer";
+
+    treasurerBtn.style.marginRight =
+      "0.5rem";
+
+    treasurerBtn.onclick =
+      async () => {
+
+        try {
+
+          await assignTreasurer(
+            groupId,
+            m.uid
+          );
+
+          alert(
+            "Treasurer updated successfully"
+          );
+
+          window.location.reload();
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert(
+            "Failed to assign treasurer"
+          );
+        }
+      };
+
+    const adminBtn =
+      document.createElement("button");
+
+    adminBtn.textContent =
+      "Make Admin";
+
+    adminBtn.onclick =
+      async () => {
+
+        try {
+
+          await assignAdmin(
+            groupId,
+            m.uid
+          );
+
+          alert(
+            "Admin updated successfully"
+          );
+
+          window.location.reload();
+
+        } catch (err) {
+
+          console.error(err);
+
+          alert(
+            "Failed to assign admin"
+          );
+        }
+      };
+
+    li.appendChild(
+      treasurerBtn
+    );
+
+    li.appendChild(
+      adminBtn
+    );
+  }
+
+  memberList.appendChild(li);
+});
 
   } catch (err) {
     console.error(err);

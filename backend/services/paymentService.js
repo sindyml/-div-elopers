@@ -15,6 +15,7 @@ class PaymentService {
         groupId,
         memberId,
         amount,
+        payoutId,
         payoutMethod = 'bank_transfer',
         reference,
         processedBy
@@ -28,75 +29,82 @@ class PaymentService {
         };
       }
 
-      // Check if group exists and has sufficient balance
       const groupRef = db.collection('groups').doc(groupId);
-      const groupDoc = await groupRef.get();
-      
-      if (!groupDoc.exists) {
-        return {
-          success: false,
-          error: 'Group not found'
+      const transactionRecordRef = db.collection('transactions').doc();
+      const historyPayoutRef = db.collection('payouts').doc();
+      const existingPayoutRef = payoutId ? db.collection('payouts').doc(payoutId) : null;
+
+      const result = await db.runTransaction(async (transaction) => {
+        const groupDoc = await transaction.get(groupRef);
+
+        if (!groupDoc.exists) {
+          throw new Error('Group not found');
+        }
+
+        const groupData = groupDoc.data();
+        const currentBalance = groupData.totalBalance || groupData.currentBalance || 0;
+
+        if (currentBalance < amount) {
+          throw new Error('Insufficient group balance');
+        }
+
+        // 1. Create history payout record
+        const payoutRecord = {
+          id: historyPayoutRef.id,
+          groupId: groupId,
+          memberId: memberId,
+          amount: amount,
+          status: 'completed',
+          payoutMethod: payoutMethod,
+          reference: reference || `PAYOUT_${Date.now()}`,
+          processedBy: processedBy || null,
+          processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
         };
-      }
+        transaction.set(historyPayoutRef, payoutRecord);
 
-      const groupData = groupDoc.data();
-      const currentBalance = groupData.currentBalance || 0;
+        // 2. Update existing payout status if payoutId is provided
+        if (existingPayoutRef) {
+          transaction.update(existingPayoutRef, {
+            status: 'completed',
+            disbursedAt: admin.firestore.FieldValue.serverTimestamp(),
+            disbursedBy: processedBy
+          });
+        }
 
-      if (currentBalance < amount) {
+        // 3. Update group balance and metadata
+        transaction.update(groupRef, {
+          totalBalance: admin.firestore.FieldValue.increment(-amount),
+          lastPayoutAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastPayoutAmount: amount,
+          lastPayoutMember: memberId,
+          lastPayoutIndex: (groupData.lastPayoutIndex || 0) + 1
+        });
+
+        // 4. Record in transactions collection
+        transaction.set(transactionRecordRef, {
+          id: transactionRecordRef.id,
+          groupId: groupId,
+          userId: memberId,
+          amount: -amount,
+          type: 'payout',
+          status: 'completed',
+          payoutId: historyPayoutRef.id,
+          description: `Payout disbursement to ${memberId}`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
         return {
-          success: false,
-          error: 'Insufficient group balance'
+          payoutId: historyPayoutRef.id,
+          amount: amount,
+          status: 'completed',
+          newBalance: currentBalance - amount
         };
-      }
-
-      // Create payout transaction record
-      const payoutRef = db.collection('payouts').doc();
-      const payoutRecord = {
-        id: payoutRef.id,
-        groupId: groupId,
-        memberId: memberId,
-        amount: amount,
-        status: 'completed',
-        payoutMethod: payoutMethod,
-        reference: reference || `PAYOUT_${Date.now()}`,
-        processedBy: processedBy || null,
-        processedAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-
-      await payoutRef.set(payoutRecord);
-
-      // Update group balance
-      await groupRef.update({
-        currentBalance: admin.firestore.FieldValue.increment(-amount),
-        lastPayoutAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastPayoutAmount: amount,
-        lastPayoutMember: memberId,
-        lastPayoutIndex: (groupData.lastPayoutIndex || 0) + 1
-      });
-
-      // Record in transactions collection
-      const transactionRef = db.collection('transactions').doc();
-      await transactionRef.set({
-        id: transactionRef.id,
-        groupId: groupId,
-        userId: memberId,
-        amount: -amount,
-        type: 'payout',
-        status: 'completed',
-        payoutId: payoutRef.id,
-        description: `Payout disbursement to ${memberId}`,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       return {
         success: true,
-        data: {
-          payoutId: payoutRef.id,
-          amount: amount,
-          status: 'completed',
-          newBalance: currentBalance - amount
-        }
+        data: result
       };
 
     } catch (error) {
@@ -144,7 +152,7 @@ class PaymentService {
         data: {
           payoutOrder: payoutOrder,
           payoutOrderDetails: memberNames,
-          currentBalance: groupData.currentBalance || 0,
+          totalBalance: groupData.totalBalance || 0,
           contributionAmount: groupData.contributionAmount,
           nextPayoutMember: nextMemberId,
           nextPayoutIndex: nextPayoutIndex,

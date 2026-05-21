@@ -4,109 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Payment Cancelled | Stockpal</title>
-  <link rel="stylesheet" href="css/styles.css">
   <style>
-    .payment-cancel-container {
-      max-width: 600px;
-      margin: 100px auto;
-      padding: 40px;
-      text-align: center;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .payment-cancel-icon {
-      font-size: 64px;
-      margin-bottom: 20px;
-    }
-    .payment-cancel-title {
-      font-size: 28px;
-      margin-bottom: 10px;
-      color: #2c3e50;
-    }
-    .payment-cancel-message {
-      font-size: 16px;
-      color: #7f8c8d;
-      margin-bottom: 30px;
-    }
-    .btn {
-      display: inline-block;
-      padding: 12px 30px;
-      background: #3498db;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
-      font-size: 16px;
-      margin: 5px;
-    }
-    .btn:hover {
-      background: #2980b9;
-    }
-    .btn-secondary {
-      background: #95a5a6;
-    }
-    .btn-secondary:hover {
-      background: #7f8c8d;
-    }
+    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+    .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
+    .btn-secondary { background: #95a5a6; }
   </style>
 </head>
 <body>
-  <div class="payment-cancel-container">
-    <div class="payment-cancel-icon">❌</div>
-    <h1 class="payment-cancel-title">Payment Cancelled</h1>
-    <p class="payment-cancel-message">
-      You cancelled the payment. No charges have been made to your account.
-    </p>
-
-    <div>
-      <a href="/dashboard.html" class="btn">Go to Dashboard</a>
-      <a href="/payment.html" class="btn btn-secondary">Try Again</a>
-    </div>
-  </div>
-
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="js/firebase-compat-init.js"></script>
-
+  <h1>❌ Payment Cancelled</h1>
+  <p>Your payment was cancelled. No charges were made.</p>
+  <a href="/payment.html" class="btn">Try Again</a>
+  <a href="/dashboard.html" class="btn btn-secondary">Dashboard</a>
+  
   <script>
-    // Get payment ID from URL and update backend
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentId = urlParams.get('paymentId') || localStorage.getItem('pendingPaymentId');
-
-    async function notifyCancellation() {
-      if (!paymentId) return;
-
-      try {
-        for (let i = 0; i < 20; i++) {
-          if (window.firebase?.auth) break;
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-
-        if (!window.firebase?.auth) return;
-
-        const auth = window.firebase.auth();
-        const user = await new Promise((resolve) => {
-          const unsubscribe = auth.onAuthStateChanged((nextUser) => {
-            unsubscribe();
-            resolve(nextUser);
-          });
-        });
-
-        if (!user) return;
-
-        const token = await user.getIdToken();
-        await fetch(`/api/payments/cancel?paymentId=${encodeURIComponent(paymentId)}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-        localStorage.removeItem('pendingPaymentId');
-      } catch (err) {
-        console.error('Error notifying cancellation:', err);
-      }
-    }
-
-    notifyCancellation();
+    localStorage.removeItem('pendingPaymentId');
   </script>
 </body>
 </html>

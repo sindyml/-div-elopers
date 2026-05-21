@@ -20,7 +20,6 @@
 
   <main class="app-main">
 
-    <!-- ── Page Header ─────────────────────────────── -->
     <header class="page-header">
       <hgroup>
         <h1 class="page-header__title">💳 Make a Payment</h1>
@@ -33,17 +32,19 @@
         <a href="payment-history.html" class="btn btn--outline btn--sm">
           View Payment History →
         </a>
+        <a href="dashboard.html" class="btn btn--outline btn--sm">
+          Back to Dashboard
+        </a>
       </div>
+      
     </header>
 
-    <!-- ── Global alert ─────────────────────────────── -->
     <div class="payment-alert payment-alert--error payment-alert--hidden"
          id="page-error"
          role="alert"
          aria-live="assertive"
          style="margin-bottom: var(--space-5);"></div>
 
-    <!-- ── Summary stat cards ────────────────────────── -->
     <ul class="dashboard-grid" aria-label="Payment summary" id="summary-cards">
       <li class="stat-card stat-card--warning">
         <small class="stat-card__label">Outstanding Balance</small>
@@ -62,7 +63,6 @@
       </li>
     </ul>
 
-    <!-- ── Pending contributions table ──────────────── -->
     <section class="card" aria-labelledby="pending-heading" id="pending-section">
 
       <header class="widget-section__header">
@@ -74,7 +74,6 @@
         </a>
       </header>
 
-      <!-- Loading skeleton -->
       <div id="pending-loading" style="padding: var(--space-6);" aria-label="Loading">
         <div style="display:flex;flex-direction:column;gap:var(--space-3);">
           <div style="height:44px;border-radius:var(--radius-sm);background:var(--color-surface-2);"></div>
@@ -83,7 +82,6 @@
         </div>
       </div>
 
-      <!-- Empty state -->
       <div id="pending-empty" class="empty-state" hidden>
         <div class="empty-state__icon">🎉</div>
         <h3 class="empty-state__title">All caught up!</h3>
@@ -93,7 +91,6 @@
            style="margin-top: var(--space-4);">View payment history</a>
       </div>
 
-      <!-- Contributions table -->
       <div class="data-table-wrapper" id="pending-table-wrapper" hidden>
         <table class="data-table" aria-label="Pending contributions">
           <thead>
@@ -111,7 +108,6 @@
 
     </section>
 
-    <!-- ── Financial Health Score Card ───────────────── -->
     <section class="card" aria-labelledby="health-pay-heading" id="health-score-section" style="margin-top:var(--space-5);">
       <header class="widget-section__header">
         <h2 id="health-pay-heading" class="widget-section__title">🏥 Your Financial Health Score</h2>
@@ -127,7 +123,6 @@
 
   </main>
 
-  <!-- ── Payment modal mount point (injected by PaymentModal) ── -->
   <div id="payment-modal-root"></div>
 
   <footer id="footer-root"></footer>
@@ -138,6 +133,7 @@
   <script src="js/firebase-compat-init.js"></script>
   <script src="components/navbar.js"></script>
   <script src="components/footer.js"></script>
+  <script src="https://js.stripe.com/v3/"></script>
 
   <script type="module" src="js/payment.js"></script>
 
@@ -170,7 +166,6 @@
   </script>
 
   <style>
-    /* page-specific tweaks */
     .widget-section__header {
       display: flex;
       justify-content: space-between;

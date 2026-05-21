@@ -24,32 +24,47 @@
             </hgroup>
         </header>
 
-        <!-- User greeting -->
+        <!-- User greeting with buttons (KEPT ORIGINAL) -->
         <section id="user-greeting">
             <p>Hi, <strong id="userDisplayName">Member</strong> 👋</p>
+            <button type="button" class="primary" onclick="window.location.href='dashboard.html'">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+                 <path d="M12 7H2M7 12l-5-5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back to Dashboard
+            </button>
+
+            <button type="button" class="primary" onclick="window.location.href='payment.html'">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+                  <path d="M12 7H2M7 12l-5-5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Back to Payments  
+            </button>
         </section>
 
         <!-- YOUR DISPUTES section -->
-        <section id="disputes-section">
-            <h2>YOUR DISPUTES</h2>
+        <section id="disputes-section" aria-labelledby="disputes-heading">
+            <h2 id="disputes-heading">YOUR DISPUTES</h2>
             <button id="viewMyDisputesBtn" class="btn btn--primary">View My Disputes</button>
-            <section id="myDisputesContainer">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Group</th>
-                            <th>Amount</th>
-                            <th>Date Disputed</th>
-                            <th>Status</th>
-                            <th>Rejection Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody id="myDisputesTableBody"></tbody>
-                </table>
-            </section>
+            <article id="myDisputesContainer" class="card" style="margin-top: var(--space-4);">
+                <div class="data-table-wrapper">
+                    <table class="data-table" aria-label="My disputes table">
+                        <thead>
+                            <tr>
+                                <th>Group</th>
+                                <th>Amount</th>
+                                <th>Date Disputed</th>
+                                <th>Status</th>
+                                <th>Rejection Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="myDisputesTableBody"></tbody>
+                    </table>
+                </div>
+            </article>
         </section>
 
-        <section id="dynamicContent"></section>
+        <section id="dynamicContent" aria-live="polite"></section>
     </main>
 
     <!-- Payment modal mount point -->
@@ -92,6 +107,9 @@
         let activeUnsubscribe = null;
         let activeTableSection = null;
         let notificationsUnsubscribe = null;
+
+        // PAGINATION ADDED: Store current page for each group
+        let groupCurrentPage = {};
 
         // Load user's display name from contributions.js
         async function loadUserDisplayNameWrapper(userId) {
@@ -231,9 +249,102 @@
             return listenToNotifications(userId, showNotificationBanner);
         }
 
-        // ============================================================
-        // FIXED: displayContributionsTable with dispute status awareness
-        // ============================================================
+        // FIX: Added groupName parameter to fix the "groupName is not defined" error
+        function renderContributionsPage(groupId, groupName, groupContributions, targetTbody, page, rowsPerPage = 5) {
+            const start = (page - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageContributions = groupContributions.slice(start, end);
+            
+            targetTbody.innerHTML = '';
+            
+            pageContributions.forEach(contribution => {
+                const row = targetTbody.insertRow();
+                const amountCell = row.insertCell(0);
+                amountCell.textContent = `R${contribution.amount}`;
+                const dateCell = row.insertCell(1);
+                dateCell.textContent = contribution.date;
+                
+                const statusCell = row.insertCell(2);
+                if (contribution.status === 'confirmed') {
+                    statusCell.textContent = '✅ Confirmed';
+                } else if (contribution.status === 'missed') {
+                    statusCell.textContent = '❌ Missed';
+                    const disputeBtn = document.createElement('button');
+                    disputeBtn.textContent = 'Dispute';
+                    disputeBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                    // FIX: Pass groupName parameter to openDisputeModal
+                    disputeBtn.addEventListener('click', () => {
+                        openDisputeModal(contribution, groupName);
+                    });
+                    statusCell.appendChild(disputeBtn);
+                } else {
+                    statusCell.textContent = '⏳ Pending';
+                }
+
+                if (contribution.status === 'pending' || contribution.status === 'missed') {
+                    const actionCell = row.insertCell(3);
+                    const payBtn = document.createElement('button');
+                    payBtn.textContent = '💳 Pay';
+                    payBtn.classList.add('btn', 'btn--primary', 'btn--sm');
+                    payBtn.addEventListener('click', () => {
+                        const user = auth.currentUser;
+                        if (!user) return;
+                        paymentModal.open({
+                            userId: user.uid,
+                            groupId: contribution.groupId,
+                            contributionId: contribution.id,
+                            amount: parseFloat(contribution.amount) || 0,
+                            groupName: groupName,  // FIX: Now groupName is defined
+                        });
+                    });
+                    actionCell.appendChild(payBtn);
+                } else {
+                    row.insertCell(3);
+                }
+            });
+            
+            // PAGINATION ADDED: Create pagination controls
+            const totalPages = Math.ceil(groupContributions.length / rowsPerPage);
+            const paginationContainer = document.getElementById(`pagination-${groupId}`);
+            if (paginationContainer) {
+                paginationContainer.innerHTML = '';
+                
+                if (totalPages > 1) {
+                    // Previous button - only show if not on first page
+                    if (page > 1) {
+                        const prevBtn = document.createElement('button');
+                        prevBtn.textContent = 'Previous';
+                        prevBtn.classList.add('btn', 'btn--secondary', 'btn--sm');
+                        prevBtn.addEventListener('click', () => {
+                            groupCurrentPage[groupId] = page - 1;
+                            // FIX: Pass groupName to renderContributionsPage
+                            renderContributionsPage(groupId, groupName, groupContributions, targetTbody, page - 1, rowsPerPage);
+                        });
+                        paginationContainer.appendChild(prevBtn);
+                    }
+                    
+                    const pageInfo = document.createElement('span');
+                    pageInfo.textContent = `Page ${page} of ${totalPages}`;
+                    pageInfo.style.margin = '0 1rem';
+                    paginationContainer.appendChild(pageInfo);
+                    
+                    // Next button - only show if not on last page
+                    if (page < totalPages) {
+                        const nextBtn = document.createElement('button');
+                        nextBtn.textContent = 'Next';
+                        nextBtn.classList.add('btn', 'btn--secondary', 'btn--sm');
+                        nextBtn.addEventListener('click', () => {
+                            groupCurrentPage[groupId] = page + 1;
+                            // FIX: Pass groupName to renderContributionsPage
+                            renderContributionsPage(groupId, groupName, groupContributions, targetTbody, page + 1, rowsPerPage);
+                        });
+                        paginationContainer.appendChild(nextBtn);
+                    }
+                }
+            }
+        }
+
+        // PAGINATION ADDED: Modified displayContributionsTable with pagination
         function displayContributionsTable(groupId, groupName, containerElement, showCollapseButton = true) {
             if (activeTableSection && activeTableSection.parentNode) {
                 activeTableSection.remove();
@@ -241,6 +352,15 @@
             if (activeUnsubscribe) {
                 activeUnsubscribe();
                 activeUnsubscribe = null;
+            }
+
+            // FIX: Restored notifications - initialize notifications for this user when viewing contributions
+            const currentUserIdForNotifications = getCurrentUserId();
+            if (currentUserIdForNotifications && notificationsUnsubscribe) {
+                notificationsUnsubscribe();
+            }
+            if (currentUserIdForNotifications) {
+                notificationsUnsubscribe = listenToNotificationsWrapper(currentUserIdForNotifications);
             }
 
             const tableSection = document.createElement('section');
@@ -285,16 +405,22 @@
             table.appendChild(tbody);
             tableSection.appendChild(table);
 
+            // PAGINATION ADDED: Container for pagination controls
+            const paginationContainer = document.createElement('div');
+            paginationContainer.id = `pagination-${groupId}`;
+            paginationContainer.style.marginTop = '1rem';
+            paginationContainer.style.display = 'flex';
+            paginationContainer.style.alignItems = 'center';
+            paginationContainer.style.justifyContent = 'center';
+            paginationContainer.style.gap = '0.5rem';
+            tableSection.appendChild(paginationContainer);
+
             containerElement.appendChild(tableSection);
             activeTableSection = tableSection;
 
-            // ============================================================
-            // FIX: Fetch member's disputes once and create a map for quick lookup
-            // ============================================================
             const currentUserId = getCurrentUserId();
             let disputeMap = {};
             
-            // Fetch disputes and build a map (contributionId -> dispute object)
             getMemberDisputes(currentUserId).then(disputes => {
                 disputeMap = {};
                 disputes.forEach(dispute => {
@@ -307,76 +433,12 @@
                 const targetTbody = document.getElementById(`contributions-body-${groupId}`);
                 if (!targetTbody) return;
                 
-                targetTbody.innerHTML = '';
+                if (!groupCurrentPage[groupId]) {
+                    groupCurrentPage[groupId] = 1;
+                }
                 
-                groupContributions.forEach(contribution => {
-                    const row = targetTbody.insertRow();
-                    const amountCell = row.insertCell(0);
-                    amountCell.textContent = `R${contribution.amount}`;
-                    const dateCell = row.insertCell(1);
-                    dateCell.textContent = contribution.date;
-                    
-                    const statusCell = row.insertCell(2);
-                    if (contribution.status === 'confirmed') {
-                        statusCell.textContent = '✅ Confirmed';
-                    } else if (contribution.status === 'missed') {
-                        statusCell.textContent = '❌ Missed';
-                        
-                        // ============================================================
-                        // FIX: Check if a dispute already exists for this contribution
-                        // ============================================================
-                        const existingDispute = disputeMap[contribution.id];
-                        
-                        if (!existingDispute) {
-                            // No dispute yet - show Dispute button
-                            const disputeBtn = document.createElement('button');
-                            disputeBtn.textContent = 'Dispute';
-                            disputeBtn.classList.add('btn', 'btn--outline', 'btn--sm');
-                            disputeBtn.addEventListener('click', () => {
-                                openDisputeModal(contribution, groupName);
-                            });
-                            statusCell.appendChild(disputeBtn);
-                        } else if (existingDispute.status === 'pending') {
-                            // Dispute already submitted and waiting for treasurer
-                            const pendingText = document.createTextNode(' ⏳ Dispute Pending');
-                            statusCell.appendChild(pendingText);
-                        } else if (existingDispute.status === 'rejected') {
-                            // Dispute was rejected - allow member to dispute again
-                            const disputeAgainBtn = document.createElement('button');
-                            disputeAgainBtn.textContent = 'Dispute Again';
-                            disputeAgainBtn.classList.add('btn', 'btn--outline', 'btn--sm');
-                            disputeAgainBtn.addEventListener('click', () => {
-                                openDisputeModal(contribution, groupName);
-                            });
-                            statusCell.appendChild(disputeAgainBtn);
-                        }
-                        // If dispute is approved, contribution status would be 'confirmed' anyway
-                        
-                    } else {
-                        statusCell.textContent = '⏳ Pending';
-                    }
-
-                    if (contribution.status === 'pending' || contribution.status === 'missed') {
-                        const actionCell = row.insertCell(3);
-                        const payBtn = document.createElement('button');
-                        payBtn.textContent = '💳 Pay';
-                        payBtn.classList.add('btn', 'btn--primary', 'btn--sm');
-                        payBtn.addEventListener('click', () => {
-                            const user = auth.currentUser;
-                            if (!user) return;
-                            paymentModal.open({
-                                userId: user.uid,
-                                groupId: contribution.groupId,
-                                contributionId: contribution.id,
-                                amount: parseFloat(contribution.amount) || 0,
-                                groupName: groupName,
-                            });
-                        });
-                        actionCell.appendChild(payBtn);
-                    } else {
-                        row.insertCell(3);
-                    }
-                });
+                // FIX: Pass groupName to renderContributionsPage
+                renderContributionsPage(groupId, groupName, groupContributions, targetTbody, groupCurrentPage[groupId], 5);
             });
         }
 
@@ -472,6 +534,7 @@
             
             await loadUserDisplayNameWrapper(currentUserId);
             
+            // FIX: Restored notifications - this was missing in the broken version
             if (notificationsUnsubscribe) {
                 notificationsUnsubscribe();
             }

@@ -1,60 +1,104 @@
-// backend/api/payments/index.js - PayFast Payment API
+// backend/api/payments/index.js - Stripe Payment API
 const admin = require('firebase-admin');
-const payfastService = require('../../services/payfastService');
 
 const db = admin.firestore();
 
-// Helper to send JSON responses
 function sendJSON(res, statusCode, data) {
   res.statusCode = statusCode;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(data));
 }
 
-// Authentication middleware
 async function authenticateUser(req, res, next) {
-  const isTestEnv = process.env.NODE_ENV === 'test';
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: false };
-        return next();
-      }
       sendJSON(res, 401, { error: 'Authentication required' });
       return;
     }
-
     const token = authHeader.split('Bearer ')[1];
-    try {
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      req.user = {
-        uid: decodedToken.uid,
-        isAdmin: decodedToken.isAdmin === true || decodedToken.admin === true
-      };
-      next();
-    } catch (error) {
-      if (isTestEnv) {
-        req.user = { uid: 'test-user-123', isAdmin: false };
-        next();
-        return;
-      }
-      sendJSON(res, 401, { error: 'Invalid authentication token' });
-    }
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = {
+      uid: decodedToken.uid,
+      isAdmin: decodedToken.isAdmin === true || decodedToken.admin === true
+    };
+    next();
   } catch (error) {
-    if (isTestEnv) {
-      req.user = { uid: 'test-user-123', isAdmin: false };
-      next();
-      return;
-    }
-    sendJSON(res, 401, { error: 'Authentication failed' });
+    sendJSON(res, 401, { error: 'Invalid authentication token' });
   }
 }
 
-// POST /initiate - Create PayFast payment
-async function initiatePayment(req, res) {
+// POST /webhook - Stripe webhook (must come before JSON body parsing routes)
+async function handleStripeWebhook(req, res) {
+  const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    console.error('❌ STRIPE_WEBHOOK_SECRET is not set');
+    sendJSON(res, 500, { error: 'Webhook secret not configured' });
+    return;
+  }
+
+  let event;
   try {
-    const { amount, contributionId, groupId, groupName, metadata, userEmail, userName } = req.body;
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    sendJSON(res, 400, { error: `Webhook Error: ${err.message}` });
+    return;
+  }
+
+  console.log(`📩 Stripe webhook received: ${event.type}`);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const { paymentId, userId, contributionId, groupId } = session.metadata || {};
+
+    console.log('✅ checkout.session.completed — paymentId:', paymentId);
+
+    if (!paymentId) {
+      console.error('❌ No paymentId in session metadata');
+      sendJSON(res, 200, { received: true }); // Still 200 so Stripe doesn't retry
+      return;
+    }
+
+    try {
+      // 1. Update the transaction record to completed
+      await db.collection('transactions').doc(paymentId).update({
+        status: 'completed',
+        stripePaymentIntentId: session.payment_intent,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log('✅ Transaction updated to completed:', paymentId);
+
+      // 2. Update the linked contribution to paid
+      if (contributionId) {
+        await db.collection('contributions').doc(contributionId).update({
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          transactionId: paymentId,
+          paymentEvidence: 'online'
+        });
+        console.log('✅ Contribution updated to paid:', contributionId);
+      }
+
+    } catch (err) {
+      console.error('❌ Firestore update failed:', err);
+      // Return 500 so Stripe will retry the webhook
+      sendJSON(res, 500, { error: 'Database update failed' });
+      return;
+    }
+  }
+
+  // For all other event types, just acknowledge receipt
+  sendJSON(res, 200, { received: true });
+}
+
+// POST /create-checkout-session - Stripe Checkout
+async function createStripeCheckoutSession(req, res) {
+  try {
+    const { amount, groupName, contributionId, groupId, returnUrl, cancelUrl, paymentId } = req.body;
     const userId = req.user ? req.user.uid : null;
 
     if (!userId) {
@@ -67,250 +111,56 @@ async function initiatePayment(req, res) {
       return;
     }
 
-    // Check PayFast configuration
-    if (!process.env.PAYFAST_MERCHANT_ID || !process.env.PAYFAST_MERCHANT_KEY) {
-      console.error('❌ PayFast credentials missing in environment variables');
-      sendJSON(res, 503, { error: 'Payment gateway not configured' });
-      return;
-    }
+    // Use payment ID from frontend or generate one
+    const finalPaymentId = paymentId || db.collection('transactions').doc().id;
+    const paymentRef = db.collection('transactions').doc(finalPaymentId);
 
-    // Create payment record in Firestore
-    const paymentRef = db.collection('transactions').doc();
-    const paymentId = paymentRef.id;
+    console.log('📝 Creating payment record with ID:', finalPaymentId);
 
-    // Build URLs for PayFast
-    const forwardedProto = req.headers['x-forwarded-proto'];
-    const protocol = process.env.BASE_URL
-      ? null
-      : ((typeof forwardedProto === 'string' && forwardedProto.split(',')[0]) || (req.socket && req.socket.encrypted ? 'https' : 'http'));
-    const host = process.env.BASE_URL
-      ? null
-      : (req.headers['x-forwarded-host'] || req.headers.host || 'localhost:8080');
-    const baseUrl = process.env.BASE_URL || `${protocol}://${host}`;
-    const returnUrl = `${baseUrl}/payment-return.html?paymentId=${paymentId}`;
-    const cancelUrl = `${baseUrl}/payment-cancel.html?paymentId=${paymentId}`;
-    const notifyUrl = `${baseUrl}/api/payments/notify`;
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-    // Generate PayFast payment data
-    try {
-      const itemName = groupName
-        ? `${groupName} - Contribution`
-        : 'Stokvel Contribution';
-      const itemDescription = contributionId
-        ? `Contribution ID: ${contributionId}`
-        : 'Stokvel payment';
-
-      // Split name if provided
-      let firstName = '';
-      let lastName = '';
-      if (userName) {
-        const nameParts = userName.trim().split(' ');
-        firstName = nameParts[0] || '';
-        lastName = nameParts.slice(1).join(' ') || '';
-      }
-
-      const paymentData = payfastService.generatePaymentData({
-        amount: amount,
-        itemName: itemName,
-        itemDescription: itemDescription,
-        userId: userId,
-        paymentId: paymentId,
-        returnUrl: returnUrl,
-        cancelUrl: cancelUrl,
-        notifyUrl: notifyUrl,
-        email: userEmail || '',
-        firstName: firstName,
-        lastName: lastName
-      });
-
-      // Store payment in Firestore
-      await paymentRef.set({
-        id: paymentId,
-        userId: userId,
-        contributionId: contributionId || null,
-        groupId: groupId || null,
-        amount: amount,
-        currency: 'ZAR',
-        status: 'pending',
-        type: 'payment',
-        provider: 'payfast',
-        metadata: metadata || {},
-        paymentData: {
-          itemName: itemName,
-          itemDescription: itemDescription
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'zar',
+          product_data: { name: `${groupName || 'Stokvel'} - Contribution` },
+          unit_amount: Math.round(amount * 100),
         },
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      sendJSON(res, 200, {
-        success: true,
-        paymentId: paymentId,
-        paymentData: paymentData,
-        message: 'Payment initiated. Redirect user to PayFast.'
-      });
-
-    } catch (error) {
-      console.error('PayFast payment generation error:', error);
-      sendJSON(res, 500, {
-        error: 'Failed to generate payment data',
-        message: error.message
-      });
-    }
-
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
-
-// POST /notify - Handle PayFast ITN (Instant Transaction Notification)
-async function handleNotify(req, res) {
-  try {
-    console.log('📡 PayFast ITN received:', req.body);
-
-    // Process ITN with PayFast service
-    const result = await payfastService.processITN(req.body);
-
-    if (!result.success) {
-      console.error('ITN verification failed:', result.error);
-      sendJSON(res, 400, { error: result.error });
-      return;
-    }
-
-    const paymentInfo = result.data;
-    const paymentId = paymentInfo.paymentId;
-
-    // Get payment record from Firestore
-    const paymentRef = db.collection('transactions').doc(paymentId);
-    const paymentDoc = await paymentRef.get();
-
-    if (!paymentDoc.exists) {
-      console.error('Payment not found:', paymentId);
-      sendJSON(res, 404, { error: 'Payment not found' });
-      return;
-    }
-
-    const payment = paymentDoc.data();
-
-    // Verify amount matches
-    if (!payfastService.verifyAmount(paymentInfo.amount, payment.amount)) {
-      console.error('Amount mismatch:', {
-        received: paymentInfo.amount,
-        expected: payment.amount
-      });
-      sendJSON(res, 400, { error: 'Amount mismatch' });
-      return;
-    }
-
-    // Update payment record
-    await paymentRef.update({
-      status: paymentInfo.paymentStatus,
-      payfastPaymentId: paymentInfo.payfastPaymentId,
-      amountGross: paymentInfo.amount,
-      amountFee: paymentInfo.amountFee,
-      amountNet: paymentInfo.amountNet,
-      signature: paymentInfo.signature,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      completedAt: paymentInfo.paymentStatus === 'completed'
-        ? admin.firestore.FieldValue.serverTimestamp()
-        : null
+        quantity: 1,
+      }],
+      mode: 'payment',
+      success_url: returnUrl,
+      cancel_url: cancelUrl,
+      metadata: { paymentId: finalPaymentId, userId, contributionId, groupId }
     });
 
-    // If payment is completed, update contribution status
-    if (paymentInfo.paymentStatus === 'completed' && payment.contributionId) {
-      try {
-        await db.collection('contributions').doc(payment.contributionId).update({
-          status: 'confirmed',
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          transactionId: paymentId
-        });
-      } catch (err) {
-        console.error('Failed to update contribution:', err);
-      }
-    }
-
-    // Log webhook event
-    try {
-      await db.collection('webhookEvents').add({
-        type: 'payfast_itn',
-        paymentId: paymentId,
-        status: paymentInfo.paymentStatus,
-        data: req.body,
-        processedData: paymentInfo,
-        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-        processed: true
-      });
-    } catch (err) {
-      console.log('Note: Could not log webhook to Firestore');
-    }
-
-    // Respond to PayFast - MUST be 200 OK
-    sendJSON(res, 200, { received: true });
-
-  } catch (error) {
-    console.error('ITN processing error:', error);
-    sendJSON(res, 500, { error: 'ITN processing failed' });
-  }
-}
-
-// GET /return - Handle user return from PayFast (success page)
-async function handleReturn(req, res) {
-  try {
-    // This is just a placeholder - actual redirect happens on frontend
-    // PayFast will redirect user here with payment details
-    sendJSON(res, 200, {
-      message: 'Payment return acknowledged. Check payment status.',
-      note: 'Frontend should poll /status endpoint to verify payment'
-    });
-  } catch (error) {
-    console.error('Return handler error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
-
-// GET /cancel - Handle payment cancellation
-async function handleCancel(req, res) {
-  try {
-    const paymentId = req.query.paymentId;
-
-    if (!paymentId) {
-      sendJSON(res, 400, { error: 'paymentId query parameter is required' });
-      return;
-    }
-
-    const paymentRef = db.collection('transactions').doc(paymentId);
-    const paymentDoc = await paymentRef.get();
-
-    if (!paymentDoc.exists) {
-      sendJSON(res, 404, { error: 'Payment not found' });
-      return;
-    }
-
-    const payment = paymentDoc.data();
-    if (payment.userId !== req.user.uid && !req.user.isAdmin) {
-      sendJSON(res, 403, { error: 'Unauthorized' });
-      return;
-    }
-
-    if (payment.status !== 'pending') {
-      sendJSON(res, 409, { error: 'Only pending payments can be cancelled' });
-      return;
-    }
-
-    await paymentRef.update({
-      status: 'cancelled',
+    // Save the transaction as pending
+    await paymentRef.set({
+      id: finalPaymentId,
+      userId: userId,
+      contributionId: contributionId || null,
+      groupId: groupId || null,
+      amount: amount,
+      currency: 'ZAR',
+      status: 'pending',
+      type: 'payment',
+      provider: 'stripe',
+      stripeSessionId: session.id,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     });
 
     sendJSON(res, 200, {
-      message: 'Payment cancelled',
-      paymentId: paymentId
+      success: true,
+      paymentId: finalPaymentId,
+      sessionId: session.id,
+      url: session.url
     });
 
   } catch (error) {
-    console.error('Cancel handler error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
+    console.error('Stripe checkout error:', error);
+    sendJSON(res, 500, { error: error.message });
   }
 }
 
@@ -318,8 +168,6 @@ async function handleCancel(req, res) {
 async function getPaymentStatus(req, res) {
   try {
     const paymentId = req.params.paymentId;
-    const userId = req.user.uid;
-
     const paymentDoc = await db.collection('transactions').doc(paymentId).get();
 
     if (!paymentDoc.exists) {
@@ -328,136 +176,25 @@ async function getPaymentStatus(req, res) {
     }
 
     const payment = paymentDoc.data();
-    if (payment.userId !== userId && !req.user.isAdmin) {
-      sendJSON(res, 403, { error: 'Unauthorized' });
-      return;
-    }
-
     sendJSON(res, 200, {
       paymentId: paymentId,
       status: payment.status,
       amount: payment.amount,
-      currency: payment.currency,
-      createdAt: payment.createdAt,
-      payfastPaymentId: payment.payfastPaymentId,
-      transactionId: payment.payfastPaymentId
+      currency: payment.currency
     });
-
   } catch (error) {
     console.error('Status check error:', error);
     sendJSON(res, 500, { error: 'Internal server error' });
   }
 }
 
-// POST /verify - Verify payment
-async function verifyPayment(req, res) {
-  try {
-    const { paymentId, payfastPaymentId } = req.body;
-
-    if (!paymentId && !payfastPaymentId) {
-      sendJSON(res, 400, { error: 'Payment ID or PayFast Payment ID required' });
-      return;
-    }
-
-    let payment;
-    let paymentRef;
-
-    if (paymentId) {
-      const paymentDoc = await db.collection('transactions').doc(paymentId).get();
-      if (!paymentDoc.exists) {
-        sendJSON(res, 404, { error: 'Payment not found' });
-        return;
-      }
-      payment = paymentDoc.data();
-      paymentRef = paymentDoc.ref;
-    } else {
-      const paymentQuery = await db.collection('transactions')
-        .where('payfastPaymentId', '==', payfastPaymentId)
-        .limit(1)
-        .get();
-      if (paymentQuery.empty) {
-        sendJSON(res, 404, { error: 'Payment not found' });
-        return;
-      }
-      payment = paymentQuery.docs[0].data();
-      paymentRef = paymentQuery.docs[0].ref;
-    }
-
-    sendJSON(res, 200, {
-      success: payment.status === 'completed',
-      status: payment.status,
-      paymentId: paymentRef.id,
-      payfastPaymentId: payment.payfastPaymentId
-    });
-
-  } catch (error) {
-    console.error('Verification error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
-
-// GET /history/:userId - Get payment history
-async function getPaymentHistory(req, res) {
-  try {
-    const { userId } = req.params;
-    const requestingUserId = req.user.uid;
-    const { limit = 50, status } = req.query;
-
-    if (userId !== requestingUserId && !req.user.isAdmin) {
-      sendJSON(res, 403, { error: 'Unauthorized' });
-      return;
-    }
-
-    let query = db.collection('transactions')
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
-      .limit(parseInt(limit));
-
-    if (status) {
-      query = query.where('status', '==', status);
-    }
-
-    const snapshot = await query.get();
-    const payments = [];
-
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      payments.push({
-        id: doc.id,
-        amount: data.amount,
-        currency: data.currency,
-        status: data.status,
-        createdAt: data.createdAt,
-        payfastPaymentId: data.payfastPaymentId
-      });
-    });
-
-    sendJSON(res, 200, {
-      payments,
-      count: payments.length
-    });
-
-  } catch (error) {
-    console.error('History error:', error);
-    sendJSON(res, 500, { error: 'Internal server error' });
-  }
-}
-
-// GET /test - Simple test endpoint
+// GET /test - Test endpoint
 async function testEndpoint(req, res) {
   sendJSON(res, 200, {
-    message: 'PayFast Payment API is working!',
+    message: 'Payment API is working!',
     timestamp: new Date().toISOString(),
-    provider: 'PayFast',
-    endpoints: [
-      'POST /initiate',
-      'POST /notify (ITN)',
-      'GET /return',
-      'GET /cancel',
-      'GET /status/:paymentId',
-      'POST /verify',
-      'GET /history/:userId'
-    ]
+    provider: 'stripe',
+    webhookConfigured: !!process.env.STRIPE_WEBHOOK_SECRET
   });
 }
 
@@ -468,56 +205,31 @@ async function handleRequest(req, res) {
 
   console.log(`📡 Payment API request: ${method} ${url}`);
 
-  // Extract params from URL
   const statusMatch = url.match(/^\/status\/(.+)$/);
   if (statusMatch) {
     req.params = { paymentId: statusMatch[1] };
   }
 
-  const historyMatch = url.match(/^\/history\/(.+)$/);
-  if (historyMatch) {
-    req.params = { userId: historyMatch[1] };
-  }
-
-  console.log(`[Payment API] Request details: method=${method}, url=${url}, params=${JSON.stringify(req.params)}`);
-
-  // Parse query parameters
-  if (req.url.includes('?')) {
-    const urlObj = new URL(req.url, `http://${req.headers.host}`);
-    req.query = Object.fromEntries(urlObj.searchParams);
-  } else {
-    req.query = {};
-  }
-
-  // Route to appropriate handler
+  // Route handlers
   if (method === 'GET' && url === '/test') {
     await testEndpoint(req, res);
   }
-  else if (method === 'POST' && url === '/notify') {
-    await handleNotify(req, res);
+  else if (method === 'POST' && url === '/webhook') {
+    // NOTE: raw body must be attached as req.rawBody before this handler is called.
+    // See server-setup note below.
+    await handleStripeWebhook(req, res);
   }
-  else if (method === 'POST' && url === '/initiate') {
-    await authenticateUser(req, res, () => initiatePayment(req, res));
+  else if (method === 'POST' && url === '/create-checkout-session') {
+    await authenticateUser(req, res, () => createStripeCheckoutSession(req, res));
   }
-  else if (method === 'GET' && url === '/return') {
-    await handleReturn(req, res);
-  }
-  else if (method === 'GET' && url === '/cancel') {
-    await authenticateUser(req, res, () => handleCancel(req, res));
-  }
-  else if (method === 'GET' && url.match(/^\/status\/.+/)) {
+  else if (method === 'GET' && statusMatch) {
     await authenticateUser(req, res, () => getPaymentStatus(req, res));
-  }
-  else if (method === 'POST' && url === '/verify') {
-    await authenticateUser(req, res, () => verifyPayment(req, res));
-  }
-  else if (method === 'GET' && url.match(/^\/history\/.+/)) {
-    await authenticateUser(req, res, () => getPaymentHistory(req, res));
   }
   else {
     sendJSON(res, 404, { error: `Endpoint not found: ${method} ${url}` });
   }
 }
 
-// Export the handler
 module.exports = handleRequest;
+
+

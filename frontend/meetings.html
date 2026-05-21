@@ -40,62 +40,15 @@
         Organise meetings, record minutes, and keep every member
         informed in real time.
       </p>
+      <button type="button" class="primary" onclick="window.location.href='dashboard.html'">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+          <path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+       Back to Dashboard
+      </button>
+
+      
     </header>
-
-
-    <!-- ═══════════════════════════════════════════════════
-         MEMBER INFO BANNER
-         Shown only for Members (role check in applyRoleUI()).
-         hidden — initial state; showMemberBanner() in meetings.js
-                  calls removeAttribute('hidden') for Members.
-         role="note" — communicates informational intent to AT.
-         The close button uses data-action="close-member-banner".
-         The request button uses data-action="open-request-meeting".
-         No onclick attributes — delegated listener in meetings.js.
-    ════════════════════════════════════════════════════════ -->
-    <aside
-      id="member-info-banner"
-      class="member-info-banner"
-      role="note"
-      aria-labelledby="member-banner-heading"
-      hidden
-    >
-      <header class="member-info-banner__header">
-        <h2 id="member-banner-heading" class="member-info-banner__title">
-          <i class="member-info-banner__icon" aria-hidden="true">📅</i>
-          Scheduling meetings
-        </h2>
-        <!--
-          data-action="close-member-banner" — handled by the delegated
-          click listener in meetings.js via closeMemberBanner().
-        -->
-        <button
-          type="button"
-          class="member-info-banner__close"
-          data-action="close-member-banner"
-          aria-label="Dismiss this notice"
-        >&times;</button>
-      </header>
-
-      <p class="member-info-banner__body">
-        Only Admins and Treasurers can schedule meetings on behalf of the group.
-        If you'd like to propose a meeting, you can send a request to your group admin.
-      </p>
-
-      <menu class="member-info-banner__actions">
-        <!--
-          data-action="open-request-meeting" — handled by the delegated
-          click listener in meetings.js via openRequestMeetingDialog().
-        -->
-        <li>
-          <button
-            type="button"
-            class="primary"
-            data-action="open-request-meeting"
-          >Request a meeting</button>
-        </li>
-      </menu>
-    </aside>
 
 
     <!-- ═════════════════════════════════════════════════
@@ -140,6 +93,11 @@
             <!--
               id="meeting-group" — loadUserGroups() in meetings.js clears this
               select and repopulates it from Firestore after auth resolves.
+              The placeholder option is kept here so something renders during
+              the brief moment before the Firestore call completes.
+              The three hardcoded options in the original HTML are removed —
+              they were overwritten by loadUserGroups() on every page load and
+              could mislead users if Firebase was slow or failed.
             -->
             <label class="full" for="meeting-group">
               Group <b class="req" aria-hidden="true">*</b>
@@ -155,6 +113,12 @@
               </select>
             </label>
 
+            <!--
+              id="meeting-date" — meetings.js sets .min to today's date at
+              module load time and again after form.reset() so the restriction
+              is always accurate regardless of when the page was cached.
+              The min attribute is intentionally absent here for that reason.
+            -->
             <label for="meeting-date">
               Date <b class="req" aria-hidden="true">*</b>
               <input
@@ -170,7 +134,9 @@
 
             <!--
               id="meeting-time" — applyRoleUI() in meetings.js sets
-              min="08:00" and max="20:00" on this input.
+              min="08:00" and max="20:00" on this input.  The submit
+              handler validates the same range again so it cannot be
+              bypassed via DevTools.
             -->
             <label for="meeting-time">
               Time <b class="req" aria-hidden="true">*</b>
@@ -224,6 +190,9 @@
           <!--
             id="schedule-status" — meetings.js writes validation errors and
             success messages here via .textContent.
+            role="status" / aria-live="polite" means screen readers announce
+            changes without interrupting the current flow or stealing focus.
+            Replaces alert() calls from the original implementation.
           -->
           <p
             id="schedule-status"
@@ -245,6 +214,21 @@
           </menu>
         </form>
 
+        <!--
+          id="member-schedule-notice" — applyRoleUI() in meetings.js removes
+          the hidden attribute when role === ROLES.MEMBER, and hides the form
+          and role-note above so only this message is visible to members.
+          role="note" / hidden — starts hidden; revealed for members only.
+        -->
+        <p id="member-schedule-notice" class="member-notice" role="note" hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          Only admins and treasurers can schedule meetings. To request a meeting,
+          please contact your group admin.
+        </p>
+
       </section><!-- /schedule card -->
 
 
@@ -262,6 +246,9 @@
           <!--
             id="upcoming-count"  — updateUpcomingCount() in meetings.js
                                    writes the live count here via .textContent.
+            <output> is the correct element for a script-computed value.
+            for="schedule-form"  — associates this output with the form
+                                   whose submissions change the count.
           -->
           <output id="upcoming-count" for="schedule-form">0 meetings</output>
         </header>
@@ -271,6 +258,8 @@
                                             append / clear upcoming <li>s here.
           aria-label="Upcoming meetings"  — used as a querySelector selector in
                                             meetings.js; this exact string is required.
+          aria-live / aria-relevant       — screen readers announce additions and
+                                            removals made by the Firestore listener.
         -->
         <ol
           id="upcoming-list"
@@ -291,7 +280,8 @@
 
         <!--
           aria-label="Past meetings" — this exact string is used in two
-          querySelector calls inside meetings.js.
+          querySelector calls inside meetings.js:
+            document.querySelector('ul.meeting-list[aria-label="Past meetings"]')
           Changing this value will silently break both queries.
         -->
         <ul
@@ -311,12 +301,20 @@
 
 
   <!-- ═════════════════════════════════════════════════════
-       NOTIFICATION BANNER
+       NOTIFICATION BANNER  (Task 4)
 
        id="notification-banner"  — showNotification() and closeBanner()
                                    in meetings.js target this element.
        hidden                    — initial state managed by the HTML
                                    hidden attribute, not style.display.
+                                   showNotification() → removeAttribute('hidden')
+                                   closeBanner()      → setAttribute('hidden','')
+       role="status" / aria-live — notification text is announced by
+                                   screen readers without stealing focus.
+
+       The close button uses data-action="close-banner" — the delegated
+       click listener in meetings.js (Section 13) handles it.
+       No onclick attribute is used.
   ════════════════════════════════════════════════════════ -->
   <aside
     id="notification-banner"
@@ -329,6 +327,10 @@
       <i class="dot" aria-hidden="true"></i>
       <figcaption>
         <strong>New meeting scheduled</strong>
+        <!--
+          id="notification-body" — showNotification() sets .textContent
+          here; never innerHTML, so no XSS risk from meeting titles.
+        -->
         <p id="notification-body"></p>
       </figcaption>
       <button
@@ -342,10 +344,28 @@
 
 
   <!-- ═════════════════════════════════════════════════════
-       MINUTES DIALOG
+       MINUTES DIALOG  (Task 5)
 
-       <dialog> provides native focus trapping, aria-modal on
-       ::backdrop, and Escape key closing without JavaScript.
+       <dialog> provides:
+         - Native focus trapping (no JS needed for this).
+         - Automatic aria-modal on ::backdrop.
+         - Escape key closes it without any JavaScript.
+
+       id="minutes-dialog"    — openMinutes() calls .showModal();
+                                saveMinutes() calls .close().
+       aria-labelledby        — ties the accessible name to #dialog-title
+                                which openMinutes() updates with the
+                                meeting title at runtime.
+       aria-describedby       — links to the sr-only description paragraph.
+
+       The form does NOT use method="dialog" because that would close
+       the dialog immediately on submit before the Firestore write
+       completes.  The meetings.js submit listener calls e.preventDefault()
+       and awaits saveMinutes() instead.
+
+       All close triggers use data-action="close-minutes-dialog".
+       The save button uses id="minutes-save-btn" and type="submit".
+       No onclick or onsubmit attributes anywhere.
   ════════════════════════════════════════════════════════ -->
   <dialog
     id="minutes-dialog"
@@ -353,7 +373,12 @@
     aria-describedby="dialog-desc"
   >
     <header>
+      <!--
+        id="dialog-title" — openMinutes() sets .textContent to
+        "Record Minutes — <title>" or "View Minutes — <title>".
+      -->
       <h2 id="dialog-title">Record Minutes</h2>
+
       <button
         type="button"
         class="secondary"
@@ -370,6 +395,12 @@
     <form id="minutes-form" novalidate>
       <label for="minutes-text">
         Meeting minutes <b class="req" aria-hidden="true">*</b>
+        <!--
+          id="minutes-text"     — openMinutes() reads .value (existing minutes)
+                                  and sets .readOnly based on the caller's role.
+          aria-describedby      — links to #minutes-status so screen readers
+                                  announce save errors alongside this field.
+        -->
         <textarea
           id="minutes-text"
           name="minutes"
@@ -380,6 +411,11 @@
         ></textarea>
       </label>
 
+      <!--
+        id="minutes-status" — saveMinutes() writes error text here via
+        .textContent.  role="status" / aria-live="polite" announces it
+        to screen readers without stealing focus.
+      -->
       <p
         id="minutes-status"
         role="status"
@@ -396,83 +432,19 @@
           >Cancel</button>
         </li>
         <li>
+          <!--
+            id="minutes-save-btn" — saveMinutes() targets this by id to
+                                    toggle .disabled and .textContent.
+            type="submit"         — triggers the #minutes-form submit
+                                    listener in meetings.js.
+            openMinutes() sets .hidden on this button for Members
+            (read-only view); it is visible for Admin / Treasurer.
+          -->
           <button
             type="submit"
             id="minutes-save-btn"
             class="primary"
           >Save Minutes</button>
-        </li>
-      </menu>
-    </form>
-
-  </dialog>
-
-
-  <!-- ═════════════════════════════════════════════════════
-       REQUEST MEETING DIALOG
-
-       Opened by data-action="open-request-meeting" on the
-       member info banner button.
-       openRequestMeetingDialog() calls .showModal().
-       submitMeetingRequest() writes to the meetingRequests
-       collection and calls .close() on success.
-       All close triggers use data-action="close-request-meeting-dialog".
-  ════════════════════════════════════════════════════════ -->
-  <dialog
-    id="request-meeting-dialog"
-    aria-labelledby="request-dialog-title"
-    aria-describedby="request-dialog-desc"
-  >
-    <header>
-      <h2 id="request-dialog-title">Request a Meeting</h2>
-      <button
-        type="button"
-        class="secondary"
-        data-action="close-request-meeting-dialog"
-        aria-label="Close dialog"
-      >&times;</button>
-    </header>
-
-    <p id="request-dialog-desc" class="sr-only">
-      Describe the meeting you would like to propose.
-      Your request will be sent to the group admin or treasurer.
-    </p>
-
-    <form id="request-meeting-form" novalidate>
-      <label for="request-meeting-text">
-        Meeting details <b class="req" aria-hidden="true">*</b>
-        <textarea
-          id="request-meeting-text"
-          name="details"
-          placeholder="Briefly describe the purpose of the meeting, suggested topics, or a preferred date…"
-          required
-          aria-required="true"
-          aria-describedby="request-meeting-status"
-          maxlength="1000"
-        ></textarea>
-      </label>
-
-      <p
-        id="request-meeting-status"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      ></p>
-
-      <menu class="form-actions" style="margin-top:0;">
-        <li>
-          <button
-            type="button"
-            class="secondary"
-            data-action="close-request-meeting-dialog"
-          >Cancel</button>
-        </li>
-        <li>
-          <button
-            type="submit"
-            id="request-meeting-save-btn"
-            class="primary"
-          >Send Request</button>
         </li>
       </menu>
     </form>
@@ -491,3 +463,4 @@
 
 </body>
 </html>
+

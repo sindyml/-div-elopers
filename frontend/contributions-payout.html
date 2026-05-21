@@ -10,6 +10,106 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/contributions.css">
+
+    <style>
+        /* ── Neutralise contributions.css's bare `header` rule ──
+           That rule targets every <header> on the page, including
+           #navbar-root which navbar.js owns. Reset it to nothing so
+           only navbar.js's own injected styles apply to the navbar. */
+        #navbar-root {
+            background: none !important;
+            padding: 0 !important;
+            display: block !important;
+            box-shadow: none !important;
+            justify-content: unset !important;
+            align-items: unset !important;
+        }
+
+        /* Restore navbar.js inner layout — contributions.css's bare
+           nav{} rule overrides the injected .navbar__inner flex layout,
+           collapsing the logo/user/sign-out into a narrow left-side box.
+           These rules re-apply what navbar.js expects. */
+        #navbar-root .navbar__inner {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            max-width: 1120px !important;
+            margin: 0 auto !important;
+            padding: 0 1.5rem !important;
+            height: 64px !important;
+            gap: 1rem !important;
+        }
+
+        #navbar-root nav.navbar__links,
+        #navbar-root nav.nav__auth,
+        #navbar-root div.nav__user {
+            display: flex !important;
+            gap: 0.75rem !important;
+            align-items: center !important;
+            flex-direction: row !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Page-header styles matching meetings.css */
+        header.page-header { margin-bottom: 2.5rem; }
+
+        header.page-header p.label {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1D9E75;
+            margin-bottom: 0.5rem;
+        }
+
+        header.page-header h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            line-height: 1.15;
+            margin-bottom: 0.5rem;
+            border: none;
+            padding: 0;
+            color: #1A1A1A;
+        }
+
+        header.page-header p.subtitle {
+            font-size: 1rem;
+            color: #6B7280;
+            max-width: 520px;
+            background: none;
+            padding: 0;
+            text-align: left;
+            box-shadow: none;
+            border-radius: 0;
+        }
+
+        header.page-header button.primary {
+            margin-top: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            border: 1.5px solid #2A7A5A;
+            padding: 0.65rem 1.5rem;
+            background: #2A7A5A;
+            color: #fff;
+        }
+
+        header.page-header button.primary:hover {
+            background: #225f46;
+            border-color: #225f46;
+        }
+
+        header.page-header button.primary:active { transform: scale(0.98); }
+    </style>
+
 </head>
 <body class="app-layout">
 
@@ -36,7 +136,8 @@
             getUserGroups,
             getCurrentUserRole
         } from './js/contributions.js';
-        import { doc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { disbursePayout } from './js/payoutService.js';
+        import { doc, writeBatch, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         function getUrlParameter(name) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -213,6 +314,17 @@ saveBtn.addEventListener('click', async () => {
             const groupHeading = document.createElement('h2');
             groupHeading.textContent = `Group: ${groupName}`;
             headerContainer.appendChild(groupHeading);
+
+            // Back to Contributions button (visible to all users)
+            const backBtn = document.createElement('button');
+            backBtn.type = 'button';
+            backBtn.classList.add('btn', 'btn--secondary');
+            backBtn.style.marginLeft = '1rem';
+            backBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
+              <path d="M12 7H2M7 2L2 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg> Back to Contributions`;
+            backBtn.addEventListener('click', () => { window.location.href = 'contributions-my.html'; });
+            headerContainer.appendChild(backBtn);
             
             // Check if user is Treasurer or Admin to show Edit button
             const userRole = await getCurrentUserRole();
@@ -247,7 +359,9 @@ saveBtn.addEventListener('click', async () => {
                 const table = document.createElement('table');
                 const thead = document.createElement('thead');
                 const headerRow = document.createElement('tr');
-                const headers = ['Order', 'Member Name', 'Payout Date', 'Amount'];
+
+                // Add Status and Action columns
+                const headers = ['Order', 'Member Name', 'Payout Date', 'Amount', 'Status', 'Action'];
                 headers.forEach(text => {
                     const th = document.createElement('th');
                     th.textContent = text;
@@ -262,15 +376,63 @@ saveBtn.addEventListener('click', async () => {
                     const orderCell = row.insertCell(0);
                     orderCell.setAttribute('data-label', 'Order');
                     orderCell.textContent = payout.order;
+
                     const nameCell = row.insertCell(1);
                     nameCell.setAttribute('data-label', 'Member Name');
                     nameCell.textContent = payout.userDisplayName;
+
                     const dateCell = row.insertCell(2);
                     dateCell.setAttribute('data-label', 'Payout Date');
                     dateCell.textContent = payout.payoutDate;
+
                     const amountCell = row.insertCell(3);
                     amountCell.setAttribute('data-label', 'Amount');
                     amountCell.textContent = `R${payout.amount}`;
+
+                    const statusCell = row.insertCell(4);
+                    statusCell.setAttribute('data-label', 'Status');
+                    const status = payout.status || 'pending';
+                    statusCell.textContent = status === 'completed' ? '✅ Paid' : '⏳ Pending';
+
+                    const actionCell = row.insertCell(5);
+                    actionCell.setAttribute('data-label', 'Action');
+
+                    if ((userRole === 'Treasurer' || userRole === 'Admin') && status !== 'completed') {
+                        const disburseBtn = document.createElement('button');
+                        disburseBtn.textContent = '💸 Disburse';
+                        disburseBtn.classList.add('btn', 'btn--primary', 'btn--sm');
+                        disburseBtn.addEventListener('click', async () => {
+                            if (confirm(`Confirm disbursement of R${payout.amount} to ${payout.userDisplayName}?`)) {
+                                try {
+                                    disburseBtn.disabled = true;
+                                    disburseBtn.textContent = 'Processing...';
+
+                                    const result = await disbursePayout({
+                                        groupId: groupId,
+                                        memberId: payout.userId,
+                                        amount: payout.amount,
+                                        payoutId: payout.id,
+                                        reference: `STOKPAL_PAYOUT_${payout.order}_${groupId.substring(0,5)}`
+                                    });
+
+                                    if (result.success) {
+                                        alert('Payout disbursed successfully!');
+                                        refreshDisplay(groupId);
+                                    }
+                                } catch (err) {
+                                    console.error('Disbursement failed:', err);
+                                    alert('Error: ' + err.message);
+                                    disburseBtn.disabled = false;
+                                    disburseBtn.textContent = '💸 Disburse';
+                                }
+                            }
+                        });
+                        actionCell.appendChild(disburseBtn);
+                    } else if (status === 'completed') {
+                        actionCell.textContent = '—';
+                    } else {
+                        actionCell.textContent = '—';
+                    }
                 });
                 table.appendChild(tbody);
                 container.appendChild(table);

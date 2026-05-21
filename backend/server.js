@@ -54,6 +54,8 @@ if (!admin.apps.length) {
   }
 }
 
+const db = admin.firestore();
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 const paymentRoutes = require('./api/payments/index.js');
 const payoutRoutes  = require('./api/payouts/index.js');
@@ -98,6 +100,82 @@ const server = http.createServer((req, res) => {
     setCORSHeaders(res);
     res.writeHead(204);
     res.end();
+    return;
+  }
+
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/stripe-webhook - Stripe Webhook
+     ⚠️  MUST be before /api/payments/* so the raw body is read unparsed.
+     Stripe needs the raw body bytes to verify the signature.
+     ──────────────────────────────────────────────────────────────────────────── */
+  if (urlPath === '/api/stripe-webhook' && req.method === 'POST') {
+    let rawBody = '';
+    req.on('data', chunk => { rawBody += chunk; });
+    req.on('end', async () => {
+      try {
+        const sig = req.headers['stripe-signature'];
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+        if (!webhookSecret) {
+          console.error('❌ STRIPE_WEBHOOK_SECRET env var is not set');
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Webhook secret not configured' }));
+          return;
+        }
+
+        let event;
+        try {
+          event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+        } catch (err) {
+          console.error('❌ Webhook signature verification failed:', err.message);
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid signature' }));
+          return;
+        }
+
+        console.log(`📩 Stripe webhook received: ${event.type}`);
+
+        if (event.type === 'checkout.session.completed') {
+          const session = event.data.object;
+          const { paymentId, userId, contributionId, groupId } = session.metadata || {};
+
+          console.log(`✅ Payment completed — paymentId: ${paymentId}, contributionId: ${contributionId}`);
+
+          // 1. Update transaction to completed
+          if (paymentId) {
+            await db.collection('transactions').doc(paymentId).update({
+              status: 'completed',
+              stripeSessionId: session.id,
+              stripePaymentIntentId: session.payment_intent,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              completedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            console.log('✅ Transaction updated to completed:', paymentId);
+          }
+
+          // 2. Update contribution to 'paid'
+          // FIX: was 'confirmed' — frontend filters for 'paid' so it never disappeared
+          if (contributionId) {
+            await db.collection('contributions').doc(contributionId).update({
+              status: 'paid',
+              paidAt: admin.firestore.FieldValue.serverTimestamp(),
+              transactionId: paymentId || null
+            });
+            console.log('✅ Contribution updated to paid:', contributionId);
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ received: true }));
+
+      } catch (error) {
+        console.error('❌ Stripe webhook error:', error);
+        // Return 500 so Stripe retries the webhook
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message }));
+      }
+    });
     return;
   }
 
@@ -213,21 +291,98 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/api/getFirebaseConfig' && req.method === 'GET') {
     setCORSHeaders(res);
     const config = {
-      apiKey: process.env.FIREBASE_API_KEY || '',
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
-      databaseURL: process.env.FIREBASE_DATABASE_URL || '',
-      projectId: process.env.FIREBASE_PROJECT_ID || '',
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
+      apiKey:            process.env.FIREBASE_API_KEY            || '',
+      authDomain:        process.env.FIREBASE_AUTH_DOMAIN        || '',
+      databaseURL:       process.env.FIREBASE_DATABASE_URL       || '',
+      projectId:         process.env.FIREBASE_PROJECT_ID         || '',
+      storageBucket:     process.env.FIREBASE_STORAGE_BUCKET     || '',
       messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
-      appId: process.env.FIREBASE_APP_ID || '',
-      measurementId: process.env.FIREBASE_MEASUREMENT_ID || '',
+      appId:             process.env.FIREBASE_APP_ID             || '',
+      measurementId:     process.env.FIREBASE_MEASUREMENT_ID     || '',
     };
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' });
     res.end(JSON.stringify(config));
     return;
   }
 
-  /* ── API: /api/set-user-role - Set custom claims for a user ── */
+  /* ────────────────────────────────────────────────────────────────────────────
+     /api/create-checkout-session - Stripe Checkout (legacy direct route)
+     ──────────────────────────────────────────────────────────────────────────── */
+  if (urlPath === '/api/create-checkout-session' && req.method === 'POST') {
+    setCORSHeaders(res);
+    
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { amount, groupName, contributionId, groupId, returnUrl, cancelUrl } = JSON.parse(body);
+        
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Authentication required' }));
+          return;
+        }
+        
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        const userId = decodedToken.uid;
+        
+        if (!amount || amount <= 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid amount' }));
+          return;
+        }
+        
+        const paymentRef = db.collection('transactions').doc();
+        const paymentId = paymentRef.id;
+        
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'zar',
+              product_data: { name: `${groupName || 'Stokvel'} - Contribution` },
+              unit_amount: Math.round(amount * 100),
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          success_url: returnUrl,
+          cancel_url: cancelUrl,
+          metadata: { paymentId, userId, contributionId, groupId }
+        });
+        
+        await paymentRef.set({
+          id: paymentId,
+          userId: userId,
+          contributionId: contributionId || null,
+          groupId: groupId || null,
+          amount: amount,
+          currency: 'ZAR',
+          status: 'pending',
+          type: 'payment',
+          provider: 'stripe',
+          stripeSessionId: session.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, paymentId, sessionId: session.id, url: session.url }));
+        
+      } catch (error) {
+        console.error('Stripe checkout error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: error.message }));
+      }
+    });
+    return;
+  }
+
+  /* ── API: /api/set-user-role ── */
   if (urlPath === '/api/set-user-role' && req.method === 'POST') {
     setCORSHeaders(res);
     
@@ -245,7 +400,7 @@ const server = http.createServer((req, res) => {
         }
         
         const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        await admin.auth().verifyIdToken(token);
         
         await admin.auth().setCustomUserClaims(uid, { role: role });
         
@@ -284,13 +439,19 @@ const server = http.createServer((req, res) => {
       return;
     }
     const mimeType = MIME_TYPES[path.extname(filePath)] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
+    res.writeHead(200, {
+      'Content-Type': mimeType,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY'
+    });
     res.end(data);
   });
 });
 
 server.listen(PORT, () => {
   console.log(`\n✅ StokPal server running → http://localhost:${PORT}`);
-  console.log(`💳 Payment API:   http://localhost:${PORT}/api/payments/`);
-  console.log(`📦 Payout API:    http://localhost:${PORT}/api/payouts/`);
+  console.log(`💳 Payment API:    http://localhost:${PORT}/api/payments/`);
+  console.log(`📦 Payout API:     http://localhost:${PORT}/api/payouts/`);
+  console.log(`🔄 Stripe Webhook: http://localhost:${PORT}/api/stripe-webhook`);
 });

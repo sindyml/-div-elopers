@@ -177,53 +177,57 @@
 </head>
 
 <body>
-<div class="onboarding-wrapper">
-  <div class="onboarding-card">
+<main class="onboarding-wrapper">
+  <article class="onboarding-card">
 
-    <h1 class="onboarding-card__logo">🌿 StokPal</h1>
-    <p class="onboarding-card__sub">Welcome! Let's get you set up with a stokvel group.</p>
+    <header>
+      <h1 class="onboarding-card__logo">🌿 StokPal</h1>
+      <p class="onboarding-card__sub">Welcome! Let's get you set up with a stokvel group.</p>
+    </header>
 
-    <div class="onboarding-tabs">
-      <button class="onboarding-tab active" data-tab="join">Join a Group</button>
-      <button class="onboarding-tab" data-tab="create">Create a Group</button>
-    </div>
+    <nav class="onboarding-tabs" aria-label="Onboarding options">
+      <button id="join-tab" class="onboarding-tab active" data-tab="join" aria-controls="panel-join" aria-selected="true">Join a Group</button>
+      <button id="create-tab" class="onboarding-tab" data-tab="create" aria-controls="panel-create" aria-selected="false">Create a Group</button>
+    </nav>
 
     <!-- JOIN PANEL -->
-    <div class="onboarding-panel active" id="panel-join">
+    <section class="onboarding-panel active" id="panel-join" role="tabpanel" aria-labelledby="join-tab">
       <div class="form-group">
         <label for="search-group-name">Search by group name</label>
         <input type="text" id="search-group-name" placeholder="e.g. Kasi lovers" />
       </div>
       <button class="btn-primary" id="btn-search-group">Search</button>
-      <div class="group-search-results" id="group-search-results"></div>
-      <p class="onboarding-msg" id="join-msg"></p>
-    </div>
+      <div class="group-search-results" id="group-search-results" aria-live="polite"></div>
+      <p class="onboarding-msg" id="join-msg" role="status" aria-live="polite"></p>
+    </section>
 
     <!-- CREATE PANEL -->
-    <div class="onboarding-panel" id="panel-create">
-      <div class="form-group">
-        <label for="new-group-name">Group Name</label>
-        <input type="text" id="new-group-name" placeholder="e.g. Friday Stokvel" required />
-      </div>
-      <div class="form-group">
-        <label for="new-group-freq">Meeting Frequency</label>
-        <select id="new-group-freq">
-          <option value="monthly">Monthly</option>
-          <option value="weekly">Weekly</option>
-          <option value="biweekly">Bi-weekly</option>
-          <option value="quarterly">Quarterly</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="new-group-amount">Contribution Amount (R)</label>
-        <input type="number" id="new-group-amount" placeholder="e.g. 500" min="1" required />
-      </div>
-      <button class="btn-primary" id="btn-create-group">Create Group &amp; Continue</button>
-      <p class="onboarding-msg" id="create-msg"></p>
-    </div>
+    <section class="onboarding-panel" id="panel-create" role="tabpanel" aria-labelledby="create-tab" hidden>
+      <form id="create-group-form">
+        <div class="form-group">
+          <label for="new-group-name">Group Name</label>
+          <input type="text" id="new-group-name" placeholder="e.g. Friday Stokvel" required />
+        </div>
+        <div class="form-group">
+          <label for="new-group-freq">Meeting Frequency</label>
+          <select id="new-group-freq">
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="new-group-amount">Contribution Amount (R)</label>
+          <input type="number" id="new-group-amount" placeholder="e.g. 500" min="1" required />
+        </div>
+        <button type="submit" class="btn-primary" id="btn-create-group">Create Group &amp; Continue</button>
+      </form>
+      <p class="onboarding-msg" id="create-msg" role="status" aria-live="polite"></p>
+    </section>
 
-  </div>
-</div>
+  </article>
+</main>
 
 <!-- Firebase compat (for auth state) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -233,7 +237,7 @@
 <script type="module">
   import { auth, db } from './js/firebase-config.js';
   import {
-    collection, query, where, getDocs, addDoc, setDoc, doc, serverTimestamp
+    collection, query, where, getDocs, addDoc, setDoc, doc, serverTimestamp, getDoc
   } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
   import { COLLECTIONS, ROLES } from './js/constants.js';
   import { checkPendingInvites } from './js/groupService.js';
@@ -291,10 +295,27 @@
     resultsEl.innerHTML = '';
 
     try {
-      // Search groups where name matches (case-sensitive Firestore)
-      const snap = await getDocs(
+      // Try case-insensitive search using nameLower first
+      const searchName = name.toLowerCase();
+      let snap;
+
+      try{
+       snap = await getDocs(
+        query(collection(db, COLLECTIONS.GROUPS), where('nameLower', '==', searchName))
+      );
+      } catch(err) {
+      // If no results, fall back to case-sensitive name search (for old groups)
+      console.log("nameLower field missing, falling back to case-sensitive search");
+      snap = await getDocs(
         query(collection(db, COLLECTIONS.GROUPS), where('name', '==', name))
       );
+      }
+
+      if (snap.empty) {
+      snap = await getDocs(
+        query(collection(db, COLLECTIONS.GROUPS), where('name', '==', name))
+      );
+    }
 
       if (snap.empty) {
         msgEl.textContent = 'No group found with that name. Try a different spelling or create a new group.';
@@ -322,16 +343,17 @@
         joinButton.className = 'btn-join';
         joinButton.dataset.groupId = docSnap.id;
         joinButton.dataset.groupName = g.name || '';
-        joinButton.textContent = 'Request to Join';
+        // [CHANGE] Button text changed from "Request to Join" to "Join Group"
+        joinButton.textContent = 'Join Group';
 
         item.appendChild(groupInfo);
         item.appendChild(joinButton);
         resultsEl.appendChild(item);
       });
 
-      // Wire join buttons
+      // [CHANGE] Wire join buttons to joinGroup instead of requestToJoin
       resultsEl.querySelectorAll('.btn-join').forEach(btn => {
-        btn.addEventListener('click', () => requestToJoin(btn.dataset.groupId, btn.dataset.groupName, btn));
+        btn.addEventListener('click', () => joinGroup(btn.dataset.groupId, btn.dataset.groupName, btn));
       });
 
     } catch (err) {
@@ -340,60 +362,71 @@
     }
   });
 
-  // Send an invite request — creates an invite doc with status "requested"
-  // Admin of the group will need to approve (or you can auto-add if you prefer)
-  async function requestToJoin(groupId, groupName, btn) {
+  // [NEW FUNCTION] Auto-join - adds member directly to group and calls handleMemberJoin
+  async function joinGroup(groupId, groupName, btn) {
     if (!currentUser) return;
     const msgEl = document.getElementById('join-msg');
 
     btn.disabled = true;
-    btn.textContent = 'Sending...';
+    btn.textContent = 'Joining...';
     msgEl.textContent = '';
 
     try {
-      // Check not already a member
-      const existing = await getDocs(
-        query(
-          collection(db, COLLECTIONS.MEMBERSHIPS),
-          where('uid', '==', currentUser.uid),
-          where('groupId', '==', groupId)
-        )
-      );
+      // Check if already a member
+      const memberRef = doc(db, COLLECTIONS.GROUPS, groupId, 'members', currentUser.uid);
+      const memberDoc = await getDoc(memberRef);
 
-      if (!existing.empty) {
+      if (memberDoc.exists()) {
         msgEl.className = 'onboarding-msg onboarding-msg--error';
         msgEl.textContent = 'You are already a member of this group.';
         btn.disabled = false;
-        btn.textContent = 'Request to Join';
+        btn.textContent = 'Join Group';
         return;
       }
 
-      // Create invite/request doc
-      await addDoc(collection(db, COLLECTIONS.INVITES), {
-        email: currentUser.email,
+      // Add user to group members subcollection
+      await setDoc(memberRef, {
         uid: currentUser.uid,
-        groupId,
-        groupName,
-        invitedBy: null,
-        status: 'requested',     // admin will approve
-        createdAt: serverTimestamp()
+        displayName: currentUser.displayName || currentUser.email,
+        role: 'member',
+        joinedAt: serverTimestamp()
       });
 
+      await setDoc(
+      doc(db, COLLECTIONS.MEMBERSHIPS, currentUser.uid + '_' + groupId),
+        {
+        uid: currentUser.uid,
+        groupId,
+        role: 'member'
+      }
+      );
+
+      // Call handleMemberJoin to create contributions and update payouts
+      const { handleMemberJoin } = await import('./js/onGroupCreate.js');
+      await handleMemberJoin(groupId, currentUser.uid);
+
       msgEl.className = 'onboarding-msg onboarding-msg--success';
-      msgEl.textContent = `✅ Request sent to join "${groupName}". The admin will approve your request.`;
-      btn.textContent = 'Requested ✓';
+      msgEl.textContent = `✅ Joined "${groupName}"! Redirecting to dashboard...`;
+      btn.textContent = 'Joined ✓';
+
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 1500);
 
     } catch (err) {
       console.error(err);
       btn.disabled = false;
-      btn.textContent = 'Request to Join';
+      btn.textContent = 'Join Group';
       msgEl.className = 'onboarding-msg onboarding-msg--error';
-      msgEl.textContent = '❌ Failed to send request. Try again.';
+      msgEl.textContent = '❌ Failed to join group. Please try again.';
     }
   }
 
+  // [REMOVED] requestToJoin function is deleted
+
   // ── CREATE GROUP ──────────────────────────────────────────
-  document.getElementById('btn-create-group').addEventListener('click', async () => {
+  document.getElementById('create-group-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
     const name   = document.getElementById('new-group-name').value.trim();
     const freq   = document.getElementById('new-group-freq').value;
     const amount = parseFloat(document.getElementById('new-group-amount').value);
@@ -412,6 +445,7 @@
       // Create the group
       const groupRef = await addDoc(collection(db, COLLECTIONS.GROUPS), {
         name,
+        nameLower: name.toLowerCase(), // To handle case-insensitive when user searches for a group to onboard.
         meetingFrequency: freq,
         contributionAmount: amount,
         totalBalance: 0,
@@ -441,6 +475,10 @@
           role: 'admin'
         }
       );
+
+      // [NEW] Call handleGroupCreation to create contributions and payouts for admin
+      const { handleGroupCreation } = await import('./js/onGroupCreate.js');
+      await handleGroupCreation(groupId);
 
       msgEl.className = 'onboarding-msg onboarding-msg--success';
       msgEl.textContent = '✅ Group created! Taking you to your dashboard...';

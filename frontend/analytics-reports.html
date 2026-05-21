@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StokPal — Analytics & Reporting</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/app.css" />
+  <style>
+    .report-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+      align-items: flex-end;
+    }
+    .report-container {
+      margin-top: var(--space-6);
+    }
+    .report-table-wrapper {
+      overflow-x: auto;
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+    }
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .report-table th, .report-table td {
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .report-table th {
+      background: var(--color-surface-2);
+      font-weight: 600;
+      color: var(--color-text-secondary);
+    }
+    .report-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .report-stat {
+      padding: var(--space-4);
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    .report-stat__label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .report-stat__value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin-top: var(--space-1);
+    }
+
+    /* Analytics Panel Enhancements */
+    .report-container {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .report-header-display {
+      border-bottom: 2px solid var(--color-primary);
+      padding-bottom: var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+
+
+
+    .report-stat:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    @media print {
+      body * { visibility: hidden; }
+      #report-print-area, #report-print-area * { visibility: visible; }
+      #report-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print { display: none !important; }
+      .app-main { padding: 0; margin: 0; }
+      .card { border: none; box-shadow: none; }
+      .page-header__actions { display: none; }
+    }
+  </style>
+</head>
+<body class="app-layout">
+
+  <header id="navbar-root"></header>
+
+  <main class="app-main">
+    <header class="page-header">
+      <hgroup>
+        <h1 class="page-header__title">📊 Analytics & Reports</h1>
+        <p class="page-header__sub">Deep dive into your stokvel's financial performance and compliance.</p>
+      </hgroup>
+      <div class="page-header__actions no-print">
+        <button id="export-csv-btn" class="btn btn--outline btn--sm">📥 Export CSV</button>
+        <button id="export-pdf-btn" class="btn btn--primary btn--sm">🖨️ Print PDF</button>
+        <button id="back-to-dash-btn" class="btn btn--primary btn--sm" onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+      </div>
+    </header>
+
+    <section class="card no-print" aria-labelledby="controls-heading">
+      <h2 id="controls-heading" class="sr-only">Report Controls</h2>
+      <div class="report-controls">
+        <div class="form-group">
+          <label for="report-type" class="form-label">Report Type</label>
+          <select id="report-type" class="form-input">
+            <option value="compliance">Member Contribution Compliance</option>
+            <option value="payouts">Payout History & Projections</option>
+            <option value="custom">Custom Contribution View</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="group-selector" class="form-label">Select Group</label>
+          <select id="group-selector" class="form-input">
+            <option value="">Loading groups...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="date-from" class="form-label">From Date</label>
+          <input type="date" id="date-from" class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label for="date-to" class="form-label">To Date</label>
+          <input type="date" id="date-to" class="form-input" />
+        </div>
+
+        <button id="generate-report-btn" class="btn btn--primary">Generate Report</button>
+      </div>
+    </section>
+
+    <section id="report-print-area" class="report-container" aria-live="polite">
+      <header id="report-header" class="report-header-display" style="display: none;">
+         <h2 id="report-title-display">Report Title</h2>
+         <p id="report-metadata-display" class="report-stat__label"></p>
+      </header>
+
+      <div id="report-summary" class="report-summary-grid" aria-label="Report summary statistics"></div>
+
+      <div id="report-content" class="report-table-wrapper">
+        <div style="padding: var(--space-10); text-align: center; color: var(--color-text-muted);">
+          Select report parameters and click "Generate Report" to view data.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer id="footer-root"></footer>
+
+  <!-- Shared Components (Must be loaded after Firebase initialization if they depend on it) -->
+  <!-- Note: Modular SDK initialization is handled inside analytics.js or firebase-config.js -->
+  <script type="module" src="components/navbar.js"></script>
+  <script type="module" src="components/footer.js"></script>
+
+  <!-- Main Logic -->
+  <script type="module" src="js/analytics.js"></script>
+
+</body>
+</html>

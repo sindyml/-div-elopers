@@ -1,108 +1,42 @@
 /* ============================================================
    payment.js — Payment Page Controller (payment.html)
-
-   Loads the current user's pending/missed contributions and
-   presents them in a table so the user can pay each one via
-   the PaymentModal component.
-
-   On payment success:
-     - Marks the contribution as confirmed in Firestore.
-     - Reloads the pending list to reflect the change.
-
-   On proof upload (optional, from the receipt screen):
-     - Delegates to payment-upload.js (Firebase Storage).
    ============================================================ */
 
-import { auth, db }          from './firebase-config.js';
+import { auth, db } from './firebase-config.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   collection,
   query,
   where,
   orderBy,
-  getDocs,
+  getDocs
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getUserGroups }           from './groupService.js';
-import { PaymentModal }            from '../components/payment-modal.js';
-import { initiatePayment }         from './paymentService.js';
-import { COLLECTIONS }             from './constants.js';
-import { uploadPaymentProof, validateProofFile } from './payment-upload.js';
-//Added imports
-import { onTransactionCreate } from './onTransactionCreate.js';
-import { onProofUpload } from './onProofUpload.js';
-import { getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-/* ── Modal initialisation ──────────────────────────────────── */
+import { getUserGroups } from './groupService.js';
+import { COLLECTIONS } from './constants.js';
 
-const modal = new PaymentModal();
+const API_BASE_URL = 'https://div-elopers.onrender.com';
 
-modal.onPaymentSuccess = async (receipt) => {
-  // Only set payment evidence, NOT status (Treasurer must confirm)
-  if (receipt.contributionId) {
-    try {
-      // Get the contribution to find userId and groupId
-      const contribDoc = await getDoc(doc(db, COLLECTIONS.CONTRIBUTIONS, receipt.contributionId));
-      if (contribDoc.exists()) {
-        const contribData = contribDoc.data();
-        await onTransactionCreate(contribData.userId, contribData.groupId);
-      }
-    } catch (err) {
-      console.warn('[payment.js] Could not update payment evidence:', err.message);
-    }
-  }
-  // Reload pending list
-  const user = auth.currentUser;
-  if (user) loadPendingContributions(user.uid);
-};
-
-modal.onProofUploaded = async (file, paymentId) => {
-  const user = auth.currentUser;
-  if (!user) throw new Error('Not authenticated.');
-
-  const validationError = validateProofFile(file);
-  if (validationError) throw new Error(validationError);
-
-  // Upload the proof file (returns fileUrl)
-  const { fileUrl, proofId } = await uploadPaymentProof(file, paymentId, user.uid);
-  
-  // Get the transaction to find userId and groupId
-  const txDoc = await getDoc(doc(db, 'transactions', paymentId));
-  if (txDoc.exists()) {
-    const txData = txDoc.data();
-    // Pass the fileUrl to onProofUpload
-    await onProofUpload(txData.userId, txData.groupId, fileUrl);
-  }
-};
-
-/* ── Auth gate ─────────────────────────────────────────────── */
+// Generate a unique payment ID
+function generatePaymentId() {
+  return 'pay_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 onAuthStateChanged(auth, (user) => {
   if (!user) { window.location.href = 'login.html'; return; }
   loadPendingContributions(user.uid);
 
-  // Wire up "Make a Payment" button in header to redirect directly to PayFast
   const makePaymentBtn = document.getElementById('make-payment-btn');
   if (makePaymentBtn) {
     makePaymentBtn.addEventListener('click', () => {
-      initiatePayFastRedirect(user);
+      initiateStripePayment(user);
     });
   }
 });
 
-/* ── Make a Payment Button Handler ─────────────────────────── */
-
-/**
- * Get the first pending contribution for the user and redirect
- * directly to the PayFast payment gateway.
- * @param {import('firebase/auth').User} user
- */
-async function initiatePayFastRedirect(user) {
+async function initiateStripePayment(user) {
   const btn = document.getElementById('make-payment-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Redirecting…'; }
   showError(null);
-
-  let redirecting = false;
-  let selectedContribution = null;
-  let selectedGroupName = 'Unknown Group';
 
   try {
     const groups = await getUserGroups(user.uid);
@@ -119,7 +53,6 @@ async function initiatePayFastRedirect(user) {
     );
 
     const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Filter for pending or missed and sort by date descending manually to avoid index requirement
     const pending = allContribs
       .filter(c => c.status === 'pending' || c.status === 'missed')
       .sort((a, b) => {
@@ -136,94 +69,51 @@ async function initiatePayFastRedirect(user) {
     const groupMap = {};
     groups.forEach(g => { groupMap[g.id] = g.name; });
 
-    selectedContribution = pending[0];
-    selectedGroupName = groupMap[selectedContribution.groupId] || selectedContribution.groupId || 'Unknown Group';
-
-    if (pending.length > 1) {
-      showError('Multiple pending contributions found. Please choose one from the list below or continue with the payment modal.');
-      openPaymentModalForContribution(user, selectedContribution, selectedGroupName);
-      return;
-    }
-
+    const selectedContribution = pending[0];
+    const groupName = groupMap[selectedContribution.groupId] || selectedContribution.groupId || 'Unknown Group';
     const amount = parseFloat(selectedContribution.amount) || 0;
+    const paymentId = generatePaymentId();
 
-    // Gather user details for PayFast pre-fill
-    const userEmail = user.email || '';
-    const userName  = user.displayName || '';
+    const authToken = await user.getIdToken();
+    const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${window.location.origin}/payment-cancel.html`;
 
-    // Get Firebase ID token for the API call
-    let authToken = '';
-    try {
-      authToken = await user.getIdToken();
-    } catch (tokenErr) {
-      console.warn('[payment.js] Could not retrieve auth token:', tokenErr.message);
-    }
+    // Store payment ID immediately
+    localStorage.setItem('pendingPaymentId', paymentId);
 
-    // Call backend to generate signed PayFast payment data
-    console.log('[payment.js] Initiating payment for:', {
-      amount,
-      contributionId: selectedContribution.id,
-      groupId:        selectedContribution.groupId,
+    const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        amount: amount,
+        groupName: groupName,
+        contributionId: selectedContribution.id,
+        groupId: selectedContribution.groupId,
+        returnUrl: returnUrl,
+        cancelUrl: cancelUrl,
+        paymentId: paymentId
+      })
     });
 
-    const result = await initiatePayment({
-      amount:         amount,
-      contributionId: selectedContribution.id,
-      groupId:        selectedContribution.groupId,
-      groupName:      selectedGroupName,
-      userEmail:      userEmail,
-      userName:       userName,
-      metadata:       { paymentMethod: 'card' },
-    });
-
-    // Persist payment ID so payment-return.html can verify the transaction
-    localStorage.setItem('pendingPaymentId', result.paymentId);
-
-    // Build a hidden form and POST to PayFast — this is the gateway redirect
-    const { paymentData } = result;
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = paymentData.paymentUrl;
-    form.style.display = 'none';
-
-    for (const key in paymentData) {
-      if (key !== 'paymentUrl') {
-        const input = document.createElement('input');
-        input.type  = 'hidden';
-        input.name  = key;
-        input.value = paymentData[key];
-        form.appendChild(input);
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create checkout session');
     }
 
-    document.body.appendChild(form);
-    redirecting = true;
-    form.submit(); // ← redirects to PayFast
+    const data = await response.json();
+    window.location.href = data.url;
 
   } catch (err) {
-    const message = err.message || 'Unknown error';
-    showError('Failed to initiate payment directly. Opening the payment modal instead. ' + message);
-    if (selectedContribution) {
-      openPaymentModalForContribution(user, selectedContribution, selectedGroupName);
-    }
-  } finally {
-    if (!redirecting && btn) {
+    showError('Failed to initiate payment: ' + (err.message || 'Unknown error'));
+    if (btn) {
       btn.disabled = false;
       btn.textContent = '💳 Make a Payment';
     }
   }
 }
-function openPaymentModalForContribution(user, contrib, groupName) {
-  if (!user || !contrib) return;
-  modal.open({
-    userId:         user.uid,
-    groupId:        contrib.groupId,
-    contributionId: contrib.id,
-    amount:         parseFloat(contrib.amount) || 0,
-    groupName:      groupName,
-  });
-}
-/* ── Data loading ──────────────────────────────────────────── */
 
 async function loadPendingContributions(userId) {
   showLoading(true);
@@ -248,16 +138,13 @@ async function loadPendingContributions(userId) {
     );
 
     const allContribs = contribSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const pending     = allContribs.filter(
-      c => c.status === 'pending' || c.status === 'missed'
-    );
+    const pending = allContribs.filter(c => c.status === 'pending' || c.status === 'missed');
 
     const groupMap = {};
     groups.forEach(g => { groupMap[g.id] = g.name; });
 
     const outstanding = pending.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
-    // Completed payments this period — read from transactions collection
     let completedCount = 0;
     try {
       const txSnap = await getDocs(
@@ -268,7 +155,7 @@ async function loadPendingContributions(userId) {
         )
       );
       completedCount = txSnap.size;
-    } catch (_) { /* transactions collection may not exist yet */ }
+    } catch (_) { }
 
     updateStats(outstanding, pending.length, completedCount);
 
@@ -288,16 +175,14 @@ async function loadPendingContributions(userId) {
   }
 }
 
-/* ── Render pending contributions table ────────────────────── */
-
 function renderTable(contributions, groupMap) {
   const tbody = document.getElementById('pending-table-body');
   tbody.innerHTML = '';
 
   contributions.forEach(contrib => {
-    const tr     = document.createElement('tr');
-    const name   = groupMap[contrib.groupId] || contrib.groupId || '—';
-    const date   = contrib.date
+    const tr = document.createElement('tr');
+    const name = groupMap[contrib.groupId] || contrib.groupId || '—';
+    const date = contrib.date
       ? (contrib.date.toDate
           ? contrib.date.toDate().toLocaleDateString('en-ZA')
           : contrib.date)
@@ -326,31 +211,52 @@ function renderTable(contributions, groupMap) {
     tbody.appendChild(tr);
   });
 
-  // Wire Pay Now buttons
   tbody.querySelectorAll('button[data-contrib-id]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const user = auth.currentUser;
       if (!user) return;
-      modal.open({
-        userId:         user.uid,
-        groupId:        btn.dataset.groupId,
-        contributionId: btn.dataset.contribId,
-        amount:         parseFloat(btn.dataset.amount),
-        groupName:      btn.dataset.groupName,
+      
+      const amount = parseFloat(btn.dataset.amount);
+      const groupName = btn.dataset.groupName;
+      const paymentId = generatePaymentId();
+      const authToken = await user.getIdToken();
+      const returnUrl = `${window.location.origin}/payment-return.html?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${window.location.origin}/payment-cancel.html`;
+      
+      localStorage.setItem('pendingPaymentId', paymentId);
+      
+      const response = await fetch(`${API_BASE_URL}/api/payments/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          amount: amount,
+          groupName: groupName,
+          contributionId: btn.dataset.contribId,
+          groupId: btn.dataset.groupId,
+          returnUrl: returnUrl,
+          cancelUrl: cancelUrl,
+          paymentId: paymentId
+        })
       });
+      
+      const data = await response.json();
+      window.location.href = data.url;
     });
   });
 }
 
-/* ── Stats ─────────────────────────────────────────────────── */
-
 function updateStats(outstanding, pendingCount, completed) {
-  document.getElementById('stat-outstanding').textContent    = `R ${outstanding.toFixed(2)}`;
-  document.getElementById('stat-pending-count').textContent  = String(pendingCount);
-  document.getElementById('stat-completed').textContent      = String(completed);
+  const outstandingEl = document.getElementById('stat-outstanding');
+  const pendingCountEl = document.getElementById('stat-pending-count');
+  const completedEl = document.getElementById('stat-completed');
+  
+  if (outstandingEl) outstandingEl.textContent = `R ${outstanding.toFixed(2)}`;
+  if (pendingCountEl) pendingCountEl.textContent = String(pendingCount);
+  if (completedEl) completedEl.textContent = String(completed);
 }
-
-/* ── UI state helpers ──────────────────────────────────────── */
 
 function showLoading(on) {
   const el = document.getElementById('pending-loading');
@@ -377,8 +283,6 @@ function showError(msg) {
     el.classList.add('payment-alert--hidden');
   }
 }
-
-/* ── Security helpers ──────────────────────────────────────── */
 
 function escHtml(str) {
   return String(str)
