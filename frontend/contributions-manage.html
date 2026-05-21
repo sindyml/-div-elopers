@@ -108,6 +108,35 @@
         }
 
         header.page-header button.primary:active { transform: scale(0.98); }
+        
+        /* ADDED FOR COLLAPSE/PAGINATION - Collapsible row styles */
+        .member-row {
+            cursor: pointer;
+            background-color: #f9f9f9;
+        }
+        .member-row:hover {
+            background-color: #f0f0f0;
+        }
+        .contributions-row {
+            background-color: #ffffff;
+        }
+        .contributions-row td {
+            padding: 0;
+        }
+        .contributions-container {
+            padding: 0.5rem 0 0.5rem 2rem;
+            width: 100%;
+        }
+        .contributions-container table {
+            margin: 0;
+            width: 100%;
+        }
+        .expand-icon {
+            font-size: 1rem;
+            margin-right: 0.5rem;
+            display: inline-block;
+            width: 20px;
+        }
     </style>
 
 </head>
@@ -122,6 +151,10 @@
                 <p class="page-header__sub">Confirm or flag member payments as Treasurer or Admin.</p>
             </hgroup>
         </header>
+
+         <button onclick="window.location.href='dashboard.html'" class="btn btn--secondary" style="margin-bottom: 1rem;">
+            ← Back to Dashboard
+        </button>
 
         <!-- PENDING DISPUTES section -->
         <section id="pending-disputes-section" aria-labelledby="disputes-heading">
@@ -161,13 +194,18 @@
             getUserDisplayName,
             listenToGroupContributions,
             getPendingDisputes,
-            rejectDispute
+            updateContributionStatus,
+            rejectDispute,
+            approveDispute
         } from './js/contributions.js';
-        import { confirmContribution } from './js/contributionService.js';
-        import { approveDispute } from './js/disputeService.js';
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
+
+        // ADDED FOR COLLAPSE/PAGINATION - Store expanded state for each member
+        let expandedMembers = {};
+        // ADDED FOR COLLAPSE/PAGINATION - Store current page for each member's contributions
+        let memberCurrentPage = {};
 
         function goToDashboard() {
             window.location.href = 'dashboard.html';
@@ -267,6 +305,178 @@
             container.appendChild(groupList);
         }
 
+        // ADDED FOR COLLAPSE/PAGINATION - Function to render contributions for a single member with pagination
+        async function renderMemberContributions(memberId, memberName, contributions, container, groupName, rowsPerPage = 5) {
+            const page = memberCurrentPage[memberId] || 1;
+            const start = (page - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageContributions = contributions.slice(start, end);
+            
+            // Create contributions table
+            const contribTable = document.createElement('table');
+            contribTable.style.width = '100%';
+            contribTable.style.borderCollapse = 'collapse';
+            
+            // Table header
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = ['Amount', 'Date', 'Status', 'Payment Evidence', 'Action'];
+            headers.forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            contribTable.appendChild(thead);
+            
+            // Table body
+            const tbody = document.createElement('tbody');
+            for (const contribution of pageContributions) {
+                const row = tbody.insertRow();
+                
+                // Amount
+                const amountCell = row.insertCell(0);
+                amountCell.textContent = `R${contribution.amount}`;
+                
+                // Date
+                const dateCell = row.insertCell(1);
+                dateCell.textContent = contribution.date;
+                
+                // Status
+                const statusCell = row.insertCell(2);
+                if (contribution.status === 'confirmed') {
+                    statusCell.textContent = '✅ Confirmed';
+                } else if (contribution.status === 'missed') {
+                    statusCell.textContent = '❌ Missed';
+                } else {
+                    statusCell.textContent = '⏳ Pending';
+                }
+                
+                // Payment Evidence
+                const evidenceCell = row.insertCell(3);
+                if (contribution.paymentEvidence === 'online') {
+                    evidenceCell.textContent = '💳 Online';
+
+                    // Add View Receipt button
+                    const receiptQuery = await getDocs(
+                    query(collection(db, 'transactions'), where('contributionId', '==', contribution.id))
+                    );
+                    if (!receiptQuery.empty) {
+                        const transactionId = receiptQuery.docs[0].id;
+                        const receiptBtn = document.createElement('button');
+                        receiptBtn.textContent = 'View Receipt';
+                        receiptBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                        receiptBtn.style.marginLeft = '0.5rem';
+                        receiptBtn.addEventListener('click', async () => {
+                            const { showReceiptModal } = await import('./js/payment-receipt.js');
+                            await showReceiptModal(transactionId);
+                        });
+                        evidenceCell.appendChild(receiptBtn);
+                       }
+
+                } else if (contribution.paymentEvidence === 'proof' && contribution.evidenceUrl) {
+                    evidenceCell.textContent = '📎 Proof uploaded';
+                    const viewBtn = document.createElement('button');
+                    viewBtn.textContent = 'View';
+                    viewBtn.classList.add('btn', 'btn--outline', 'btn--sm');
+                    viewBtn.addEventListener('click', () => {
+                        window.open(contribution.evidenceUrl, '_blank');
+                    });
+                    evidenceCell.appendChild(viewBtn);
+                } else {
+                    evidenceCell.textContent = '—';
+                }
+                
+                // Action
+                const actionCell = row.insertCell(4);
+                if (contribution.status === 'pending') {
+                    const confirmBtn = document.createElement('button');
+                    confirmBtn.textContent = 'Confirm';
+                    confirmBtn.classList.add('btn', 'confirm', 'btn--sm');
+                    confirmBtn.addEventListener('click', async () => {
+                        confirmBtn.disabled = true;
+                        confirmBtn.textContent = '...';
+                        await updateContributionStatus(contribution.id, 'confirmed');
+                        alert('Contribution confirmed successfully');
+                        // Refresh the view
+                        loadContributionsForGroup(activeGroupId, groupName);
+                    });
+                    
+                    const missBtn = document.createElement('button');
+                    missBtn.textContent = 'Miss';
+                    missBtn.classList.add('btn', 'miss', 'btn--sm');
+                    missBtn.addEventListener('click', async () => {
+                        await updateContributionStatus(contribution.id, 'missed');
+                        try {
+                            await addDoc(collection(db, 'notifications'), {
+                                userId: contribution.userId,
+                                message: `You missed a payment of R${contribution.amount} for ${groupName}`,
+                                read: false,
+                                createdAt: new Date(),
+                                contributionId: contribution.id
+                            });
+                        } catch (notifError) {
+                            console.error('Failed to send notification:', notifError);
+                        }
+                        loadContributionsForGroup(activeGroupId, groupName);
+                    });
+                    
+                    actionCell.appendChild(confirmBtn);
+                    actionCell.appendChild(missBtn);
+                } else {
+                    actionCell.textContent = '-';
+                }
+            };
+            contribTable.appendChild(tbody);
+            
+            // Clear container and add table
+            container.innerHTML = '';
+            container.appendChild(contribTable);
+            
+            // Add pagination controls - FIXED: Previous only shows on page > 1, Next only shows on page < totalPages
+            const totalPages = Math.ceil(contributions.length / rowsPerPage);
+            if (totalPages > 1) {
+                const paginationDiv = document.createElement('div');
+                paginationDiv.style.display = 'flex';
+                paginationDiv.style.alignItems = 'center';
+                paginationDiv.style.justifyContent = 'center';
+                paginationDiv.style.gap = '0.5rem';
+                paginationDiv.style.marginTop = '0.5rem';
+                paginationDiv.style.padding = '0.5rem';
+                
+                // Previous button - only show if not on first page
+                if (page > 1) {
+                    const prevBtn = document.createElement('button');
+                    prevBtn.textContent = 'Previous';
+                    prevBtn.classList.add('btn', 'btn--secondary', 'btn--sm');
+                    prevBtn.addEventListener('click', () => {
+                        memberCurrentPage[memberId] = page - 1;
+                        renderMemberContributions(memberId, memberName, contributions, container, groupName, rowsPerPage);
+                    });
+                    paginationDiv.appendChild(prevBtn);
+                }
+                
+                const pageInfo = document.createElement('span');
+                pageInfo.textContent = `Page ${page} of ${totalPages}`;
+                pageInfo.style.fontSize = '0.85rem';
+                paginationDiv.appendChild(pageInfo);
+                
+                // Next button - only show if not on last page
+                if (page < totalPages) {
+                    const nextBtn = document.createElement('button');
+                    nextBtn.textContent = 'Next';
+                    nextBtn.classList.add('btn', 'btn--secondary', 'btn--sm');
+                    nextBtn.addEventListener('click', () => {
+                        memberCurrentPage[memberId] = page + 1;
+                        renderMemberContributions(memberId, memberName, contributions, container, groupName, rowsPerPage);
+                    });
+                    paginationDiv.appendChild(nextBtn);
+                }
+                
+                container.appendChild(paginationDiv);
+            }
+        }
+
         async function displayContributionsTable(groupId, groupName, container) {
             if (activeUnsubscribe) {
                 activeUnsubscribe();
@@ -292,22 +502,23 @@
             });
             container.appendChild(backToGroupsButton);
 
-            const table = document.createElement('table');
+            // Create main table for member summary (collapsible rows)
+            const mainTable = document.createElement('table');
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
-            const headers = ['Member', 'Amount', 'Date', 'Status', 'Payment Evidence', 'Action'];
+            const headers = ['Member', 'Total Pending', 'Status', 'Action'];
             headers.forEach(text => {
                 const th = document.createElement('th');
                 th.textContent = text;
                 headerRow.appendChild(th);
             });
             thead.appendChild(headerRow);
-            table.appendChild(thead);
-
-            const tbody = document.createElement('tbody');
-            tbody.id = `contributions-tbody-${groupId}`;
-            table.appendChild(tbody);
-            container.appendChild(table);
+            mainTable.appendChild(thead);
+            
+            const mainTbody = document.createElement('tbody');
+            mainTbody.id = `members-tbody-${groupId}`;
+            mainTable.appendChild(mainTbody);
+            container.appendChild(mainTable);
 
             const payoutButton = document.createElement('button');
             payoutButton.textContent = 'View Payout Schedule';
@@ -318,97 +529,100 @@
             container.appendChild(payoutButton);
 
             activeUnsubscribe = listenToGroupContributions(groupId, async (contributions) => {
-                const tbodyElement = document.getElementById(`contributions-tbody-${groupId}`);
-                if (!tbodyElement) return;
-                tbodyElement.innerHTML = '';
-
-                if (contributions.length === 0) {
-                    const emptyRow = tbodyElement.insertRow();
-                    const emptyCell = emptyRow.insertCell(0);
-                    emptyCell.colSpan = 6;
-                    emptyCell.textContent = 'No contributions found for this group.';
-                    return;
-                }
-
+                if (!contributions.length) return;
+                
+                // Group contributions by userId
+                const contributionsByMember = {};
                 for (const contribution of contributions) {
-                    const row = tbodyElement.insertRow();
-                    const memberName = await getUserDisplayName(contribution.userId);
-
-                    const memberCell = row.insertCell(0);
-                    memberCell.textContent = memberName;
-                    const amountCell = row.insertCell(1);
-                    amountCell.textContent = `R${contribution.amount}`;
-                    const dateCell = row.insertCell(2);
-                    dateCell.textContent = contribution.date;
-
-                    const statusCell = row.insertCell(3);
-                    if (contribution.status === 'confirmed') {
-                        statusCell.textContent = '✅ Confirmed';
-                    } else if (contribution.status === 'missed') {
-                        statusCell.textContent = '❌ Missed';
-                    } else {
-                        statusCell.textContent = '⏳ Pending';
+                    if (!contributionsByMember[contribution.userId]) {
+                        contributionsByMember[contribution.userId] = [];
                     }
-
-                    // Payment Evidence column
-                    const evidenceCell = row.insertCell(4);
-                    if (contribution.paymentEvidence === 'online') {
-                        evidenceCell.textContent = '💳 Online';
-                    } else if (contribution.paymentEvidence === 'proof' && contribution.evidenceUrl) {
-                        evidenceCell.textContent = '📎 Proof uploaded';
-                        const viewBtn = document.createElement('button');
-                        viewBtn.textContent = 'View';
-                        viewBtn.classList.add('btn', 'btn--outline', 'btn--sm');
-                        viewBtn.addEventListener('click', () => {
-                            window.open(contribution.evidenceUrl, '_blank');
-                        });
-                        evidenceCell.appendChild(viewBtn);
-                    } else {
-                        evidenceCell.textContent = '—';
+                    contributionsByMember[contribution.userId].push(contribution);
+                }
+                
+                const mainTbodyElement = document.getElementById(`members-tbody-${groupId}`);
+                if (!mainTbodyElement) return;
+                mainTbodyElement.innerHTML = '';
+                
+                // Reset expanded states for this group
+                for (const userId of Object.keys(contributionsByMember)) {
+                    if (expandedMembers[`${groupId}-${userId}`] === undefined) {
+                        expandedMembers[`${groupId}-${userId}`] = false;
                     }
-
-                    const actionCell = row.insertCell(5);
-                    if (contribution.status === 'pending') {
-                        const confirmButton = document.createElement('button');
-                        confirmButton.textContent = 'Confirm';
-                        confirmButton.classList.add('btn', 'confirm');
-                        confirmButton.addEventListener('click', async () => {
-                            try {
-                                confirmButton.disabled = true;
-                                confirmButton.textContent = '...';
-                                await confirmContribution(contribution.id);
-                                alert('Contribution confirmed successfully');
-                            } catch (err) {
-                                console.error('Confirmation failed:', err);
-                                alert('Error: ' + err.message);
-                                confirmButton.disabled = false;
-                                confirmButton.textContent = 'Confirm';
-                            }
-                        });
-
-                        const missButton = document.createElement('button');
-                        missButton.textContent = 'Miss';
-                        missButton.classList.add('btn', 'miss');
-                        missButton.addEventListener('click', async () => {
-                            await updateContributionStatus(contribution.id, 'missed');
-                            try {
-                                await addDoc(collection(db, 'notifications'), {
-                                    userId: contribution.userId,
-                                    message: `You missed a payment of R${contribution.amount} for ${groupName}`,
-                                    read: false,
-                                    createdAt: new Date(),
-                                    contributionId: contribution.id
-                                });
-                            } catch (notifError) {
-                                console.error('Failed to send notification:', notifError);
-                            }
-                        });
-
-                        actionCell.appendChild(confirmButton);
-                        actionCell.appendChild(missButton);
-                    } else {
-                        actionCell.textContent = '-';
+                    if (memberCurrentPage[`${groupId}-${userId}`] === undefined) {
+                        memberCurrentPage[`${groupId}-${userId}`] = 1;
                     }
+                }
+                
+                // Build member rows
+                for (const [userId, userContributions] of Object.entries(contributionsByMember)) {
+                    const memberName = await getUserDisplayName(userId);
+                    const pendingCount = userContributions.filter(c => c.status === 'pending').length;
+                    const hasPending = pendingCount > 0;
+                    const isExpanded = expandedMembers[`${groupId}-${userId}`];
+                    
+                    // Sort contributions by date (ascending - closest first)
+                    userContributions.sort((a, b) => a.date.localeCompare(b.date));
+                    
+                    const memberRow = mainTbodyElement.insertRow();
+                    memberRow.classList.add('member-row');
+                    
+                    // Expand/collapse icon cell
+                    const iconCell = memberRow.insertCell(0);
+                    const expandIcon = document.createElement('span');
+                    expandIcon.className = 'expand-icon';
+                    expandIcon.textContent = isExpanded ? '▼' : '▶';
+                    iconCell.appendChild(expandIcon);
+                    iconCell.appendChild(document.createTextNode(` ${memberName}`));
+                    
+                    // Total Pending cell
+                    const pendingCell = memberRow.insertCell(1);
+                    pendingCell.textContent = pendingCount > 0 ? `${pendingCount} pending` : 'None';
+                    
+                    // Status cell
+                    const statusCell = memberRow.insertCell(2);
+                    statusCell.textContent = hasPending ? '⏳ Pending' : '✅ Up to date';
+                    
+                    // Action cell
+                    const actionCell = memberRow.insertCell(3);
+                    actionCell.textContent = '-';
+                    
+                    // Create hidden row for contributions (will be shown/hidden)
+                    const contribRow = mainTbodyElement.insertRow();
+                    contribRow.classList.add('contributions-row');
+                    contribRow.style.display = isExpanded ? '' : 'none';
+                    
+                    const contribCell = contribRow.insertCell(0);
+                    contribCell.colSpan = 4;
+                    contribCell.style.padding = '0';
+                    
+                    const contribContainer = document.createElement('div');
+                    contribContainer.className = 'contributions-container';
+                    contribContainer.id = `contrib-container-${groupId}-${userId}`;
+                    contribCell.appendChild(contribContainer);
+                    
+                    // Render contributions in the container
+                    await renderMemberContributions(
+                        `${groupId}-${userId}`, 
+                        memberName, 
+                        userContributions, 
+                        contribContainer,
+                        groupName,  
+                        5
+                    );
+                    
+                    // Toggle expand/collapse on click
+                    memberRow.addEventListener('click', () => {
+                        const newExpanded = !expandedMembers[`${groupId}-${userId}`];
+                        expandedMembers[`${groupId}-${userId}`] = newExpanded;
+                        expandIcon.textContent = newExpanded ? '▼' : '▶';
+                        contribRow.style.display = newExpanded ? '' : 'none';
+                        
+                        // Reset page when collapsing
+                        if (!newExpanded) {
+                            memberCurrentPage[`${groupId}-${userId}`] = 1;
+                        }
+                    });
                 }
             });
         }

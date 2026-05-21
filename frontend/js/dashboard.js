@@ -194,14 +194,14 @@ if (
         if (balanceEl) balanceEl.textContent = 'R ' + groupBalance.toLocaleString('en-ZA');
 
         // Show Admin/Treasurer buttons if applicable
-        const manageBtn = document.getElementById('manageContributionsBtn');
+        
         const analyticsBtn = document.getElementById('analyticsBtn');
         const roleLower = userRole?.toLowerCase();
         if (roleLower === 'admin' || roleLower === 'treasurer') {
-          if (manageBtn) manageBtn.style.display = 'inline-flex';
+          
           if (analyticsBtn) analyticsBtn.style.display = 'inline-flex';
         } else {
-          if (manageBtn) manageBtn.style.display = 'none';
+          
           if (analyticsBtn) analyticsBtn.style.display = 'none';
         }
 

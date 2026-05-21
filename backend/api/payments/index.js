@@ -76,9 +76,9 @@ async function handleStripeWebhook(req, res) {
       // 2. Update the linked contribution to paid
       if (contributionId) {
         await db.collection('contributions').doc(contributionId).update({
-          status: 'paid',
           paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          transactionId: paymentId
+          transactionId: paymentId,
+          paymentEvidence: 'online'
         });
         console.log('✅ Contribution updated to paid:', contributionId);
       }

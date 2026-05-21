@@ -358,7 +358,6 @@
       initPaymentReminders
     } from './js/payment-reminders.js';
 
-
     const auth       = getAuth(getApp());
     const container  = document.getElementById('health-score-container');
     const refreshBtn = document.getElementById('health-refresh-btn');
@@ -386,9 +385,19 @@
       }
     }
 
-    onAuthStateChanged(auth, (user) => {
+    onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       initPaymentReminders(user.uid);
+
+          // Dynamic import for button
+    const { getCurrentUserRole } = await import('./js/contributions.js');
+    const manageBtn = document.getElementById('manageContributionsBtn');
+    if (manageBtn) {
+        const role = await getCurrentUserRole();
+        if (role === 'Treasurer' || role === 'Admin') {
+            manageBtn.style.display = 'inline-flex';
+        }
+    }
 
       setTimeout(() => renderHealthScore(user.uid), 1200);
       refreshBtn.addEventListener('click', () => renderHealthScore(user.uid));
