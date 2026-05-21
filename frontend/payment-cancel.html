@@ -3,21 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Payment Cancelled | Stockpal</title>
+  <title>Payment Cancelled | StokPal</title>
+
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-    .btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin: 10px; }
-    .btn-secondary { background: #95a5a6; }
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 50px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin: 10px;
+    }
+
+    .btn-secondary {
+      background: #95a5a6;
+    }
   </style>
 </head>
+
 <body>
-  <h1>❌ Payment Cancelled</h1>
-  <p>Your payment was cancelled. No charges were made.</p>
-  <a href="/payment.html" class="btn">Try Again</a>
-  <a href="/dashboard.html" class="btn btn-secondary">Dashboard</a>
-  
-  <script>
-    localStorage.removeItem('pendingPaymentId');
-  </script>
+
+<main>
+
+  <header>
+    <h1>❌ Payment Cancelled</h1>
+  </header>
+
+  <section aria-labelledby="cancel-message">
+
+    <p id="cancel-message">
+      Your payment was cancelled.
+      No charges were made.
+    </p>
+
+  </section>
+
+  <nav aria-label="Payment Navigation">
+
+    <a
+      href="/payment.html"
+      class="btn"
+    >
+      Try Again
+    </a>
+
+    <a
+      href="/dashboard.html"
+      class="btn btn-secondary"
+    >
+      Dashboard
+    </a>
+
+  </nav>
+
+</main>
+
+<script>
+  localStorage.removeItem('pendingPaymentId');
+</script>
+
 </body>
 </html>
