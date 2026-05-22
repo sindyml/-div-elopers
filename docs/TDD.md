@@ -3,6 +3,18 @@
 ## 1. System Architecture
 Stockpal follows a decoupled Client-Server architecture leveraging Managed Services for scalability and real-time capabilities.
 
+```mermaid
+graph TD
+    User([User/Browser]) <-->|HTTPS/ESM| Frontend[Frontend: Vanilla JS SPA]
+    Frontend <-->|SDK| Firebase_Auth[Firebase Authentication]
+    Frontend <-->|SDK| Firestore[(Cloud Firestore)]
+    Frontend <-->|API| Backend[Backend: Node.js Server]
+    Backend <-->|Admin SDK| Firestore
+    Backend -->|API| Stripe[Stripe/PayFast Gateway]
+    Backend -->|API| Frankfurter[Frankfurter FX API]
+    Stripe -.->|Webhooks| Backend
+```
+
 - **Frontend:** Single Page Application (SPA) built with Vanilla JavaScript (ES Modules), HTML5, and CSS3. It interacts directly with Firebase for Auth and Real-time Database updates, and with the Node.js backend for sensitive financial operations.
 - **Backend:** Node.js server acting as a secure proxy and API gateway. It handles Stripe/PayFast webhooks, manages sensitive Firestore transactions, and interfaces with the Firebase Admin SDK.
 - **Database & Auth:** Google Cloud Firestore (NoSQL) and Firebase Authentication.
@@ -20,6 +32,33 @@ Routes are delegated to modular handlers:
 
 ### 2.2 Payment Integration
 The system is currently transitioning from **PayFast** to **Stripe**.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant B as Backend (Node.js)
+    participant S as Stripe/PayFast
+    participant DB as Firestore
+
+    U->>F: Click "Pay Now"
+    F->>B: POST /api/payments/create-checkout-session
+    B->>S: Create Checkout Session
+    S-->>B: Session ID & URL
+    B->>DB: Create 'pending' Transaction
+    B-->>F: Return Checkout URL
+    F->>U: Redirect to Gateway
+    U->>S: Complete Payment
+    S-->>U: Redirect to returnUrl
+    S->>B: Webhook: Payment Success
+    B->>DB: Update Transaction & Contribution (Paid)
+    U->>F: View Return Page
+    F->>B: GET /api/payments/status/:id
+    B->>DB: Read Status
+    B-->>F: Status: Completed
+    F->>U: Show Success Message
+```
+
 - **Stripe Flow:** Frontend creates a Checkout Session via `/api/payments/create-checkout-session`. The backend listens for `checkout.session.completed` webhooks to atomically update the transaction and contribution status.
 - **Security:** All webhooks verify signatures (Stripe-Signature or PayFast MD5) before processing.
 
