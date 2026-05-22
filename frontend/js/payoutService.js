@@ -3,6 +3,7 @@
  *
  * Service for interacting with the backend payout disbursement API.
  */
+
 import { auth } from './firebase-config.js';
 
 const API_BASE_URL = 'https://div-elopers.onrender.com';
@@ -26,18 +27,27 @@ async function getAuthToken() {
  */
 export async function disbursePayout({ groupId, memberId, amount, payoutId, reference }) {
   const token = await getAuthToken();
+
   const response = await fetch(`${API_BASE_URL}/api/payouts/disburse`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
     },
-    body: JSON.stringify({ groupId, memberId, amount, payoutId, reference })
+    body: JSON.stringify({
+      groupId,
+      memberId,
+      amount,
+      payoutId,
+      reference
+    })
   });
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to disburse payout');
   }
+
   return await response.json();
 }
 
@@ -46,13 +56,18 @@ export async function disbursePayout({ groupId, memberId, amount, payoutId, refe
  */
 export async function getPayoutSchedule(groupId) {
   const token = await getAuthToken();
+
   const response = await fetch(`${API_BASE_URL}/api/payouts/schedule/${groupId}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
   });
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to get payout schedule');
   }
+
   return await response.json();
 }
 
@@ -61,12 +76,17 @@ export async function getPayoutSchedule(groupId) {
  */
 export async function getPayoutHistory(groupId) {
   const token = await getAuthToken();
+
   const response = await fetch(`${API_BASE_URL}/api/payouts/history/${groupId}`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
   });
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error || 'Failed to get payout history');
   }
+
   return await response.json();
 }
