@@ -1,66 +1,54 @@
-# Project Plan & Roadmap: Stockpal
+# Project Plan & Roadmap: Stockpal (Sprints 1-4)
 
-This document outlines the development trajectory of the Stockpal platform, mapping technical milestones to the agile sprint cycles.
+This document outlines the development trajectory of the Stockpal platform through its first four sprints.
 
-## 1. Project Timeline Overview
+## 1. Project Timeline
 
-| Phase | Milestone | Focus Area | Dates | Status |
-|---|---|---|---|---|
-| **Phase 1** | Foundation | Auth & User Roles | Apr 1 – Apr 14 | Completed |
-| **Phase 2** | Governance | Group & Meeting Management | Apr 15 – Apr 30 | Completed |
-| **Phase 3** | Financials | PayFast Integration & Tracking | May 1 – May 14 | Completed |
-| **Phase 4** | Optimization | Dashboard UX & AI Chatbot | May 15 – May 30 | In Progress |
-| **Phase 5** | Intelligence | Analytics & Automated Payouts | Jun 1 – Jun 14 | Planning |
-
----
-
-## 2. Sprint Details
-
-### Sprint 1: Identity & Access (Completed)
-- **Goal:** Establish secure entry points and role-based foundations.
-- **Key Deliverables:**
-    - Firebase Auth setup (Email/Password).
-    - User profile creation in Firestore.
-    - Application-level RBAC (Admin, Treasurer, Member).
-
-### Sprint 2: The Stokvel Model (Completed)
-- **Goal:** Implement the logic for managing savings groups.
-- **Key Deliverables:**
-    - Group creation and invitation system.
-    - 12-month payout sequence generator.
-    - Meeting scheduler with real-time minutes tracking.
-
-### Sprint 3: Payment Gateway Migration (Completed)
-- **Goal:** Move from Yoco to PayFast for ZAR EFT/Card support.
-- **Key Deliverables:**
-    - `payfastService` for secure ITN handling.
-    - Manual proof-of-payment upload workflow.
-    - Firestore-backed transaction history.
-
-### Sprint 4: UX & AI Assistance (Current)
-- **Goal:** Refine the financial dashboard and provide real-time support.
-- **Key Deliverables:**
-    - Fix Auth header display and session persistence.
-    - Standardize financial fields (`totalBalance`).
-    - Deploy the Gemini-powered AI Support Widget.
-    - Initiate Stripe integration for broader card support.
-
-### Sprint 5: Analytics & Scaling (Next)
-- **Goal:** Provide actionable financial insights and automate disbursements.
-- **Key Deliverables:**
-    - Comprehensive financial health scoring module.
-    - PDF report generation for treasurers.
-    - Final UAT and production deployment on Azure.
+| Sprint | Phase | Focus Area | Status |
+|---|---|---|---|
+| **Sprint 1** | Foundation | Identity, Auth & RBAC | Completed |
+| **Sprint 2** | Governance | Groups, Meetings & Payout Order | Completed |
+| **Sprint 3** | Financials | PayFast Integration & Contribution Tracking | Completed |
+| **Sprint 4** | Optimization | UI Refinement, AI Support & Stripe Transition | Completed |
 
 ---
 
-## 3. Resource Allocation (Core Team)
-- **Frontend Lead:** Sindy (Dashboard, Payments UI)
-- **Backend Lead:** Kwezi (API Routing, Stripe Integration)
-- **Auth & Security:** Alondwe (Firebase Rules, Claims)
-- **Feature Devs:** Owen (Groups), Athandwa (Contributions), Ziya (Meetings/AI)
+## 2. Sprint Deliverables
 
-## 4. Risk Management
-- **Security:** Financial data handled via backend transactions only.
-- **Compliance:** POPIA compliance for user data storage in South Africa.
-- **Uptime:** Azure Static Web Apps provide high availability for the global frontend.
+### Sprint 1: Identity & Access
+- **Focus:** Secure onboarding and role foundations.
+- **Key Results:**
+    - Firebase Auth integration.
+    - Global `users` collection with `Admin`, `Treasurer`, and `Member` roles.
+    - Private route guarding in `auth.js`.
+
+### Sprint 2: The Stokvel Model
+- **Focus:** Digitalizing group savings logic.
+- **Key Results:**
+    - Group creation workflow with contribution amount setup.
+    - Automated 12-month payout sequence generation.
+    - Real-time meeting scheduling and minutes tracking via Firestore.
+
+### Sprint 3: Payment Gateway (ZAR)
+- **Focus:** Integration of PayFast for South African ZAR transactions.
+- **Key Results:**
+    - Backend `payfastService.js` for ITN (webhook) handling.
+    - Frontend payment redirection flow.
+    - Manual proof-of-payment upload and treasurer verification.
+
+### Sprint 4: UX & AI Refinement
+- **Focus:** Enhancing user experience and support.
+- **Key Results:**
+    - Standardized `totalBalance` field across the platform.
+    - AI-powered support widget (`stokvel-widget-chatbot.html`).
+    - Accessibility audit (Semantic HTML5 conversion).
+    - Initiation of Stripe integration for expanded payment options.
+
+---
+
+## 3. Tech Stack at Sprint 4 Completion
+- **Database:** Cloud Firestore
+- **Auth:** Firebase Auth
+- **Frontend:** Vanilla JS / ES Modules
+- **Backend:** Node.js (Azure Functions / Express Proxy)
+- **Payments:** PayFast (Live) / Stripe (Integrated)

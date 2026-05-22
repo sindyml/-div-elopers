@@ -1,8 +1,8 @@
-# Product Backlog: Stockpal
+# Product Backlog: Stockpal (End of Sprint 4)
 
-This backlog tracks the prioritized list of features, enhancements, and technical debt for the Stockpal Stokvel Management Platform.
+This backlog tracks the remaining prioritized items for the Stockpal platform as of the completion of Sprint 4.
 
-## 1. High Priority (Sprint 4 & 5)
+## 1. High Priority (Immediate Post-Sprint 4)
 
 | ID | Title | Description | Category | Status |
 |---|---|---|---|---|
@@ -10,29 +10,20 @@ This backlog tracks the prioritized list of features, enhancements, and technica
 | BP-02 | Legacy Field Refactor | Rename all `currentBalance` instances to `totalBalance` across the frontend widgets. | Technical Debt | Pending |
 | BP-03 | Analytics UAT | Conduct user acceptance testing for the Compliance and Payout reporting panels. | Testing | Pending |
 | BP-04 | Role-Based Navigation | Ensure the UI dynamically hides "Treasurer" and "Admin" menus for standard Members. | UI/UX | In Progress |
-| BP-05 | Mobile UI Optimization | Refine dashboard and contribution tables for better visibility on mobile browsers. | UI/UX | Pending |
 
-## 2. Medium Priority (Sprint 6+)
+## 2. Future Enhancements (Post-MVP)
 
 | ID | Title | Description | Category | Status |
 |---|---|---|---|---|
+| BP-05 | Email Notification Engine | Automated emails for upcoming meetings, payment reminders, and payout alerts. | Feature | Backlog |
 | BP-06 | Multi-Currency Support | Allow groups to define contributions in currencies other than ZAR (e.g., USD, EUR) using live rates. | Feature | Backlog |
-| BP-07 | Email Notification Engine | Automated emails for upcoming meetings, payment reminders, and payout alerts. | Feature | Backlog |
-| BP-08 | Automated Payout Disbursement | Integrate Stripe Payouts API to automatically send funds to member bank accounts. | Feature | Backlog |
-| BP-09 | Meeting Recording Upload | Allow Treasurers to upload audio/video recordings of meetings to Firestore. | Feature | Backlog |
-| BP-10 | Performance Optimization | Implement lazy loading for large transaction histories and meeting logs. | Performance | Backlog |
+| BP-07 | Automated Payout Disbursement | Integrate Stripe Payouts API to automatically send funds to member bank accounts. | Feature | Backlog |
+| BP-08 | Meeting Recording Upload | Allow Treasurers to upload audio/video recordings of meetings to Firestore. | Feature | Backlog |
+| BP-09 | Performance Optimization | Implement lazy loading for large transaction histories and meeting logs. | Performance | Backlog |
+| BP-10 | PDF Statement Export | Generate professional monthly statements for members to download. | Feature | Backlog |
 
-## 3. Low Priority (Future Roadmap)
+## 3. Maintenance & Tech Debt
 
-| ID | Title | Description | Category | Status |
-|---|---|---|---|---|
-| BP-11 | AI Financial Advisor | Extend the chatbot to provide personalized saving tips based on contribution history. | AI | Backlog |
-| BP-12 | PDF Statement Export | Generate professional monthly statements for members to download. | Feature | Backlog |
-| BP-13 | External Audit Mode | A read-only role for external auditors to verify stokvel financial health. | Security | Backlog |
-| BP-14 | Push Notifications | PWA integration for real-time mobile push notifications. | Feature | Backlog |
-
-## 4. Maintenance & Tech Debt
-
-- **Dependency Updates:** Regular audits of `firebase-admin` and `stripe` packages.
-- **Unit Testing:** Increase coverage for the `financial-health.js` logic to 90%+.
-- **Documentation:** Keep the TDD and PRD updated as new integrations are added.
+- **Unit Testing:** Increase coverage for the `financial-health.js` logic.
+- **Dependency Audit:** Review `firebase-admin` and `stripe` package versions.
+- **Documentation:** Maintain consistency between code comments and the TDD.
