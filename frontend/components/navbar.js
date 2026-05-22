@@ -8,26 +8,64 @@
 
 (function () {
 
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[m]));
+  }
+
   // ── Build the navbar HTML ─────────────────────────────────
   function buildNavbar(user) {
-    const isLanding = ['/', '/index.html', ''].some(p =>
-      window.location.pathname === p ||
-      window.location.pathname.endsWith('index.html')
-    );
+    const path = window.location.pathname;
+    const isLanding = path === '/' || path.endsWith('/index.html') || path.endsWith('/index') || path === '';
 
-    const authHTML = user
-      ? `<div class="nav__user">
-           <span class="nav__user-name">👤 ${user.displayName || user.email}</span>
-           <button id="nav-logout-btn" class="btn btn--outline btn--sm">Sign Out</button>
-         </div>`
-      : `<nav class="nav__auth" aria-label="Account actions">
-           <a href="login.html"    class="btn btn--outline btn--sm">Sign In</a>
-           <a href="register.html" class="btn btn--primary btn--sm">Get Started</a>
-         </nav>`;
+    const backButtonHTML = !isLanding
+      ? `<button type="button" class="nav__back-btn" id="nav-back-btn" aria-label="Go back">
+           <span aria-hidden="true">←</span> Back
+         </button>`
+      : '';
+
+    let authHTML = '';
+    if (user) {
+      const displayName = escapeHTML(user.displayName || user.email);
+      authHTML = `
+        <div class="nav__user">
+          <span class="nav__user-name">👤 ${displayName}</span>
+          <button id="nav-logout-btn" class="btn btn--outline btn--sm">Sign Out</button>
+        </div>`;
+    } else if (isLanding) {
+      authHTML = `
+        <nav class="nav__auth" aria-label="Account actions">
+          <a href="login.html"    class="btn btn--outline btn--sm">Sign In</a>
+          <a href="register.html" class="btn btn--primary btn--sm">Get Started</a>
+        </nav>`;
+    }
+
+    const mobileMenuContent = `
+      ${!isLanding ? `<button type="button" class="nav__link nav__back-btn--mobile" id="nav-back-mobile">← Back</button>` : ''}
+      ${isLanding
+        ? `<a href="#features"    class="nav__link">Features</a>
+           <a href="#how-it-works" class="nav__link">How It Works</a>
+           <a href="#cta"         class="nav__link">Get Started</a>`
+        : ''}
+      ${user
+        ? `<span class="nav__user-name">👤 ${escapeHTML(user.displayName || user.email)}</span>
+           <button id="nav-logout-mobile" class="btn btn--outline btn--sm">Sign Out</button>`
+        : (isLanding ? `<a href="login.html"    class="btn btn--outline btn--sm">Sign In</a>
+           <a href="register.html" class="btn btn--primary btn--sm">Get Started</a>` : '')
+      }
+    `;
 
     return `
       <nav class="navbar" role="navigation" aria-label="Main navigation">
         <div class="navbar__inner">
+
+          ${backButtonHTML}
 
           <a href="index.html" class="navbar__brand" aria-label="StokPal home">
             <span aria-hidden="true">🌿</span>
@@ -57,17 +95,7 @@
         </div>
 
         <div class="navbar__mobile-menu" id="nav-mobile-menu" aria-hidden="true">
-          ${isLanding
-            ? `<a href="#features"    class="nav__link">Features</a>
-               <a href="#how-it-works" class="nav__link">How It Works</a>
-               <a href="#cta"         class="nav__link">Get Started</a>`
-            : ''}
-          ${user
-            ? `<span class="nav__user-name">${user.displayName || user.email}</span>
-               <button id="nav-logout-mobile" class="btn btn--outline btn--sm">Sign Out</button>`
-            : `<a href="login.html"    class="btn btn--outline btn--sm">Sign In</a>
-               <a href="register.html" class="btn btn--primary btn--sm">Get Started</a>`
-          }
+          ${mobileMenuContent}
         </div>
       </nav>`;
   }
@@ -96,6 +124,11 @@
     const logoutMobile = document.getElementById('nav-logout-mobile');
     if (logoutBtn)    logoutBtn.addEventListener('click', handleLogout);
     if (logoutMobile) logoutMobile.addEventListener('click', handleLogout);
+
+    const backBtn = document.getElementById('nav-back-btn');
+    const backMobile = document.getElementById('nav-back-mobile');
+    if (backBtn) backBtn.addEventListener('click', () => window.history.back());
+    if (backMobile) backMobile.addEventListener('click', () => window.history.back());
 
     const toggle     = document.getElementById('nav-toggle');
     const mobileMenu = document.getElementById('nav-mobile-menu');
@@ -141,6 +174,26 @@
         color: var(--color-primary);
         text-decoration: none;
         flex-shrink: 0;
+        margin-right: auto;
+      }
+      .nav__back-btn {
+        background: none;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        transition: all var(--transition);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .nav__back-btn:hover {
+        background: var(--color-surface-2);
+        color: var(--color-primary);
+        border-color: var(--color-primary);
       }
       .navbar__brand-name {
         font-family: var(--font-display);
@@ -153,7 +206,6 @@
         list-style: none;
         padding: 0;
         margin: 0;
-        flex: 1;
       }
       .nav__link {
         font-size: 0.88rem;
@@ -201,9 +253,19 @@
         background: var(--color-surface);
       }
       .navbar__mobile-menu.is-open { display: flex; }
+      .nav__back-btn--mobile {
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 0;
+        font-weight: 600;
+        color: var(--color-primary) !important;
+        cursor: pointer;
+      }
       @media (max-width: 768px) {
         .navbar__links, .nav__auth, .nav__user { display: none; }
         .navbar__mobile-toggle { display: flex; }
+        .nav__back-btn { display: none; }
       }
     `;
     document.head.appendChild(style);
@@ -217,8 +279,9 @@
     injectNavbar(null);
 
     // 2. If Firebase is available, update quietly once auth resolves
-    if (typeof firebase !== 'undefined' && firebase.auth) {
-      firebase.auth().onAuthStateChanged(function (user) {
+    const fb = window.firebase || (typeof firebase !== 'undefined' ? firebase : null);
+    if (fb && fb.auth) {
+      fb.auth().onAuthStateChanged(function (user) {
         injectNavbar(user);
       });
     }
