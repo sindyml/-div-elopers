@@ -67,9 +67,6 @@
         <section id="dynamicContent" aria-live="polite"></section>
     </main>
 
-    <!-- Payment modal mount point -->
-    <div id="payment-modal-root"></div>
-
     <footer id="footer-root"></footer>
 
     <script type="module">
@@ -89,19 +86,7 @@
             listenToNotifications,
             
         } from './js/contributions.js';
-        import { PaymentModal } from './components/payment-modal.js';
-        import { uploadPaymentProof, validateProofFile } from './js/payment-upload.js';
 
-        // ── Payment modal ────────────────────────────────────────
-        const paymentModal = new PaymentModal();
-        paymentModal.onPaymentSuccess = () => loadMyPage();
-        paymentModal.onProofUploaded = async (file, paymentId) => {
-            const user = auth.currentUser;
-            if (!user) throw new Error('Not authenticated.');
-            const err = validateProofFile(file);
-            if (err) throw new Error(err);
-            await uploadPaymentProof(file, paymentId, user.uid);
-        };
 
         let activeGroupId = null;
         let activeUnsubscribe = null;
@@ -251,6 +236,7 @@
 
         // FIX: Added groupName parameter to fix the "groupName is not defined" error
         function renderContributionsPage(groupId, groupName, groupContributions, targetTbody, page, rowsPerPage = 5) {
+
             const start = (page - 1) * rowsPerPage;
             const end = start + rowsPerPage;
             const pageContributions = groupContributions.slice(start, end);
@@ -281,26 +267,7 @@
                     statusCell.textContent = '⏳ Pending';
                 }
 
-                if (contribution.status === 'pending' || contribution.status === 'missed') {
-                    const actionCell = row.insertCell(3);
-                    const payBtn = document.createElement('button');
-                    payBtn.textContent = '💳 Pay';
-                    payBtn.classList.add('btn', 'btn--primary', 'btn--sm');
-                    payBtn.addEventListener('click', () => {
-                        const user = auth.currentUser;
-                        if (!user) return;
-                        paymentModal.open({
-                            userId: user.uid,
-                            groupId: contribution.groupId,
-                            contributionId: contribution.id,
-                            amount: parseFloat(contribution.amount) || 0,
-                            groupName: groupName,  // FIX: Now groupName is defined
-                        });
-                    });
-                    actionCell.appendChild(payBtn);
-                } else {
-                    row.insertCell(3);
-                }
+
             });
             
             // PAGINATION ADDED: Create pagination controls
@@ -391,7 +358,7 @@
             const table = document.createElement('table');
             const thead = document.createElement('thead');
             const headerRow = document.createElement('tr');
-            const headers = ['Amount', 'Date', 'Status', 'Payment'];
+            const headers = ['Amount', 'Date', 'Status'];
             headers.forEach(text => {
                 const th = document.createElement('th');
                 th.textContent = text;
@@ -476,22 +443,6 @@
                     window.location.href = `contributions-payout.html?groupId=${group.id}&returnTo=my`;
                 });
                 listItem.appendChild(viewPayoutBtn);
-
-                const makePaymentBtn = document.createElement('button');
-                makePaymentBtn.textContent = '💳 Make Payment';
-                makePaymentBtn.classList.add('btn', 'btn--primary', 'btn--sm');
-                makePaymentBtn.addEventListener('click', () => {
-                    const user = auth.currentUser;
-                    if (!user) return;
-                    paymentModal.open({
-                        userId: user.uid,
-                        groupId: group.id,
-                        contributionId: `pending-${group.id}`,
-                        amount: group.contributionAmount || 0,
-                        groupName: group.name,
-                    });
-                });
-                listItem.appendChild(makePaymentBtn);
 
                 groupList.appendChild(listItem);
             });
